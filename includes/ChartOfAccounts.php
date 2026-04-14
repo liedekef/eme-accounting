@@ -276,6 +276,9 @@ $accounts = [
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
         foreach ( $items as $i => $item ) {
+
+            error_log('Processing item: ' . print_r($item, true));
+
             $row = [];
             if ( isset( $item['sort_order'] ) ) {
                 $row['sort_order'] = (int) $item['sort_order'];
@@ -289,11 +292,22 @@ $accounts = [
             if ( empty( $row ) ) {
                 continue;
             }
-            $wpdb->update( 
-                $table, 
-                $row, 
-                [ 'id' => (int) $item['id'] ] 
+            //$wpdb->update( $table, $row, [ 'id' => (int) $item['id'] ] );
+            $result = $wpdb->update(
+                $table,
+                $row,
+                [ 'id' => (int) $item['id'] ]
             );
+
+            // Debug: check resultaat
+            if ( $result === false ) {
+                error_log('Update failed for ID ' . $item['id'] . ': ' . $wpdb->last_error);
+                error_log('SQL: ' . $wpdb->last_query);
+            } elseif ( $result === 0 ) {
+                error_log('No rows updated for ID ' . $item['id'] . ' (maybe same values or ID not found)');
+            } else {
+                error_log('Successfully updated ' . $result . ' row(s) for ID ' . $item['id']);
+            }
         }
     }
 

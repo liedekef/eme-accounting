@@ -1,241 +1,243 @@
 /* eme-accounting/assets/js/admin.js */
-/* global emeAccounting */
+/* global emeAccounting, Sortable */
 
-(function() {
+(function () {
     'use strict';
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
 
-    /**
-     * Recursive helper: convert complex JS objects to FormData with bracket keys.
-     * E.g., { board_changes: [{ id: 1 }] } becomes board_changes[0][id]=1
-     */
-    function buildFormData(data, formData = new FormData(), parentKey = '') {
-        for (const key in data) {
-            if (!data.hasOwnProperty(key)) continue;
-            const value = data[key];
-            const formKey = parentKey ? `${parentKey}[${key}]` : key;
+    /* ═══════════════════════════════════════════════════════════════════
+     * UTILITIES
+     * ═══════════════════════════════════════════════════════════════════ */
 
-            // Recursive for objects/arrays (except File instances)
-            if (typeof value === 'object' && value !== null && !(value instanceof File)) {
-                buildFormData(value, formData, formKey);
-            } else {
-                formData.append(formKey, value);
-            }
-        }
-        return formData;
+    function esc(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    /**
-     * Generic AJAX function
-     * Automatically uses FormData with recursive keys for nested data.
-     */
-    function ajax(action, data, onSuccess, onError) {
-        // Add action and nonce to the data
-        const payload = { action, nonce, ...data };
-        
-        // Build FormData with nested keys
-        const formData = buildFormData(payload);
-
-        // Fetch sends FormData as 'multipart/form-data' automatically
-        fetch(ajaxUrl, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(r => {
-            if (r.success) {
-                onSuccess && onSuccess(r.data);
-            } else {
-                (onError || alert)(r.data || 'Er is een fout opgetreden.');
-            }
-        })
-        .catch(() => (onError || alert)('Verbindingsfout met server.'));
-    }
-
-    /* ── Format currency ─────────────────────────────────────────── */
-    function formatCurrency(amount, currency = 'EUR') {
+    function formatCurrency(amount) {
         return new Intl.NumberFormat('nl-BE', {
-            style: 'currency', currency,
-            minimumFractionDigits: 2,
+            style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
         }).format(amount);
     }
 
-    /* ── Inline save feedback ────────────────────────────────────── */
+    function toFormData(obj, fd = new FormData(), prefix = '') {
+        for (const key in obj) {
+            if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+            const val     = obj[key];
+            const formKey = prefix ? `${prefix}[${key}]` : key;
+            if (val !== null && typeof val === 'object' && !(val instanceof File)) {
+                toFormData(val, fd, formKey);
+            } else {
+                fd.append(formKey, val ?? '');
+            }
+        }
+        return fd;
+    }
+
+    function ajax(action, data, onSuccess, onError) {
+        fetch(ajaxUrl, { method: 'POST', body: toFormData({ action, nonce, ...data }) })
+            .then(r => r.json())
+            .then(r => r.success ? onSuccess?.(r.data) : (onError || alert)(r.data || 'Er is een fout opgetreden.'))
+            .catch(() => (onError || alert)('Verbindingsfout met server.'));
+    }
+
     function flashButton(btn, text) {
         const orig = btn.textContent;
         btn.textContent = text;
         btn.disabled = true;
-        setTimeout(() => {
-            btn.textContent = orig;
-            btn.disabled = false;
-        }, 1800);
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1800);
     }
 
-    /* ── DOM Helper Functions ────────────────────────────────────── */
-    function $(selector, context = document) {
-        return context.querySelector(selector);
+    function formToObj(form) {
+        const obj = {};
+        new FormData(form).forEach((v, k) => { obj[k] = v; });
+        return obj;
     }
 
-    function $$(selector, context = document) {
-        return Array.from(context.querySelectorAll(selector));
+    function fadeRemove(el) {
+        if (!el) return;
+        el.style.transition = 'opacity .3s';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 320);
     }
 
-    function closest(el, selector) {
-        return el.closest(selector);
-    }
+    /* ═══════════════════════════════════════════════════════════════════
+     * SINGLE SUBMIT DISPATCHER
+     * ═══════════════════════════════════════════════════════════════════ */
+    const submitHandlers = {
+        'eme-acc-account-form':        handleAccountSave,
+        'eme-acc-coa-form':            handleCoaSave,
+        'eme-acc-journal-form':        handleJournalSave,
+        'eme-acc-import-form':         handleImportUpload,
+        'eme-acc-stock-form':          handleStockSave,
+        'eme-acc-stock-movement-form': handleStockMovement,
+        'eme-acc-asset-form':          handleAssetSave,
+        'eme-acc-budget-form':         handleBudgetSave,
+    };
 
-    /* ════════════════════════════════════════════════════════════════
+    document.addEventListener('submit', function (e) {
+        const handler = submitHandlers[e.target.id];
+        if (!handler) return;
+        e.preventDefault();
+        handler(e.target);
+    });
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * SINGLE CLICK DISPATCHER
+     * ═══════════════════════════════════════════════════════════════════ */
+    const clickHandlers = {
+        'eme-acc-edit-account':   handleAccountEdit,
+        'eme-acc-delete-account': handleAccountDelete,
+        'eme-acc-account-cancel': handleAccountCancel,
+        'eme-acc-edit-coa':       handleCoaEdit,
+        'eme-acc-delete-coa':     handleCoaDelete,
+        'eme-acc-coa-cancel':     handleCoaCancel,
+        'eme-acc-delete-entry':   handleJournalDelete,
+        'btn-auto-reconcile':     handleAutoReconcile,
+        'btn-reconcile-manual':   handleManualReconcile,
+        'btn-ignore-line':        handleIgnoreLine,
+        'btn-create-from-line':   handleCreateFromLine,
+        'btn-load-report':        handleLoadReport,
+        'btn-export-csv':         handleExportCsv,
+        'eme-acc-edit-row':       handleToggleEditRow,
+    };
+
+    document.addEventListener('click', function (e) {
+        for (const [cls, handler] of Object.entries(clickHandlers)) {
+            const btn = e.target.closest(`#${cls}, .${cls}`);
+            if (btn) { handler(btn, e); return; }
+        }
+    });
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * SINGLE CHANGE DISPATCHER
+     * ═══════════════════════════════════════════════════════════════════ */
+    document.addEventListener('change', function (e) {
+        if (e.target.id === 'entry_date') {
+            const fy = document.querySelector('#fiscal_year');
+            if (fy && !fy.value) fy.value = e.target.value.substring(0, 4);
+        }
+        if (e.target.id === 'eme-acc-year-select') {
+            localStorage.setItem('eme_acc_year', e.target.value);
+            e.target.closest('form')?.submit();
+        }
+    });
+
+    document.addEventListener('input', function (e) {
+        if (e.target.matches('#purchase_price, #useful_life_years, #residual_value, #method')) {
+            updateDepreciationPreview();
+        }
+    });
+
+    /* ═══════════════════════════════════════════════════════════════════
      * ACCOUNTS PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-account-form');
-        if (!form) return;
-        e.preventDefault();
-        
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleAccountSave(form) {
         const btn = form.querySelector('.submit-btn');
         btn.textContent = i18n.saving;
         btn.disabled = true;
-
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-
-        ajax('eme_accounting_save_account', data, function() {
-            flashButton(btn, i18n.saved);
-            if (!form.querySelector('[name="id"]').value) {
-                location.reload();
-            }
-        });
-    });
-
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.eme-acc-delete-account');
-        if (!btn) return;
-        
-        if (!confirm(i18n.confirm_delete)) return;
-        const id = btn.dataset.id;
-        ajax('eme_accounting_delete_account', { id }, function() {
-            const row = document.querySelector(`[data-account-row="${id}"]`);
-            if (row) {
-                row.style.transition = 'opacity 0.3s';
-                row.style.opacity = '0';
-                setTimeout(() => row.remove(), 300);
-            }
-        });
-    });
-
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.eme-acc-edit-account');
-        if (!btn) return;
-        
-        const id = btn.dataset.id;
-        const row = document.querySelector(`[data-account-row="${id}"]`);
-        if (!row) return;
-
-        // Fill form with existing data
-        const form = document.getElementById('eme-acc-account-form');
-        form.querySelector('[name="id"]').value = id;
-        
-        const nameCell = row.querySelector('td:first-child');
-        const nameText = nameCell ? nameCell.textContent.replace('inactief', '').trim() : '';
-        form.querySelector('[name="name"]').value = nameText;
-        
-        const ibanCell = row.querySelector('td:nth-child(2)');
-        form.querySelector('[name="iban"]').value = ibanCell ? ibanCell.textContent.trim() : '';
-        
-        form.querySelector('[name="description"]').value = '';
-        
-        // Scroll to form
-        form.scrollIntoView({ behavior: 'smooth' });
-    });
-
-    /* ════════════════════════════════════════════════════════════════
-     * CHART OF ACCOUNTS PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-coa-form');
-        if (!form) return;
-        e.preventDefault();
-        
-        const btn = form.querySelector('.submit-btn');
-        btn.textContent = i18n.saving;
-        btn.disabled = true;
-
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        // Convert empty parent_id to null
-        if (!data.parent_id) data.parent_id = '';
-
-        ajax('eme_accounting_save_coa', data, function() {
+        ajax('eme_accounting_save_account', formToObj(form), () => {
             flashButton(btn, i18n.saved);
             location.reload();
         });
-    });
+    }
 
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.eme-acc-edit-coa');
-        if (!btn) return;
-        
-        const id = btn.dataset.id;
-        const li = document.querySelector(`[data-id="${id}"]`);
-        if (!li) return;
-
-        // Fill form with existing data
-        const form = document.getElementById('eme-acc-coa-form');
-        form.querySelector('[name="id"]').value = id;
-        form.querySelector('[name="code"]').value = li.querySelector('.code').textContent;
-        form.querySelector('[name="name"]').value = li.querySelector('.name').textContent;
-        form.querySelector('[name="direction"]').value = li.dataset.direction || 'out';
-        
-        const parentId = parseInt(li.dataset.parentId) || '';
-        form.querySelector('[name="parent_id"]').value = parentId;
-        form.querySelector('[name="sort_order"]').value = li.dataset.sortOrder || 0;
-        
-        // Scroll to form
+    function handleAccountEdit(btn) {
+        const d    = btn.dataset;
+        const form = document.getElementById('eme-acc-account-form');
+        form.querySelector('[name="id"]').value              = d.id;
+        form.querySelector('[name="name"]').value            = d.name;
+        form.querySelector('[name="iban"]').value            = d.iban;
+        form.querySelector('[name="bic"]').value             = d.bic;
+        form.querySelector('[name="opening_balance"]').value = d.openingBalance;
+        form.querySelector('[name="sort_order"]').value      = d.sortOrder;
+        form.querySelector('[name="is_active"]').value       = d.isActive;
+        form.querySelector('[name="description"]').value     = d.description;
+        document.getElementById('eme-acc-account-form-title').textContent = 'Rekening bewerken';
+        document.getElementById('eme-acc-account-cancel').style.display = '';
         form.scrollIntoView({ behavior: 'smooth' });
-    });
+    }
 
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.eme-acc-delete-coa');
-        if (!btn) return;
-        
+    function handleAccountDelete(btn) {
         if (!confirm(i18n.confirm_delete)) return;
-        const id = btn.dataset.id;
-        ajax('eme_accounting_delete_coa', { id }, function() {
-            const li = document.querySelector(`[data-id="${id}"]`);
-            if (li) {
-                li.style.transition = 'opacity 0.3s';
-                li.style.opacity = '0';
-                setTimeout(() => li.remove(), 300);
-            }
-        });
-    });
+        ajax('eme_accounting_delete_account', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`[data-account-row="${btn.dataset.id}"]`))
+        );
+    }
 
-    // Drag and drop reorder via Sortable library
-    function initSortable(list) {
+    function handleAccountCancel() {
+        const form = document.getElementById('eme-acc-account-form');
+        form.reset();
+        form.querySelector('[name="id"]').value = '0';
+        document.getElementById('eme-acc-account-form-title').textContent = 'Rekening toevoegen';
+        document.getElementById('eme-acc-account-cancel').style.display = 'none';
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * CHART OF ACCOUNTS PAGE
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleCoaSave(form) {
+        const btn  = form.querySelector('.submit-btn');
+        btn.textContent = i18n.saving;
+        btn.disabled = true;
+        const data = formToObj(form);
+        if (!data.parent_id) data.parent_id = '';
+        ajax('eme_accounting_save_coa', data, () => {
+            flashButton(btn, i18n.saved);
+            location.reload();
+        });
+    }
+
+    function handleCoaEdit(btn) {
+        const li = document.querySelector(`li[data-id="${btn.dataset.id}"]`);
+        if (!li) return;
+        const d    = li.dataset;
+        const form = document.getElementById('eme-acc-coa-form');
+        form.querySelector('[name="id"]').value          = d.id;
+        form.querySelector('[name="code"]').value        = d.code;
+        form.querySelector('[name="name"]').value        = d.name;
+        form.querySelector('[name="direction"]').value   = d.direction || 'out';
+        form.querySelector('[name="parent_id"]').value   = parseInt(d.parentId) || '';
+        form.querySelector('[name="sort_order"]').value  = d.sortOrder || 0;
+        form.querySelector('[name="description"]').value = d.description || '';
+        document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening bewerken';
+        document.getElementById('eme-acc-coa-cancel').style.display = '';
+        form.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function handleCoaDelete(btn) {
+        if (!confirm(i18n.confirm_delete)) return;
+        ajax('eme_accounting_delete_coa', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`li[data-id="${btn.dataset.id}"]`))
+        );
+    }
+
+    function handleCoaCancel() {
+        const form = document.getElementById('eme-acc-coa-form');
+        form.reset();
+        form.querySelector('[name="id"]').value = '0';
+        document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening toevoegen';
+        document.getElementById('eme-acc-coa-cancel').style.display = 'none';
+    }
+
+    /* ── COA drag-and-drop reorder ──────────────────────────────── */
+    document.querySelectorAll('.eme-acc-coa-tree').forEach(function (list) {
         if (!window.Sortable) return;
-        
         new Sortable(list, {
             handle: '.handle',
-            onStart: (evt) => { 
-                list.style.opacity = '0.6'; 
-                // Store parent for filtering
-                evt.item._sortableParentId = parseInt(evt.item.dataset.parentId) || 0;
-            },
-            onEnd: (evt) => { 
-                list.style.opacity = '1'; 
-                const parentId = evt.item._sortableParentId;
+            onEnd(evt) {
+                if (evt.oldIndex === evt.newIndex) return;
                 const to = evt.to;
-                
-                if (!to || evt.oldIndex === evt.newIndex) return;
-                
+                if (!to) return;
+
                 // Get all items in target list
                 const allLi = Array.from(to.querySelectorAll('li'));
                 if (allLi.length === 0) return;
                 const direction = to.dataset.direction || 'in';
-                
+
                 // Separate main vs sub accounts
                 const mainLi = allLi.filter(li => !li.classList.contains('sub'));
                 const subLi = allLi.filter(li => li.classList.contains('sub'));
@@ -260,14 +262,14 @@
                         li._newCode = baseCode + '-' + String(idx + 1).padStart(6, '0');
                     });
                 });
-                
+
                 // Build items array with all accounts in target list
                 const items = [];
                 allLi.forEach((li, idx) => {
                     const pid = parseInt(li.dataset.parentId) || 0;
                     const codeEl = li.querySelector('.code');
                     const code = li._newCode || (codeEl ? codeEl.textContent : '');
-                    
+
                     items.push({
                         id: li.dataset.id,
                         sort_order: idx,
@@ -276,7 +278,6 @@
                     });
                     delete li._newCode;
                 });
-                
                 // Update UI codes first
                 allLi.forEach((li, idx) => {
                     const codeSpan = li.querySelector('.code');
@@ -284,55 +285,28 @@
                         codeSpan.textContent = items[idx].code;
                     }
                 });
-                
-                // Save to server
-                const formData = new FormData();
-                formData.append('action', 'eme_accounting_reorder_coa');
-                formData.append('nonce', nonce);
-                formData.append('items', JSON.stringify(items));
-                fetch(ajaxUrl, {
-                    method: 'POST',
-                    body: formData
-                }).then(() => location.reload());
-            }
+
+                const fd = new FormData();
+                fd.append('action', 'eme_accounting_reorder_coa');
+                fd.append('nonce', nonce);
+                fd.append('items', JSON.stringify(items));
+                fetch(ajaxUrl, { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(r => { if (!r.success) alert('Herordenen mislukt.'); else location.reload(); });
+            },
         });
-    }
+    });
 
-    function getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
-    document.querySelectorAll('.eme-acc-coa-tree').forEach(list => initSortable(list));
-
-    /* ════════════════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════════════════════════════
      * JOURNAL PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-journal-form');
-        if (!form) return;
-        e.preventDefault();
-        
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleJournalSave(form) {
         const btn = form.querySelector('.submit-btn');
         btn.textContent = i18n.saving;
         btn.disabled = true;
-
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-
-        ajax('eme_accounting_save_entry', data, function(data) {
+        ajax('eme_accounting_save_entry', formToObj(form), (data) => {
             flashButton(btn, i18n.saved);
-            // Update row if editing, else prepend
-            const existing = document.querySelector(`[data-journal-row="${data.id}"]`);
+            const existing = document.querySelector(`[data-journal-row="${data?.id}"]`);
             if (existing) {
                 existing.classList.add('updated');
                 setTimeout(() => existing.classList.remove('updated'), 1500);
@@ -340,62 +314,32 @@
                 location.reload();
             }
         });
-    });
+    }
 
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.eme-acc-delete-entry');
-        if (!btn) return;
-        
+    function handleJournalDelete(btn) {
         if (!confirm(i18n.confirm_delete)) return;
-        const id = btn.dataset.id;
-        const tr = document.querySelector(`[data-journal-row="${id}"]`);
-        ajax('eme_accounting_delete_entry', { id }, function() {
-            if (tr) {
-                tr.style.transition = 'opacity 0.3s';
-                tr.style.opacity = '0';
-                setTimeout(() => tr.remove(), 300);
-            }
-        });
-    });
+        ajax('eme_accounting_delete_entry', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`[data-journal-row="${btn.dataset.id}"]`))
+        );
+    }
 
-    // Auto-fill fiscal year from entry date
-    document.addEventListener('change', function(e) {
-        const entryDate = e.target.closest('#entry_date');
-        if (!entryDate) return;
-        
-        const year = entryDate.value.substring(0, 4);
-        const fy = document.querySelector('#fiscal_year');
-        if (fy && !fy.value) fy.value = year;
-    });
-
-    /* ════════════════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════════════════════════════
      * IMPORT / RECONCILIATION PAGE
-     * ════════════════════════════════════════════════════════════════ */
-
-    // Upload form
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-import-form');
-        if (!form) return;
-        e.preventDefault();
-        
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleImportUpload(form) {
         const btn = form.querySelector('.submit-btn');
-        const fd = new FormData(form);
+        const fd  = new FormData(form);
         fd.append('action', 'eme_accounting_import_upload');
         fd.append('nonce', nonce);
-
         btn.textContent = 'Importeren…';
         btn.disabled = true;
-
-        fetch(ajaxUrl, {
-            method: 'POST',
-            body: fd
-        })
-        .then(response => response.json())
-        .then(r => {
-            btn.textContent = 'Importeren';
-            btn.disabled = false;
-            if (r.success) {
-                const d = r.data;
+        fetch(ajaxUrl, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(r => {
+                btn.textContent = 'Importeren';
+                btn.disabled = false;
+                if (!r.success) { alert(r.data || 'Importfout'); return; }
+                const d         = r.data;
                 const resultDiv = document.querySelector('#import-result');
                 if (resultDiv) {
                     resultDiv.innerHTML = `<div class="notice notice-success"><p>
@@ -405,348 +349,217 @@
                     </p></div>`;
                     resultDiv.style.display = 'block';
                 }
-                if (d.pending > 0) {
-                    loadPendingLines(d.log_id);
-                }
-            } else {
-                alert(r.data || 'Importfout');
-            }
-        })
-        .catch(() => alert('Verbindingsfout met server.'));
-    });
+                if (d.pending > 0) loadPendingLines(d.log_id);
+            })
+            .catch(() => alert('Verbindingsfout met server.'));
+    }
 
     function loadPendingLines(logId) {
         const section = document.querySelector('#reconcile-section');
-        if (section) {
-            section.innerHTML = '<p>Laden...</p>';
-            fetch(`${ajaxUrl}?action=eme_accounting_reconcile_view&nonce=${nonce}&log_id=${logId}`)
-                .then(response => response.text())
-                .then(html => {
-                    section.innerHTML = html;
-                });
-        }
+        if (!section) return;
+        section.innerHTML = '<p>Laden...</p>';
+        fetch(`${ajaxUrl}?action=eme_accounting_reconcile_view&nonce=${nonce}&log_id=${logId}`)
+            .then(r => r.text())
+            .then(html => { section.innerHTML = html; });
     }
 
-    // Auto-reconcile all
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('#btn-auto-reconcile');
-        if (!btn) return;
-        
-        const logId = btn.dataset.logId;
-        const accountId = btn.dataset.accountId;
+    function handleAutoReconcile(btn) {
         btn.textContent = 'Bezig…';
         btn.disabled = true;
         ajax('eme_accounting_auto_reconcile',
-            { log_id: logId, account_id: accountId },
-            function(data) {
+            { log_id: btn.dataset.logId, account_id: btn.dataset.accountId },
+            (data) => {
                 btn.textContent = `Auto-reconciliatie (${data.matched} gematcht)`;
                 btn.disabled = false;
                 location.reload();
             }
         );
-    });
-
-    // Manual reconcile: link import line to existing journal entry
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.btn-reconcile-manual');
-        if (!btn) return;
-        
-        const lineId = btn.dataset.lineId;
-        const row = closest(btn, 'tr');
-        const journalIdInput = row ? row.querySelector('.journal-id-input') : null;
-        const journalId = journalIdInput ? journalIdInput.value : null;
-        
-        if (!journalId) { alert('Voer eerst een dagboek-ID in.'); return; }
-        ajax('eme_accounting_reconcile_line',
-            { line_id: lineId, journal_id: journalId },
-            function() { 
-                const lastCell = row ? row.querySelector('td:last-child') : null;
-                if (lastCell) lastCell.innerHTML = '<span class="recon-matched">✓ Gematcht</span>';
-            }
-        );
-    });
-
-    // Ignore a line
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.btn-ignore-line');
-        if (!btn) return;
-        
-        const lineId = btn.dataset.lineId;
-        const row = closest(btn, 'tr');
-        ajax('eme_accounting_ignore_line', { line_id: lineId }, function() {
-            if (row) {
-                row.classList.add('recon-ignored');
-                const lastCell = row.querySelector('td:last-child');
-                if (lastCell) lastCell.innerHTML = '<span class="recon-ignored">Genegeerd</span>';
-            }
-        });
-    });
-
-    // Create journal entry from import line
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.btn-create-from-line');
-        if (!btn) return;
-        
-        const lineId = btn.dataset.lineId;
-        const row = closest(btn, 'tr');
-        const categoryInput = row ? row.querySelector('.category-input') : null;
-        const category = categoryInput ? categoryInput.value : '';
-        ajax('eme_accounting_create_entry_from_line',
-            { line_id: lineId, category },
-            function(data) {
-                alert(`Boeking aangemaakt (ID: ${data.journal_id})`);
-                location.reload();
-            }
-        );
-    });
-
-    /* ════════════════════════════════════════════════════════════════
-     * STOCK PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-stock-form');
-        if (!form) return;
-        e.preventDefault();
-        
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        ajax('eme_accounting_save_stock', data, () => location.reload());
-    });
-
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-stock-movement-form');
-        if (!form) return;
-        e.preventDefault();
-        
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        ajax('eme_accounting_stock_movement', data, function() {
-            const btn = form.querySelector('.submit-btn');
-            if (btn) flashButton(btn, 'Opgeslagen ✓');
-            setTimeout(() => location.reload(), 800);
-        });
-    });
-
-    /* ════════════════════════════════════════════════════════════════
-     * DEPRECIATION PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-asset-form');
-        if (!form) return;
-        e.preventDefault();
-        
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        ajax('eme_accounting_save_asset', data, () => location.reload());
-    });
-
-    // Live depreciation preview
-    function updateDepreciationPreview() {
-        const priceInput = document.querySelector('#purchase_price');
-        const lifeInput = document.querySelector('#useful_life_years');
-        const residualInput = document.querySelector('#residual_value');
-        const methodSelect = document.querySelector('#method');
-        const previewSpan = document.querySelector('#depreciation-preview');
-        
-        if (!priceInput || !lifeInput || !residualInput || !methodSelect || !previewSpan) return;
-        
-        const price = parseFloat(priceInput.value) || 0;
-        const life = parseInt(lifeInput.value) || 1;
-        const residual = parseFloat(residualInput.value) || 0;
-        const method = methodSelect.value;
-        let annual;
-        if (method === 'declining') {
-            annual = (price * (2 / life)).toFixed(2);
-        } else {
-            annual = ((price - residual) / life).toFixed(2);
-        }
-        previewSpan.textContent = `Jaarlijkse afschrijving: ${formatCurrency(annual)}`;
     }
 
-    document.addEventListener('input', function(e) {
-        if (e.target.closest('#purchase_price, #useful_life_years, #residual_value, #method')) {
-            updateDepreciationPreview();
-        }
-    });
+    function handleManualReconcile(btn) {
+        const row       = btn.closest('tr');
+        const journalId = row?.querySelector('.journal-id-input')?.value;
+        if (!journalId) { alert('Voer eerst een dagboek-ID in.'); return; }
+        ajax('eme_accounting_reconcile_line',
+            { line_id: btn.dataset.lineId, journal_id: journalId },
+            () => {
+                const cell = row.querySelector('td:last-child');
+                if (cell) cell.innerHTML = '<span class="recon-matched">✓ Gematcht</span>';
+            }
+        );
+    }
 
-    /* ════════════════════════════════════════════════════════════════
+    function handleIgnoreLine(btn) {
+        const row = btn.closest('tr');
+        ajax('eme_accounting_ignore_line', { line_id: btn.dataset.lineId }, () => {
+            row?.classList.add('recon-ignored');
+            const cell = row?.querySelector('td:last-child');
+            if (cell) cell.innerHTML = '<span class="recon-ignored">Genegeerd</span>';
+        });
+    }
+
+    function handleCreateFromLine(btn) {
+        const row      = btn.closest('tr');
+        const category = row?.querySelector('.category-input')?.value ?? '';
+        ajax('eme_accounting_create_entry_from_line',
+            { line_id: btn.dataset.lineId, category },
+            (data) => { alert(`Boeking aangemaakt (ID: ${data.journal_id})`); location.reload(); }
+        );
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * STOCK PAGE
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleStockSave(form) {
+        ajax('eme_accounting_save_stock', formToObj(form), () => location.reload());
+    }
+
+    function handleStockMovement(form) {
+        ajax('eme_accounting_stock_movement', formToObj(form), () => {
+            const btn = form.querySelector('.submit-btn');
+            if (btn) flashButton(btn, 'Opgeslagen ✓');
+            setTimeout(() => location.reload(), 900);
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * DEPRECIATION PAGE
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleAssetSave(form) {
+        ajax('eme_accounting_save_asset', formToObj(form), () => location.reload());
+    }
+
+    function updateDepreciationPreview() {
+        const price    = parseFloat(document.querySelector('#purchase_price')?.value)    || 0;
+        const life     = parseInt(document.querySelector('#useful_life_years')?.value)   || 1;
+        const residual = parseFloat(document.querySelector('#residual_value')?.value)    || 0;
+        const method   = document.querySelector('#method')?.value;
+        const preview  = document.querySelector('#depreciation-preview');
+        if (!preview) return;
+        const annual = method === 'declining' ? price * (2 / life) : (price - residual) / life;
+        preview.textContent = `Jaarlijkse afschrijving: ${formatCurrency(annual)}`;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
      * BUDGET PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('submit', function(e) {
-        const form = e.target.closest('#eme-acc-budget-form');
-        if (!form) return;
-        e.preventDefault();
-        
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        ajax('eme_accounting_save_budget_line', data, () => location.reload());
-    });
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleBudgetSave(form) {
+        ajax('eme_accounting_save_budget_line', formToObj(form), () => location.reload());
+    }
 
-    /* ════════════════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════════════════════════════
      * REPORTS PAGE
-     * ════════════════════════════════════════════════════════════════ */
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('#btn-load-report');
-        if (!btn) return;
-        
-        const typeSelect = document.querySelector('#report_type');
-        const yearSelect = document.querySelector('#report_year');
-        const dateInput = document.querySelector('#report_date');
-        const outputDiv = document.querySelector('#report-output');
-        
-        const type = typeSelect ? typeSelect.value : '';
-        const year = yearSelect ? yearSelect.value : '';
-        const date = dateInput ? dateInput.value : '';
-        
-        if (outputDiv) outputDiv.innerHTML = '<p>Laden…</p>';
-        
-        fetch(`${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=json`)
-            .then(response => response.json())
-            .then(r => {
-                if (r.success && outputDiv) {
-                    renderReport(type, r.data, outputDiv);
-                } else if (outputDiv) {
-                    outputDiv.innerHTML = `<p class="error">${r.data}</p>`;
-                }
-            });
-    });
+     * ═══════════════════════════════════════════════════════════════════ */
+    function getReportParams() {
+        return {
+            type: document.querySelector('#report_type')?.value ?? '',
+            year: document.querySelector('#report_year')?.value ?? '',
+            date: document.querySelector('#report_date')?.value ?? '',
+        };
+    }
 
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('#btn-export-csv');
-        if (!btn) return;
-        
-        const typeSelect = document.querySelector('#report_type');
-        const yearSelect = document.querySelector('#report_year');
-        const dateInput = document.querySelector('#report_date');
-        
-        const type = typeSelect ? typeSelect.value : '';
-        const year = yearSelect ? yearSelect.value : '';
-        const date = dateInput ? dateInput.value : '';
-        
+    function handleLoadReport() {
+        const { type, year, date } = getReportParams();
+        const output = document.querySelector('#report-output');
+        if (output) output.innerHTML = '<p>Laden…</p>';
+        fetch(`${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=json`)
+            .then(r => r.json())
+            .then(r => {
+                if (!output) return;
+                r.success ? renderReport(type, r.data, output)
+                          : (output.innerHTML = `<p class="error">${esc(r.data)}</p>`);
+            });
+    }
+
+    function handleExportCsv() {
+        const { type, year, date } = getReportParams();
         window.location = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=csv`;
-    });
+    }
 
     function renderReport(type, data, container) {
-        if (type === 'income_expenditure') {
-            renderIncomeExpenditure(data, container);
-        } else if (type === 'patrimony') {
-            renderPatrimony(data, container);
-        } else {
-            renderDiary(data, container);
-        }
+        if (type === 'income_expenditure') renderIncomeExpenditure(data, container);
+        else if (type === 'patrimony')      renderPatrimony(data, container);
+        else                                renderDiary(data, container);
     }
 
     function renderIncomeExpenditure(data, container) {
-        let html = `<h2>Staat van Ontvangsten en Uitgaven – ${esc(data.fiscal_year)}</h2>`;
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">';
+        let html = `<h2>Staat van Ontvangsten en Uitgaven – ${esc(data.fiscal_year)}</h2>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">`;
 
         html += '<div><h3>Ontvangsten</h3><table class="eme-acc-table">';
-        for (const [cat, amt] of Object.entries(data.income)) {
+        for (const [cat, amt] of Object.entries(data.income))
             html += `<tr><td>${esc(cat)}</td><td class="amount in">${formatCurrency(amt)}</td></tr>`;
-        }
-        html += `<tr style="font-weight:600"><td>Totaal ontvangsten</td><td class="amount in">${formatCurrency(data.totals.income)}</td></tr>`;
-        html += '</table></div>';
+        html += `<tr style="font-weight:600"><td>Totaal ontvangsten</td>
+                 <td class="amount in">${formatCurrency(data.totals.income)}</td></tr></table></div>`;
 
         html += '<div><h3>Uitgaven</h3><table class="eme-acc-table">';
-        for (const [cat, amt] of Object.entries(data.expenses)) {
+        for (const [cat, amt] of Object.entries(data.expenses))
             html += `<tr><td>${esc(cat)}</td><td class="amount out">${formatCurrency(amt)}</td></tr>`;
-        }
-        html += `<tr style="font-weight:600"><td>Totaal uitgaven</td><td class="amount out">${formatCurrency(data.totals.expenses)}</td></tr>`;
-        html += '</table></div></div>';
+        html += `<tr style="font-weight:600"><td>Totaal uitgaven</td>
+                 <td class="amount out">${formatCurrency(data.totals.expenses)}</td></tr></table></div></div>`;
 
         const net = data.totals.result;
-        const cls = net >= 0 ? 'in' : 'out';
-        const label = net >= 0 ? 'Overschot' : 'Tekort';
         html += `<p style="font-size:16px;font-weight:600;margin-top:16px">
-            ${label} boekjaar: <span class="amount ${cls}">${formatCurrency(Math.abs(net))}</span></p>`;
-
+            ${net >= 0 ? 'Overschot' : 'Tekort'} boekjaar:
+            <span class="amount ${net >= 0 ? 'in' : 'out'}">${formatCurrency(Math.abs(net))}</span></p>`;
         container.innerHTML = html;
     }
 
     function renderPatrimony(data, container) {
-        let html = `<h2>Staat van Vermogen per ${esc(data.date)}</h2>`;
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">';
+        let html = `<h2>Staat van Vermogen per ${esc(data.date)}</h2>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">`;
 
         html += '<div><h3>Activa</h3><table class="eme-acc-table">';
-        for (const [name, bal] of Object.entries(data.assets)) {
+        for (const [name, bal] of Object.entries(data.assets))
             html += `<tr><td>${esc(name)}</td><td class="amount">${formatCurrency(bal)}</td></tr>`;
-        }
-        html += `<tr style="font-weight:600"><td>Totaal activa</td><td class="amount">${formatCurrency(data.totals.assets)}</td></tr>`;
-        html += '</table></div>';
+        html += `<tr style="font-weight:600"><td>Totaal activa</td>
+                 <td class="amount">${formatCurrency(data.totals.assets)}</td></tr></table></div>`;
 
         html += '<div><h3>Passiva / Schulden</h3><table class="eme-acc-table">';
-        for (const [name, bal] of Object.entries(data.liabilities)) {
+        for (const [name, bal] of Object.entries(data.liabilities))
             html += `<tr><td>${esc(name)}</td><td class="amount">${formatCurrency(bal)}</td></tr>`;
-        }
-        html += `<tr style="font-weight:600"><td>Totaal schulden</td><td class="amount">${formatCurrency(data.totals.liabilities)}</td></tr>`;
-        html += '</table></div></div>';
+        html += `<tr style="font-weight:600"><td>Totaal schulden</td>
+                 <td class="amount">${formatCurrency(data.totals.liabilities)}</td></tr></table></div></div>`;
 
         const eq = data.totals.equity;
-        const cls = eq >= 0 ? 'in' : 'out';
         html += `<p style="font-size:16px;font-weight:600;margin-top:16px">
-            Eigen vermogen: <span class="amount ${cls}">${formatCurrency(eq)}</span></p>`;
-
+            Eigen vermogen: <span class="amount ${eq >= 0 ? 'in' : 'out'}">${formatCurrency(eq)}</span></p>`;
         container.innerHTML = html;
     }
 
     function renderDiary(data, container) {
-        let html = '<h2>Financieel Dagboek</h2><table class="eme-acc-table">';
-        html += '<tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th>Bankref.</th><th class="amount">Bedrag</th><th>Rekening</th><th>Vereff.</th></tr>';
+        let html = '<h2>Financieel Dagboek</h2><table class="eme-acc-table">'
+            + '<tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th>Bankref.</th>'
+            + '<th class="amount">Bedrag</th><th>Rekening</th><th>Vereff.</th></tr>';
         for (const [date, entries] of Object.entries(data)) {
             entries.forEach((e, i) => {
-                const amtClass = e.direction === 'in' ? 'in' : 'out';
                 const sign = e.direction === 'in' ? '+' : '–';
                 html += `<tr>
                     <td>${i === 0 ? esc(date) : ''}</td>
-                    <td>${esc(e.description)}</td>
-                    <td>${esc(e.category)}</td>
-                    <td style="font-size:11px;color:#646970">${esc(e.bank_statement_ref || '')}</td>
-                    <td class="amount ${amtClass}">${sign} ${formatCurrency(e.amount)}</td>
-                    <td>${esc(e.account_name || '')}</td>
+                    <td>${esc(e.description)}</td><td>${esc(e.category)}</td>
+                    <td style="font-size:11px;color:#646970">${esc(e.bank_statement_ref)}</td>
+                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${sign} ${formatCurrency(e.amount)}</td>
+                    <td>${esc(e.account_name)}</td>
                     <td>${e.is_reconciled ? '<span class="tag reconciled">✓</span>' : ''}</td>
                 </tr>`;
             });
         }
-        html += '</table>';
-        container.innerHTML = html;
+        container.innerHTML = html + '</table>';
     }
 
-    /* ── Utility ─────────────────────────────────────────────────── */
-    function esc(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+    /* ═══════════════════════════════════════════════════════════════════
+     * GENERIC
+     * ═══════════════════════════════════════════════════════════════════ */
+    function handleToggleEditRow(btn) {
+        const target = document.querySelector(`[data-edit-form="${btn.dataset.id}"]`);
+        if (target) target.style.display = target.style.display === 'none' ? '' : 'none';
     }
 
-    /* ── Toggle edit forms ───────────────────────────────────────── */
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.eme-acc-edit-row');
-        if (!btn) return;
-        
-        const id = btn.dataset.id;
-        const formRow = document.querySelector(`[data-edit-form="${id}"]`);
-        if (formRow) {
-            const display = formRow.style.display;
-            formRow.style.display = display === 'none' ? '' : 'none';
-        }
-    });
-
-    /* ── Year selector persistence ───────────────────────────────── */
+    /* ── Year selector persistence ──────────────────────────────── */
     const yearSel = document.querySelector('#eme-acc-year-select');
     if (yearSel) {
-        const savedYear = localStorage.getItem('eme_acc_year');
-        if (savedYear) yearSel.value = savedYear;
-        yearSel.addEventListener('change', function() {
-            localStorage.setItem('eme_acc_year', this.value);
-            const form = closest(this, 'form');
-            if (form) form.submit();
-        });
+        const saved = localStorage.getItem('eme_acc_year');
+        if (saved) yearSel.value = saved;
     }
+
 })();
