@@ -1,0 +1,191 @@
+/* eme-accounting/assets/css/admin.css */
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+.eme-acc-wrap {
+    max-width: 1200px;
+    margin: 0;
+}
+.eme-acc-wrap h1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Dashboard cards ──────────────────────────────────────────────── */
+.eme-acc-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+.eme-acc-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+.eme-acc-card h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #646970;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.eme-acc-card .card-value {
+    font-size: 28px;
+    font-weight: 600;
+    color: #1d2327;
+    line-height: 1;
+}
+.eme-acc-card .card-value.positive { color: #00a32a; }
+.eme-acc-card .card-value.negative { color: #d63638; }
+.eme-acc-card .card-sub {
+    font-size: 12px;
+    color: #646970;
+    margin-top: 4px;
+}
+
+/* ── Data tables ──────────────────────────────────────────────────── */
+.eme-acc-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.eme-acc-table th {
+    background: #f6f7f7;
+    border-bottom: 1px solid #c3c4c7;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.eme-acc-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f1;
+    font-size: 13px;
+    vertical-align: middle;
+}
+.eme-acc-table tr:last-child td { border-bottom: none; }
+.eme-acc-table tr:hover td { background: #f6f7f7; }
+.eme-acc-table .amount { text-align: right; font-variant-numeric: tabular-nums; }
+.eme-acc-table .amount.in  { color: #00a32a; }
+.eme-acc-table .amount.out { color: #d63638; }
+.eme-acc-table .tag {
+    display: inline-block;
+    background: #e0f0ff;
+    color: #0073aa;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 11px;
+}
+.eme-acc-table .tag.reconciled {
+    background: #edfaef;
+    color: #00a32a;
+}
+.eme-acc-table .tag.pending {
+    background: #fff8e5;
+    color: #996800;
+}
+
+/* ── Forms ────────────────────────────────────────────────────────── */
+.eme-acc-form-box {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.eme-acc-form-box h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f1;
+    font-size: 15px;
+}
+.eme-acc-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.eme-acc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 160px;
+}
+.eme-acc-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d2327;
+}
+.eme-acc-field input,
+.eme-acc-field select,
+.eme-acc-field textarea {
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.eme-acc-field input[type="number"] { max-width: 140px; }
+.eme-acc-field textarea { min-height: 64px; }
+.eme-acc-field .description { font-size: 11px; color: #646970; }
+
+/* ── Toolbar / filters ───────────────────────────────────────────── */
+.eme-acc-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+.eme-acc-toolbar select,
+.eme-acc-toolbar input[type="text"],
+.eme-acc-toolbar input[type="date"] {
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 13px;
+}
+.eme-acc-toolbar .spacer { flex: 1; }
+
+/* ── Reconciliation status indicators ───────────────────────────── */
+.recon-matched   { color: #00a32a; }
+.recon-pending   { color: #996800; }
+.recon-ignored   { color: #646970; text-decoration: line-through; }
+.recon-manual    { color: #0073aa; }
+
+/* ── Budget comparison bar ───────────────────────────────────────── */
+.budget-bar-wrap {
+    background: #f0f0f1;
+    border-radius: 3px;
+    height: 6px;
+    width: 120px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+}
+.budget-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: #0073aa;
+    transition: width .3s;
+}
+.budget-bar-fill.over { background: #d63638; }
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 782px) {
+    .eme-acc-cards { grid-template-columns: 1fr 1fr; }
+    .eme-acc-row { flex-direction: column; }
+}

@@ -1,0 +1,43 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+$year  = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
+$years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
+?>
+<div class="wrap eme-acc-wrap">
+<h1><?php esc_html_e( 'Financiële Rapporten', 'eme-accounting' ); ?></h1>
+<div class="eme-acc-form-box">
+<div class="eme-acc-row" style="align-items:flex-end">
+    <div class="eme-acc-field">
+        <label><?php esc_html_e( 'Rapporttype', 'eme-accounting' ); ?></label>
+        <select id="report_type">
+            <option value="income_expenditure"><?php esc_html_e( 'Staat van Ontvangsten en Uitgaven', 'eme-accounting' ); ?></option>
+            <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen', 'eme-accounting' ); ?></option>
+            <option value="diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
+        </select>
+    </div>
+    <div class="eme-acc-field">
+        <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
+        <select id="report_year">
+            <?php foreach ( $years as $y ): ?>
+            <option value="<?= $y ?>" <?= selected( $y, $year, false ) ?>><?= $y ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="eme-acc-field" id="report-date-wrap" style="display:none">
+        <label><?php esc_html_e( 'Peildatum (Staat van Vermogen)', 'eme-accounting' ); ?></label>
+        <input type="date" id="report_date" value="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>">
+    </div>
+    <div>
+        <button id="btn-load-report" class="button button-primary"><?php esc_html_e( 'Rapport laden', 'eme-accounting' ); ?></button>
+        <button id="btn-export-csv" class="button"><?php esc_html_e( 'Exporteren CSV', 'eme-accounting' ); ?></button>
+    </div>
+</div>
+</div>
+<div id="report-output" style="margin-top:20px"></div>
+
+<script>
+document.getElementById('report_type').addEventListener('change', function() {
+    document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
+});
+</script>
+</div>
