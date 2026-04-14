@@ -55,6 +55,8 @@ function eme_accounting_init(): void {
 
     EMEAccounting\Admin\Menu::init();
     EMEAccounting\Accounts::init();
+    EMEAccounting\ChartOfAccounts::init();
+    EMEAccounting\FiscalYear::init();
     EMEAccounting\Journal::init();
     EMEAccounting\Import::init();
     EMEAccounting\Stock::init();

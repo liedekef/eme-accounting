@@ -56,24 +56,50 @@ class Reports {
     /**
      * Staat van Vermogen (balance sheet / patrimony statement).
      * For a micro VZW using single-entry bookkeeping, this is a simplified
-     * asset/liability overview based on account balances.
+     * asset/liability overview based on account balances + stock + depreciation.
      *
      * @return array{date: string, assets: array, liabilities: array, equity: float}
      */
     public static function patrimony( string $date = '' ): array {
+        global $wpdb;
         if ( ! $date ) $date = current_time( 'Y-m-d' );
 
+        // Financial accounts (all treated as assets for VZW)
         $accounts = Accounts::get_all();
         $assets   = [];
         $liabs    = [];
 
         foreach ( $accounts as $acc ) {
             $balance = Accounts::get_balance( (int) $acc->id, $date );
-            if ( in_array( $acc->type, [ 'asset' ], true ) ) {
+            if ( $balance > 0 ) {
                 $assets[ $acc->name ] = $balance;
-            } elseif ( in_array( $acc->type, [ 'liability' ], true ) ) {
-                $liabs[ $acc->name ] = $balance;
+            } elseif ( $balance < 0 ) {
+                $liabs[ $acc->name ] = abs( $balance );
             }
+        }
+
+        // Stock inventory value
+        $stock_value = (float) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(current_qty * sale_price), 0) 
+                 FROM `{$wpdb->prefix}emeacc_stock` 
+                 WHERE is_active = 1 AND current_qty > 0"
+            )
+        );
+        if ( $stock_value > 0 ) {
+            $assets[ __( 'Voorraad', 'eme-accounting' ) ] = $stock_value;
+        }
+
+        // Depreciation: current book value of assets
+        $dep_value = (float) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(current_book_value), 0) 
+                 FROM `{$wpdb->prefix}emeacc_depreciation` 
+                 WHERE is_active = 1"
+            )
+        );
+        if ( $dep_value > 0 ) {
+            $assets[ __( 'Afschrijfbare activa', 'eme-accounting' ) ] = $dep_value;
         }
 
         $total_assets = array_sum( $assets );

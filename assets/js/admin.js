@@ -125,6 +125,194 @@
         });
     });
 
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.eme-acc-edit-account');
+        if (!btn) return;
+        
+        const id = btn.dataset.id;
+        const row = document.querySelector(`[data-account-row="${id}"]`);
+        if (!row) return;
+
+        // Fill form with existing data
+        const form = document.getElementById('eme-acc-account-form');
+        form.querySelector('[name="id"]').value = id;
+        
+        const nameCell = row.querySelector('td:first-child');
+        const nameText = nameCell ? nameCell.textContent.replace('inactief', '').trim() : '';
+        form.querySelector('[name="name"]').value = nameText;
+        
+        const ibanCell = row.querySelector('td:nth-child(2)');
+        form.querySelector('[name="iban"]').value = ibanCell ? ibanCell.textContent.trim() : '';
+        
+        form.querySelector('[name="description"]').value = '';
+        
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    /* ════════════════════════════════════════════════════════════════
+     * CHART OF ACCOUNTS PAGE
+     * ════════════════════════════════════════════════════════════════ */
+    document.addEventListener('submit', function(e) {
+        const form = e.target.closest('#eme-acc-coa-form');
+        if (!form) return;
+        e.preventDefault();
+        
+        const btn = form.querySelector('.submit-btn');
+        btn.textContent = i18n.saving;
+        btn.disabled = true;
+
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value; });
+        // Convert empty parent_id to null
+        if (!data.parent_id) data.parent_id = '';
+
+        ajax('eme_accounting_save_coa', data, function() {
+            flashButton(btn, i18n.saved);
+            location.reload();
+        });
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.eme-acc-edit-coa');
+        if (!btn) return;
+        
+        const id = btn.dataset.id;
+        const li = document.querySelector(`[data-id="${id}"]`);
+        if (!li) return;
+
+        // Fill form with existing data
+        const form = document.getElementById('eme-acc-coa-form');
+        form.querySelector('[name="id"]').value = id;
+        form.querySelector('[name="code"]').value = li.querySelector('.code').textContent;
+        form.querySelector('[name="name"]').value = li.querySelector('.name').textContent;
+        form.querySelector('[name="direction"]').value = li.dataset.direction || 'out';
+        
+        const parentId = parseInt(li.dataset.parentId) || '';
+        form.querySelector('[name="parent_id"]').value = parentId;
+        form.querySelector('[name="sort_order"]').value = li.dataset.sortOrder || 0;
+        
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.eme-acc-delete-coa');
+        if (!btn) return;
+        
+        if (!confirm(i18n.confirm_delete)) return;
+        const id = btn.dataset.id;
+        ajax('eme_accounting_delete_coa', { id }, function() {
+            const li = document.querySelector(`[data-id="${id}"]`);
+            if (li) {
+                li.style.transition = 'opacity 0.3s';
+                li.style.opacity = '0';
+                setTimeout(() => li.remove(), 300);
+            }
+        });
+    });
+
+    // Drag and drop reorder via Sortable library
+    function initSortable(list) {
+        if (!window.Sortable) return;
+        
+        new Sortable(list, {
+            handle: '.handle',
+            onStart: (evt) => { 
+                list.style.opacity = '0.6'; 
+                // Store parent for filtering
+                evt.item._sortableParentId = parseInt(evt.item.dataset.parentId) || 0;
+            },
+            onEnd: (evt) => { 
+                list.style.opacity = '1'; 
+                const parentId = evt.item._sortableParentId;
+                const to = evt.to;
+                
+                if (!to || evt.oldIndex === evt.newIndex) return;
+                
+                // Get all items in target list
+                const allLi = Array.from(to.querySelectorAll('li'));
+                if (allLi.length === 0) return;
+                const direction = to.dataset.direction || 'in';
+                
+                // Separate main vs sub accounts
+                const mainLi = allLi.filter(li => !li.classList.contains('sub'));
+                const subLi = allLi.filter(li => li.classList.contains('sub'));
+
+                // Renumber main accounts: 01, 02, 03...
+                mainLi.forEach((li, idx) => {
+                    li._newCode = String(idx + 1).padStart(2, '0');
+                });
+
+                // Renumber sub accounts grouped by parent
+                const parentGroups = {};
+                subLi.forEach(li => {
+                    const pid = parseInt(li.dataset.parentId) || 0;
+                    if (!parentGroups[pid]) parentGroups[pid] = [];
+                    parentGroups[pid].push(li);
+                });
+                Object.values(parentGroups).forEach(group => {
+                    const parentId = parseInt(group[0].dataset.parentId);
+                    const parentLi = allLi.find(li => parseInt(li.dataset.id) === parentId);
+                    const baseCode = parentLi ? parentLi.querySelector('.code').textContent : '';
+                    group.forEach((li, idx) => {
+                        li._newCode = baseCode + '-' + String(idx + 1).padStart(6, '0');
+                    });
+                });
+                
+                // Build items array with all accounts in target list
+                const items = [];
+                allLi.forEach((li, idx) => {
+                    const pid = parseInt(li.dataset.parentId) || 0;
+                    const codeEl = li.querySelector('.code');
+                    const code = li._newCode || (codeEl ? codeEl.textContent : '');
+                    
+                    items.push({
+                        id: li.dataset.id,
+                        sort_order: idx,
+                        code: code,
+                        parent_id: pid || null
+                    });
+                    delete li._newCode;
+                });
+                
+                // Update UI codes first
+                allLi.forEach((li, idx) => {
+                    const codeSpan = li.querySelector('.code');
+                    if (codeSpan && items[idx] && items[idx].code) {
+                        codeSpan.textContent = items[idx].code;
+                    }
+                });
+                
+                // Save to server
+                const formData = new FormData();
+                formData.append('action', 'eme_accounting_reorder_coa');
+                formData.append('nonce', nonce);
+                formData.append('items', JSON.stringify(items));
+                fetch(ajaxUrl, {
+                    method: 'POST',
+                    body: formData
+                }).then(() => location.reload());
+            }
+        });
+    }
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    document.querySelectorAll('.eme-acc-coa-tree').forEach(list => initSortable(list));
+
     /* ════════════════════════════════════════════════════════════════
      * JOURNAL PAGE
      * ════════════════════════════════════════════════════════════════ */

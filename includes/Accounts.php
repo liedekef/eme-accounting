@@ -18,25 +18,18 @@ class Accounts {
      * ------------------------------------------------------------------ */
 
     /**
-     * Get all active accounts, optionally filtered by type.
+     * Get all active accounts.
      *
-     * @param  string|null $type  asset|liability|equity|income|expense
      * @return array<int, object>
      */
-    public static function get_all( ?string $type = null ): array {
+    public static function get_all(): array {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_accounts';
-
-        if ( $type ) {
-            return $wpdb->get_results(
-                $wpdb->prepare( "SELECT * FROM `$table` WHERE type = %s ORDER BY sort_order, name", $type )
-            );
-        }
-        return $wpdb->get_results( "SELECT * FROM `$table` ORDER BY type, sort_order, name" );
+        return $wpdb->get_results( "SELECT * FROM `$table` ORDER BY sort_order, name" );
     }
 
     /**
-     * Get a single account by ID.
+     * Get account by ID.
      */
     public static function get( int $id ): ?object {
         global $wpdb;
@@ -48,8 +41,8 @@ class Accounts {
     /**
      * Get accounts as id => name array (for dropdowns).
      */
-    public static function get_dropdown( ?string $type = null ): array {
-        $accounts = self::get_all( $type );
+    public static function get_dropdown(): array {
+        $accounts = self::get_all();
         $out      = [];
         foreach ( $accounts as $a ) {
             $label = $a->name;
@@ -105,17 +98,10 @@ class Accounts {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_accounts';
 
-        $allowed_types = [ 'asset', 'liability', 'equity', 'income', 'expense' ];
-        if ( ! in_array( $data['type'] ?? '', $allowed_types, true ) ) {
-            return new \WP_Error( 'invalid_type', __( 'Ongeldig rekeningtype.', 'eme-accounting' ) );
-        }
-
         $row = [
             'name'            => eme_sanitize_request( $data['name'] ?? '' ),
             'iban'            => strtoupper( preg_replace( '/\s+/', '', $data['iban'] ?? '' ) ),
             'bic'             => strtoupper( eme_sanitize_request( $data['bic'] ?? '' ) ),
-            'type'            => $data['type'],
-            'subtype'         => eme_sanitize_request( $data['subtype'] ?? '' ),
             'currency'        => strtoupper( substr( eme_sanitize_request( $data['currency'] ?? 'EUR' ), 0, 3 ) ),
             'opening_balance' => (float) ( $data['opening_balance'] ?? 0 ),
             'is_active'       => (int) (bool) ( $data['is_active'] ?? 1 ),

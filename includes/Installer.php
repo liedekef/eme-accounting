@@ -25,8 +25,13 @@ class Installer {
 
     public static function activate(): void {
         self::create_tables();
+        self::seed_data();
         update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
         flush_rewrite_rules();
+    }
+
+    private static function seed_data(): void {
+        ChartOfAccounts::seed();
     }
 
     public static function deactivate(): void {
@@ -58,8 +63,6 @@ class Installer {
             name            VARCHAR(150)    NOT NULL,
             iban            VARCHAR(34)     NOT NULL DEFAULT '',
             bic             VARCHAR(11)     NOT NULL DEFAULT '',
-            type            ENUM('asset','liability','equity','income','expense') NOT NULL DEFAULT 'asset',
-            subtype         VARCHAR(50)     NOT NULL DEFAULT '',
             currency        CHAR(3)         NOT NULL DEFAULT 'EUR',
             opening_balance DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
             is_active       TINYINT(1)      NOT NULL DEFAULT 1,
@@ -68,8 +71,25 @@ class Installer {
             created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY idx_type (type),
             KEY idx_active (is_active)
+        ) $charset;" );
+
+        // ── Chart of accounts (rekeningstelsel) ───────────────────────────
+        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_chart_of_accounts (
+            id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            parent_id           BIGINT UNSIGNED              DEFAULT NULL,
+            code                VARCHAR(20)     NOT NULL,
+            name                VARCHAR(200)    NOT NULL,
+            direction           ENUM('in','out') NOT NULL DEFAULT 'out',
+            is_active           TINYINT(1)      NOT NULL DEFAULT 1,
+            sort_order          SMALLINT        NOT NULL DEFAULT 0,
+            description         TEXT,
+            created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_parent (parent_id),
+            KEY idx_direction (direction),
+            KEY idx_code (code)
         ) $charset;" );
 
         // ── Journal entries ─────────────────────────────────────────────
@@ -243,6 +263,7 @@ class Installer {
             'emeacc_stock_movements',
             'emeacc_stock',
             'emeacc_journal',
+            'emeacc_chart_of_accounts',
             'emeacc_accounts',
         ];
         foreach ( $tables as $table ) {

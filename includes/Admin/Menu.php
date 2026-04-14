@@ -25,13 +25,15 @@ class Menu {
 
         $subpages = [
             [ 'eme-accounting',             __( 'Dashboard', 'eme-accounting' ),              [ __CLASS__, 'page_dashboard' ] ],
-            [ 'eme-accounting-accounts',    __( 'Rekeningen', 'eme-accounting' ),             [ __CLASS__, 'page_accounts' ] ],
+            [ 'eme-accounting-coa',         __( 'Rekeningstelsel', 'eme-accounting' ),        [ __CLASS__, 'page_coa' ] ],
+            [ 'eme-accounting-accounts',    __( 'Financiële Rekeningen', 'eme-accounting' ), [ __CLASS__, 'page_accounts' ] ],
             [ 'eme-accounting-journal',     __( 'Dagboek', 'eme-accounting' ),                [ __CLASS__, 'page_journal' ] ],
             [ 'eme-accounting-import',      __( 'Import / Reconciliatie', 'eme-accounting' ), [ __CLASS__, 'page_import' ] ],
             [ 'eme-accounting-stock',       __( 'Stock', 'eme-accounting' ),                  [ __CLASS__, 'page_stock' ] ],
             [ 'eme-accounting-depreciation',__( 'Afschrijvingen', 'eme-accounting' ),         [ __CLASS__, 'page_depreciation' ] ],
             [ 'eme-accounting-budget',      __( 'Begroting', 'eme-accounting' ),              [ __CLASS__, 'page_budget' ] ],
-            [ 'eme-accounting-reports',     __( 'Rapporten', 'eme-accounting' ),              [ __CLASS__, 'page_reports' ] ],
+[ 'eme-accounting-reports',     __( 'Rapporten', 'eme-accounting' ),          [ __CLASS__, 'page_reports' ] ],
+            [ 'eme-accounting-close',       __( 'Boekjaar Afsluiten', 'eme-accounting' ), [ __CLASS__, 'page_close' ] ],
             [ 'eme-accounting-settings',    __( 'Instellingen', 'eme-accounting' ),           [ __CLASS__, 'page_settings' ] ],
         ];
 
@@ -62,6 +64,7 @@ class Menu {
     }
 
     public static function page_dashboard():    void { self::load_template( 'dashboard' ); }
+    public static function page_coa():         void { self::load_template( 'coa' ); }
     public static function page_accounts():     void { self::load_template( 'accounts' ); }
     public static function page_journal():      void { self::load_template( 'journal' ); }
     public static function page_import():       void { self::load_template( 'import' ); }
@@ -69,5 +72,6 @@ class Menu {
     public static function page_depreciation(): void { self::load_template( 'depreciation' ); }
     public static function page_budget():       void { self::load_template( 'budget' ); }
     public static function page_reports():      void { self::load_template( 'reports' ); }
+    public static function page_close():        void { self::load_template( 'close' ); }
     public static function page_settings():     void { self::load_template( 'settings' ); }
 }

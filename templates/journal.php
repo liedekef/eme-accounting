@@ -15,6 +15,7 @@ $entries    = EMEAccounting\Journal::get_entries( [
     'limit'       => 200,
 ] );
 $accounts   = EMEAccounting\Accounts::get_dropdown();
+$coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $categories = EMEAccounting\Journal::get_categories();
 $edit_entry = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
 $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
@@ -56,14 +57,30 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                            value="<?= esc_attr( $edit_entry->description ?? '' ) ?>">
                 </div>
                 <div class="eme-acc-field">
-                    <label><?php esc_html_e( 'Categorie', 'eme-accounting' ); ?></label>
-                    <input type="text" name="category" list="eme-categories"
-                           value="<?= esc_attr( $edit_entry->category ?? '' ) ?>">
-                    <datalist id="eme-categories">
-                        <?php foreach ( $categories as $cat ): ?>
-                        <option value="<?= esc_attr( $cat ) ?>">
-                        <?php endforeach; ?>
-                    </datalist>
+                    <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
+                    <select name="category" list="eme-categories">
+                        <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                        <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
+                        <?php foreach ( $coa_accounts as $id => $name ): 
+                            $acc = EMEAccounting\ChartOfAccounts::get( (int) $id );
+                            if ( $acc && $acc->direction === 'in' ):
+                        ?>
+                        <option value="<?= esc_attr( $name ) ?>" <?= selected( $edit_entry->category ?? '', $name, false ) ?>>
+                            <?= esc_html( $name ) ?>
+                        </option>
+                        <?php endif; endforeach; ?>
+                        </optgroup>
+                        <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
+                        <?php foreach ( $coa_accounts as $id => $name ): 
+                            $acc = EMEAccounting\ChartOfAccounts::get( (int) $id );
+                            if ( $acc && $acc->direction === 'out' ):
+                        ?>
+                        <option value="<?= esc_attr( $name ) ?>" <?= selected( $edit_entry->category ?? '', $name, false ) ?>>
+                            <?= esc_html( $name ) ?>
+                        </option>
+                        <?php endif; endforeach; ?>
+                        </optgroup>
+                    </select>
                 </div>
             </div>
 

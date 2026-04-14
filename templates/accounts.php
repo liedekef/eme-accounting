@@ -11,13 +11,6 @@ $types = [ 'asset' => __( 'Actief', 'eme-accounting' ), 'liability' => __( 'Pass
 <input type="hidden" name="id" value="0">
 <div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'Naam', 'eme-accounting' ); ?> *</label><input type="text" name="name" required maxlength="150"></div>
-    <div class="eme-acc-field"><label><?php esc_html_e( 'Type', 'eme-accounting' ); ?></label>
-        <select name="type">
-            <?php foreach ( $types as $v => $l ): ?>
-            <option value="<?= esc_attr( $v ) ?>"><?= esc_html( $l ) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
 </div>
 <div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'IBAN', 'eme-accounting' ); ?></label><input type="text" name="iban" maxlength="34" placeholder="BE68 5390 0754 7034"></div>
@@ -35,7 +28,6 @@ $types = [ 'asset' => __( 'Actief', 'eme-accounting' ), 'liability' => __( 'Pass
 <table class="eme-acc-table">
 <thead><tr>
     <th><?php esc_html_e( 'Naam', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Type', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'IBAN', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Huidig saldo', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Acties', 'eme-accounting' ); ?></th>
@@ -46,10 +38,10 @@ $types = [ 'asset' => __( 'Actief', 'eme-accounting' ), 'liability' => __( 'Pass
 ?>
 <tr data-account-row="<?= (int) $a->id ?>">
     <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
-    <td><?= esc_html( $types[ $a->type ] ?? $a->type ) ?></td>
     <td><?= esc_html( $a->iban ) ?></td>
     <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= number_format( $balance, 2, ',', '.' ) ?> €</td>
     <td>
+        <button class="button button-small eme-acc-edit-account" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
         <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-journal&account_id=' . $a->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Boekingen', 'eme-accounting' ); ?></a>
         <button class="button button-small eme-acc-delete-account" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
     </td>
