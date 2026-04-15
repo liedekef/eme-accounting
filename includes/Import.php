@@ -22,6 +22,26 @@ class Import {
         add_action( 'wp_ajax_eme_accounting_ignore_line',           [ __CLASS__, 'ajax_ignore_line' ] );
         add_action( 'wp_ajax_eme_accounting_auto_reconcile',        [ __CLASS__, 'ajax_auto_reconcile' ] );
         add_action( 'wp_ajax_eme_accounting_create_entry_from_line',[ __CLASS__, 'ajax_create_from_line' ] );
+        add_action( 'wp_ajax_eme_accounting_delete_import_log',    [ __CLASS__, 'ajax_delete_log' ] );
+    }
+
+    /**
+     * Delete import log and all related lines.
+     */
+    public static function delete_log( int $log_id ): void {
+        global $wpdb;
+        $wpdb->delete( $wpdb->prefix . 'emeacc_import_lines', [ 'log_id' => $log_id ], [ '%d' ] );
+        $wpdb->delete( $wpdb->prefix . 'emeacc_import_log', [ 'id' => $log_id ], [ '%d' ] );
+    }
+
+    public static function ajax_delete_log(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        $id = (int) ( $_POST['id'] ?? 0 );
+        if ( $id > 0 ) {
+            self::delete_log( $id );
+        }
+        wp_send_json_success();
     }
 
     /* ------------------------------------------------------------------

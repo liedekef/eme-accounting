@@ -113,7 +113,7 @@ $import_logs = $wpdb->get_results(
 </tr></thead>
 <tbody>
 <?php foreach ( $import_logs as $log ): ?>
-<tr>
+<tr data-import-log="<?= (int) $log->id ?>">
     <td><?= (int) $log->id ?></td>
     <td><?= esc_html( date_i18n( 'd/m/Y H:i', strtotime( $log->import_date ) ) ) ?></td>
     <td><?= esc_html( $log->account_name ) ?></td>
@@ -121,7 +121,10 @@ $import_logs = $wpdb->get_results(
     <td><?= (int) $log->total_lines ?></td>
     <td><span class="tag reconciled"><?= (int) $log->matched_lines ?></span></td>
     <td><?= $log->unmatched_lines > 0 ? '<span class="tag pending">' . (int) $log->unmatched_lines . '</span>' : '–' ?></td>
-    <td><a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a></td>
+    <td>
+        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
+        <a href="#" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>
+    </td>
 </tr>
 <?php endforeach; ?>
 </tbody>

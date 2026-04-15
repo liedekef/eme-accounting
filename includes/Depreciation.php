@@ -107,6 +107,13 @@ class Depreciation {
             return new \WP_Error( 'invalid_method', __( 'Onbekende afschrijvingsmethode.', 'eme-accounting' ) );
         }
 
+        // Check: both account_id and depreciation_account_id must be filled together
+        $has_account_id              = ! empty( $data['account_id'] );
+        $has_depreciation_account_id = ! empty( $data['depreciation_account_id'] );
+        if ( $has_account_id !== $has_depreciation_account_id ) {
+            return new \WP_Error( 'invalid_accounts', __( '.beide rekeningen invoegen of geen van beide', 'eme-accounting' ) );
+        }
+
         $purchase_price = (float) ( $data['purchase_price'] ?? 0 );
         $useful_life   = max( 1, (int) ( $data['useful_life_years'] ?? 5 ) );
         $method       = $data['method'] ?? 'linear';

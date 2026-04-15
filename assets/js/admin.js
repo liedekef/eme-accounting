@@ -104,6 +104,7 @@
         'btn-reconcile-manual':   handleManualReconcile,
         'btn-ignore-line':        handleIgnoreLine,
         'btn-create-from-line':   handleCreateFromLine,
+        'btn-delete-import-log': handleDeleteImportLog,
         'btn-load-report':        handleLoadReport,
         'btn-export-csv':         handleExportCsv,
         'eme-acc-edit-row':       handleToggleEditRow,
@@ -362,6 +363,13 @@
         ajax('eme_accounting_create_entry_from_line',
             { line_id: btn.dataset.lineId, category },
             (data) => { alert(`Boeking aangemaakt (ID: ${data.journal_id})`); location.reload(); }
+        );
+    }
+
+    function handleDeleteImportLog(btn) {
+        if (!confirm(i18n.confirm_delete)) return;
+        ajax('eme_accounting_delete_import_log', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`[data-import-log="${btn.dataset.id}"]`))
         );
     }
 
