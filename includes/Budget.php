@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
 class Budget {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_budget_line', [ __CLASS__, 'ajax_save' ] );
+        add_action( 'wp_ajax_eme_accounting_get_budget_year', [ __CLASS__, 'ajax_get_year' ] );
     }
 
     /**
@@ -50,6 +51,23 @@ class Budget {
             $totals[ $key ] = (float) $r->total;
         }
         return $totals;
+    }
+
+    /**
+     * Get actual total for a specific COA and direction.
+     */
+    public static function get_actual_for_coa( int $year, int $coa_id, string $direction ): float {
+        global $wpdb;
+        return (float) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COALESCE(SUM(amount), 0) as total
+                 FROM `{$wpdb->prefix}emeacc_journal`
+                 WHERE fiscal_year = %d AND coa_id = %d AND direction = %s AND direction != 'transfer'",
+                $year,
+                $coa_id,
+                $direction
+            )
+        );
     }
 
     /**
@@ -151,7 +169,80 @@ class Budget {
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
-        $r = self::save( $_POST );
-        is_wp_error( $r ) ? wp_send_json_error( $r->get_error_message() ) : wp_send_json_success( [ 'id' => $r ] );
+
+        $fiscal_year = (int) ( $_POST['fiscal_year'] ?? gmdate( 'Y' ) );
+        $budget    = $_POST['budget'] ?? [];
+        $saved    = 0;
+
+        // Handle IN entries
+        foreach ( $budget['in'] ?? [] as $coa_id => $amount ) {
+            $coa_id = (int) $coa_id;
+            $amount = (float) $amount;
+            if ( $coa_id <= 0 ) continue;
+
+            if ( $amount > 0 ) {
+                $result = self::save( [
+                    'fiscal_year'      => $fiscal_year,
+                    'coa_id'        => $coa_id,
+                    'direction'    => 'in',
+                    'budgeted_amount' => $amount,
+                ] );
+                if ( $result > 0 ) $saved++;
+            } else {
+                global $wpdb;
+                $wpdb->delete(
+                    $wpdb->prefix . 'emeacc_budget',
+                    [ 'fiscal_year' => $fiscal_year, 'coa_id' => $coa_id, 'direction' => 'in' ],
+                    [ '%d', '%d', '%s' ]
+                );
+            }
+        }
+
+        // Handle OUT entries
+        foreach ( $budget['out'] ?? [] as $coa_id => $amount ) {
+            $coa_id = (int) $coa_id;
+            $amount = (float) $amount;
+            if ( $coa_id <= 0 ) continue;
+
+            if ( $amount > 0 ) {
+                $result = self::save( [
+                    'fiscal_year'      => $fiscal_year,
+                    'coa_id'        => $coa_id,
+                    'direction'    => 'out',
+                    'budgeted_amount' => $amount,
+                ] );
+                if ( $result > 0 ) $saved++;
+            } else {
+                global $wpdb;
+                $wpdb->delete(
+                    $wpdb->prefix . 'emeacc_budget',
+                    [ 'fiscal_year' => $fiscal_year, 'coa_id' => $coa_id, 'direction' => 'out' ],
+                    [ '%d', '%d', '%s' ]
+                );
+            }
+        }
+
+        wp_send_json_success( [ 'saved' => $saved ] );
+    }
+
+    /**
+     * Get actual totals for a specific year (for AJAX copy).
+     */
+    public static function ajax_get_year(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+
+        $year = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
+        // Return actual totals (not budget) for copying
+        $actuals = [];
+        $coa = ChartOfAccounts::get_all();
+        foreach ( $coa as $c ) {
+            $actual = self::get_actual_for_coa( $year, $c->id, $c->direction );
+            if ( $actual > 0 ) {
+                $actuals[ $c->id . '|' . $c->direction ] = $actual;
+            }
+        }
+
+        wp_send_json_success( $actuals );
     }
 }

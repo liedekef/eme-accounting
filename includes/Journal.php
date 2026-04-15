@@ -90,9 +90,14 @@ class Journal {
 
         $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
 
-        $allowed_order = [ 'entry_date', 'amount', 'category', 'description', 'created_at' ];
+        $allowed_order = [ 'entry_date', 'id', 'amount', 'category', 'description', 'created_at' ];
         $orderby       = in_array( $args['orderby'], $allowed_order, true ) ? $args['orderby'] : 'entry_date';
         $order         = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
+
+        // Always order by date + id DESC for same-date consistency
+        $order_clause = $orderby === 'id'
+            ? "id {$order}"
+            : "entry_date {$order}, id {$order}";
 
         $prepare[] = (int) $args['limit'];
         $prepare[] = (int) $args['offset'];
@@ -103,7 +108,7 @@ class Journal {
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a  ON a.id = j.account_id
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` ca ON ca.id = j.contra_account_id
              {$where_sql}
-             ORDER BY {$orderby} {$order}
+             ORDER BY {$order_clause}
              LIMIT %d OFFSET %d",
             ...$prepare
         );

@@ -1,12 +1,13 @@
 <?php
 defined( 'ABSPATH' ) || exit;
-$year         = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
-$coa         = EMEAccounting\ChartOfAccounts::get_all();
-$comparison  = EMEAccounting\Budget::get_comparison( $year );
-$budget_map  = EMEAccounting\Budget::get_year_map( $year );
+$year        = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
+$coa        = EMEAccounting\ChartOfAccounts::get_all();
+$budget_map = EMEAccounting\Budget::get_year_map( $year );
+$prev_years = range( $year - 5, $year - 1 );
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?= $year ?></h1>
+
 <p>
     <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></label>
     <select id="eme-acc-year-select" onchange="window.location='?page=eme-accounting-budget&year='+this.value">
@@ -14,58 +15,55 @@ $budget_map  = EMEAccounting\Budget::get_year_map( $year );
         <option value="<?= $y ?>" <?= $y === $year ? 'selected' : '' ?>><?= $y ?></option>
         <?php endfor; ?>
     </select>
+
+    <label style="margin-left:20px"><?php esc_html_e( 'Kopieer resultaten van:', 'eme-accounting' ); ?></label>
+    <select id="eme-acc-copy-year">
+        <option value="">— <?php esc_html_e( 'Kies jaar', 'eme-accounting' ); ?> —</option>
+        <?php foreach ( $prev_years as $y ): ?>
+        <option value="<?= $y ?>"><?= $y ?></option>
+        <?php endforeach; ?>
+    </select>
+    <span id="copy-status" style="margin-left:8px;color:#646970"></span>
 </p>
+
+<?php // Group by direction: IN first, then OUT ?>
+<?php foreach ( [ 'in', 'out' ] as $dir ): ?>
 <div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Begrotingslijn toevoegen', 'eme-accounting' ); ?></h2>
-<form id="eme-acc-budget-form">
-    <div class="eme-acc-row">
-        <div class="eme-acc-field">
-            <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?> *</label>
-            <select name="coa_id" required>
-                <option value=""><?php esc_html_e( '— Kies —', 'eme-accounting' ); ?></option>
-                <?php foreach ( $coa as $c ): ?>
-                <option value="<?= (int) $c->id ?>"><?= esc_html( $c->code . ' - ' . $c->name ) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="eme-acc-field">
-            <label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
-            <select name="direction">
-                <option value="in"><?php esc_html_e( 'Ontvangst', 'eme-accounting' ); ?></option>
-                <option value="out"><?php esc_html_e( 'Uitgave', 'eme-accounting' ); ?></option>
-            </select>
-        </div>
-        <div class="eme-acc-field">
-            <label><?php esc_html_e( 'Begroot bedrag (€)', 'eme-accounting' ); ?></label>
-            <input type="number" name="budgeted_amount" step="0.01" min="0">
-        </div>
-    </div>
-    <input type="hidden" name="fiscal_year" value="<?= $year ?>">
-    <p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
-</form>
-</div>
-<?php if ( $comparison ): ?>
+<h2><?php esc_html_e( $dir === 'in' ? 'Ontvangsten' : 'Uitgaven', 'eme-accounting' ); ?></h2>
+<form class="eme-acc-budget-form" data-direction="<?= $dir ?>">
 <table class="eme-acc-table">
 <thead><tr>
-    <th><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Dir.', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Begroot', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Werkelijk', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Verschil', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Voortgang', 'eme-accounting' ); ?></th>
 </tr></thead>
 <tbody>
-<?php foreach ( $comparison as $row ):
-    $pct  = $row['budget'] > 0 ? min( 150, (int) ( $row['actual'] / $row['budget'] * 100 ) ) : 0;
-    $over = $pct > 100;
-    $dir_class = $row['direction'] === 'in' ? 'in' : 'out';
+<?php foreach ( $coa as $c ):
+    if ( $c->direction !== $dir ) continue;
+
+    $key = $c->id . '|' . $dir;
+    $budget = $budget_map[ $key ] ?? 0;
+    $actual  = EMEAccounting\Budget::get_actual_for_coa( $year, $c->id, $dir );
+    $variance = $budget - $actual;
+    $pct     = $budget > 0 ? min( 150, (int) ( $actual / $budget * 100 ) ) : 0;
+    $over    = $pct > 100;
 ?>
-<tr>
-    <td><?= esc_html( $row['account_name'] ) ?></td>
-    <td><span class="tag"><?= $row['direction'] === 'in' ? 'O' : 'U' ?></span></td>
-    <td class="amount"><?= number_format( $row['budget'], 2, ',', '.' ) ?> €</td>
-    <td class="amount <?= $dir_class ?>"><?= number_format( $row['actual'], 2, ',', '.' ) ?> €</td>
-    <td class="amount <?= $dir_class ?>"><?= number_format( $row['variance'], 2, ',', '.' ) ?> €<?php if ( $row['budget'] > 0 ): ?> (<?= $row['variance'] >= 0 ? '+' : '' ?><?= round( $row['variance'] / $row['budget'] * 100, 1 ) ?>%)<?php endif; ?></td>
+<tr data-coa-id="<?= (int) $c->id ?>">
+    <td>
+        <?= esc_html( $c->code . ' - ' . $c->name ) ?>
+        <input type="hidden" name="lines[<?= $c->id ?>][coa_id]" value="<?= (int) $c->id ?>">
+        <input type="hidden" name="lines[<?= $c->id ?>][direction]" value="<?= $dir ?>">
+    </td>
+    <td>
+        <input type="number" name="lines[<?= $c->id ?>][budgeted_amount]" 
+               value="<?= $budget > 0 ? $budget : '' ?>" 
+               step="0.01" min="0" style="width:120px"
+               data-orig="<?= $budget > 0 ? $budget : '' ?>">
+    </td>
+    <td class="amount <?= $dir ?>"><?= number_format( $actual, 2, ',', '.' ) ?> EUR</td>
+    <td class="amount <?= $dir ?>"><?= number_format( $variance, 2, ',', '.' ) ?> EUR</td>
     <td>
         <div class="budget-bar-wrap">
             <div class="budget-bar-fill <?= $over ? 'over' : '' ?>" style="width:<?= min( 100, $pct ) ?>%"></div>
@@ -76,7 +74,10 @@ $budget_map  = EMEAccounting\Budget::get_year_map( $year );
 <?php endforeach; ?>
 </tbody>
 </table>
-<?php else: ?>
-<p><?php esc_html_e( 'Geen begrotingslijnen of boekingen gevonden voor dit boekjaar.', 'eme-accounting' ); ?></p>
-<?php endif; ?>
+<input type="hidden" name="fiscal_year" value="<?= $year ?>">
+<input type="hidden" name="direction" value="<?= $dir ?>">
+<p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
+</form>
+</div>
+<?php endforeach; ?>
 </div>
