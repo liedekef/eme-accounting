@@ -156,13 +156,17 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <label><?php esc_html_e( 'Notities', 'eme-accounting' ); ?></label>
                     <textarea name="notes"><?= esc_textarea( $edit_entry->notes ?? '' ) ?></textarea>
                 </div>
+                <?php if ($edit_entry) : ?>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Vereffend?', 'eme-accounting' ); ?></label>
                     <select name="is_reconciled">
-                        <option value="0" <?= selected( (int) ( $edit_entry->is_reconciled ?? 0 ), 0, false ) ?>><?php esc_html_e( 'Nee', 'eme-accounting' ); ?></option>
-                        <option value="1" <?= selected( (int) ( $edit_entry->is_reconciled ?? 0 ), 1, false ) ?>><?php esc_html_e( 'Ja', 'eme-accounting' ); ?></option>
+                        <option value="0" <?= selected( (int) ( $edit_entry->is_reconciled ?? 1 ), 0, false ) ?>><?php esc_html_e( 'Nee', 'eme-accounting' ); ?></option>
+                        <option value="1" <?= selected( (int) ( $edit_entry->is_reconciled ?? 1 ), 1, false ) ?>><?php esc_html_e( 'Ja', 'eme-accounting' ); ?></option>
                     </select>
                 </div>
+                <?php else: ?>
+                    <input type="hidden" name="is_reconciled" value="1">
+                <?php endif; ?>
             </div>
 
             <p>

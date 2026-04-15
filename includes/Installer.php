@@ -82,7 +82,6 @@ class Installer {
             name                VARCHAR(200)    NOT NULL,
             direction           ENUM('in','out') NOT NULL DEFAULT 'out',
             is_active           TINYINT(1)      NOT NULL DEFAULT 1,
-            sort_order          SMALLINT        NOT NULL DEFAULT 0,
             description         TEXT,
             created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

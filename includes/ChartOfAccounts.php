@@ -147,8 +147,7 @@ $accounts = [
             $wpdb->insert( $table, [
                 'code'      => $group['code'],
                 'name'      => $group['name'],
-                'direction' => $group['direction'],
-                'sort_order'=> 0,
+                'direction' => $group['direction']
             ] );
             $parent_id = (int) $wpdb->insert_id;
             $parent_ids[ $group['code'] ] = $parent_id;
@@ -159,8 +158,7 @@ $accounts = [
                     'parent_id' => $parent_id,
                     'code'     => $child['code'],
                     'name'     => $child['name'],
-                    'direction'=> $group['direction'],
-                    'sort_order'=> $sort++,
+                    'direction'=> $group['direction']
                 ] );
             }
         }
@@ -169,7 +167,7 @@ $accounts = [
     public static function get_all(): array {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
-        return $wpdb->get_results( "SELECT * FROM `$table` ORDER BY code, sort_order" );
+        return $wpdb->get_results( "SELECT * FROM `$table` ORDER BY code" );
     }
 
     public static function get( int $id ): ?object {
@@ -190,7 +188,7 @@ $accounts = [
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
         return $wpdb->get_results(
-            $wpdb->prepare( "SELECT * FROM `$table` WHERE direction = %s ORDER BY code, sort_order", $direction )
+            $wpdb->prepare( "SELECT * FROM `$table` WHERE direction = %s ORDER BY code", $direction )
         );
     }
 
@@ -242,7 +240,6 @@ $accounts = [
             'name'        => eme_sanitize_request( $data['name'] ),
             'direction'   => in_array( $data['direction'] ?? 'out', [ 'in', 'out' ], true ) ? $data['direction'] : 'out',
             'is_active'   => (int) (bool) ( $data['is_active'] ?? 1 ),
-            'sort_order'  => (int) ( $data['sort_order'] ?? 0 ),
             'description' => eme_sanitize_request( $data['description'] ?? '' ),
         ];
 
@@ -292,7 +289,6 @@ $accounts = [
             //error_log('Processing item: ' . print_r($item, true));
 
             $row = [];
-            $row['sort_order'] = $idx;
             $row['code'] = $parent_code . '-' . str_pad( (string) $idx, 6, '0', STR_PAD_LEFT );
             $row['parent_id'] = $parent_id;
             //error_log('Row : ' . print_r($row, true));

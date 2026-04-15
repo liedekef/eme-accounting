@@ -205,7 +205,6 @@
         form.querySelector('[name="name"]').value        = d.name;
         form.querySelector('[name="direction"]').value   = d.direction || 'out';
         form.querySelector('[name="parent_id"]').value   = parseInt(d.parentId) || '';
-        form.querySelector('[name="sort_order"]').value  = d.sortOrder || 0;
         form.querySelector('[name="description"]').value = d.description || '';
         document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening bewerken';
         document.getElementById('eme-acc-coa-cancel').style.display = '';
@@ -236,7 +235,6 @@
                 if (evt.oldIndex === evt.newIndex) return;
                 const items = Array.from(evt.to.querySelectorAll('li')).map((li, idx) => ({
                     id:         li.dataset.id,
-                    sort_order: idx,
                     parent_id:  parseInt(li.dataset.parentId) || null,
                     code:       li.querySelector('.code')?.textContent ?? '',
                 }));

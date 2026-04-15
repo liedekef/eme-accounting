@@ -45,7 +45,6 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
             <?php endif; ?>
         </select>
     </div>
-    <div class="eme-acc-field"><label><?php esc_html_e( 'Volgorde', 'eme-accounting' ); ?></label><input type="number" name="sort_order" value="0" min="0"></div>
 </div>
 <div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?></label><textarea name="description"></textarea></div>
@@ -66,7 +65,6 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
     data-id="<?= (int) $a->id ?>"
     data-direction="<?= esc_attr( $a->direction ) ?>"
     data-parent-id="<?= (int) ( $a->parent_id ?? 0 ) ?>"
-    data-sort-order="<?= (int) $a->sort_order ?>"
     data-code="<?= esc_attr( $a->code ) ?>"
     data-name="<?= esc_attr( $a->name ) ?>"
     data-description="<?= esc_attr( $a->description ?? '' ) ?>"
@@ -92,7 +90,6 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
     data-id="<?= (int) $a->id ?>"
     data-direction="<?= esc_attr( $a->direction ) ?>"
     data-parent-id="<?= (int) ( $a->parent_id ?? 0 ) ?>"
-    data-sort-order="<?= (int) $a->sort_order ?>"
     data-code="<?= esc_attr( $a->code ) ?>"
     data-name="<?= esc_attr( $a->name ) ?>"
     data-description="<?= esc_attr( $a->description ?? '' ) ?>"
