@@ -247,3 +247,16 @@
     opacity: 0.5;
     background: #e0f0ff;
 }
+
+/* ── Row actions ──────────────────────────────────────────────── */
+.row-actions {
+    font-size: 11px;
+    margin-top: 4px;
+}
+.row-actions a {
+    color: #2271b1;
+    text-decoration: none;
+}
+.row-actions a:hover {
+    text-decoration: underline;
+}

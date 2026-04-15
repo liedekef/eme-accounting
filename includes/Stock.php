@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
 class Stock {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_stock',     [ __CLASS__, 'ajax_save' ] );
+        add_action( 'wp_ajax_eme_accounting_delete_stock', [ __CLASS__, 'ajax_delete' ] );
         add_action( 'wp_ajax_eme_accounting_stock_movement', [ __CLASS__, 'ajax_movement' ] );
     }
 
@@ -85,5 +86,16 @@ class Stock {
             eme_sanitize_request( $_POST['notes'] ?? '' )
         );
         is_wp_error( $r ) ? wp_send_json_error( $r->get_error_message() ) : wp_send_json_success();
+    }
+
+    public static function ajax_delete(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        global $wpdb;
+        $id = (int) ( $_POST['id'] ?? 0 );
+        if ( $id > 0 ) {
+            $wpdb->delete( $wpdb->prefix . 'emeacc_stock', [ 'id' => $id ], [ '%d' ] );
+        }
+        wp_send_json_success();
     }
 }

@@ -6,10 +6,92 @@ defined( 'ABSPATH' ) || exit;
 class Depreciation {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_asset',      [ __CLASS__, 'ajax_save' ] );
-        add_action( 'eme_accounting_annual_depreciation_run', [ __CLASS__, 'run_annual' ] );
-        // Schedule yearly cron if not yet scheduled
-        if ( ! wp_next_scheduled( 'eme_accounting_annual_depreciation_run' ) ) {
-            wp_schedule_event( mktime( 0, 0, 0, 1, 2, (int) gmdate( 'Y' ) + 1 ), 'yearly', 'eme_accounting_annual_depreciation_run' );
+        add_action( 'wp_ajax_eme_accounting_delete_asset', [ __CLASS__, 'ajax_delete' ] );
+        add_action( 'eme_accounting_daily_cron', [ __CLASS__, 'daily_check' ] );
+
+        // Schedule daily cron if not exists
+        if ( ! wp_next_scheduled( 'eme_accounting_daily_cron' ) ) {
+            wp_schedule_event( time() + 3600, 'daily', 'eme_accounting_daily_cron' );
+        }
+    }
+
+    /**
+     * Daily check - runs automatic depreciation on January 2nd.
+     */
+    public static function daily_check(): void {
+        // Only run on January 2nd
+        if ( (int) gmdate( 'm' ) !== 1 || (int) gmdate( 'd' ) !== 2 ) {
+            return;
+        }
+
+        $assets = self::get_all();
+        foreach ( $assets as $asset ) {
+            // Skip if no last_depreciation date or already processed this year
+            if ( empty( $asset->last_depreciation ) ) {
+                continue;
+            }
+
+            // Skip if already at residual value
+            if ( (float) $asset->current_book_value <= (float) $asset->residual_value ) {
+                continue;
+            }
+
+            $amount = self::calculate_annual_amount( $asset );
+            if ( $amount <= 0 ) {
+                continue;
+            }
+
+            // Calculate new book value
+            $new_value = max( (float) $asset->residual_value, (float) $asset->current_book_value - $amount );
+
+            // Set next automatic date: January 2nd of next year
+            $next_year = (int) gmdate( 'Y' ) + 1;
+            $next_date = sprintf( '%d-01-02', $next_year );
+
+            // Optional: Create journal entries if both account_id and depreciation_account_id are set
+            if ( ! empty( $asset->account_id ) && ! empty( $asset->depreciation_account_id ) ) {
+                // Boeking voor afschrijvingsrekening (kosten)
+                Journal::save( [
+                    'entry_date'      => current_time( 'Y-m-d' ),
+                    'description'   => sprintf(
+                        __( 'Afschrijving %s – %s', 'eme-accounting' ),
+                        $asset->name,
+                        gmdate( 'Y' )
+                    ),
+                    'category'      => 'afschrijving',
+                    'amount'      => $amount,
+                    'direction'   => 'out',
+                    'account_id'   => $asset->depreciation_account_id,
+                    'fiscal_year' => (int) gmdate( 'Y' ),
+                ] );
+                // Boeking voor activarekening (verminderen activa)
+                Journal::save( [
+                    'entry_date'      => current_time( 'Y-m-d' ),
+                    'description'   => sprintf(
+                        __( 'Afschrijving %s – %s', 'eme-accounting' ),
+                        $asset->name,
+                        gmdate( 'Y' )
+                    ),
+                    'category'      => 'afschrijving',
+                    'amount'      => $amount,
+                    'direction'   => 'in',
+                    'account_id'   => $asset->account_id,
+                    'fiscal_year' => (int) gmdate( 'Y' ),
+                ] );
+            }
+
+            // Update asset
+            global $wpdb;
+            $wpdb->update(
+                $wpdb->prefix . 'emeacc_depreciation',
+                [
+                    'current_book_value' => $new_value,
+                    'last_depreciation'  => $next_date,
+                ],
+                [ 'id' => $asset->id ],
+                [ '%f', '%s' ],
+                [ '%d' ]
+            );
         }
     }
 
@@ -24,21 +106,105 @@ class Depreciation {
         if ( ! in_array( $data['method'] ?? 'linear', $allowed_methods, true ) ) {
             return new \WP_Error( 'invalid_method', __( 'Onbekende afschrijvingsmethode.', 'eme-accounting' ) );
         }
+
         $purchase_price = (float) ( $data['purchase_price'] ?? 0 );
+        $useful_life   = max( 1, (int) ( $data['useful_life_years'] ?? 5 ) );
+        $method       = $data['method'] ?? 'linear';
+        $residual     = (float) ( $data['residual_value'] ?? 0 );
+        $purchase_date = eme_sanitize_request( $data['purchase_date'] ?? '' );
+
+        // Calculate years since purchase
+        $years_elapsed = 0;
+        if ( $purchase_date ) {
+            $purchase_ts = strtotime( $purchase_date );
+            $now_ts     = current_time( 'timestamp' );
+            $years_elapsed = floor( ( $now_ts - $purchase_ts ) / ( 365.25 * 24 * 3600 ) );
+        }
+
+        // Calculate current book value with historical depreciation
+        $current_book_value = $purchase_price;
+        if ( $years_elapsed > 0 ) {
+            // Temporary: set to purchase price for calculation
+            $temp_asset = (object) [
+                'purchase_price'    => $purchase_price,
+                'residual_value'  => $residual,
+                'useful_life_years' => $useful_life,
+                'method'          => $method,
+                'current_book_value' => $purchase_price,
+            ];
+
+            $total_depreciation = 0;
+            for ( $i = 0; $i < $years_elapsed; $i++ ) {
+                $annual = self::calculate_annual_amount( $temp_asset );
+                $total_depreciation += $annual;
+                $temp_asset->current_book_value = max( $residual, $temp_asset->current_book_value - $annual );
+            }
+            $current_book_value = max( $residual, $purchase_price - $total_depreciation );
+        }
+
+        // Set last_depreciation date
+        // If purchased more than 1 year ago: set to January 2nd of next year
+        // Otherwise: NULL (will be handled by first daily cron on Jan 2)
+        $last_depreciation = null;
+        if ( $years_elapsed >= 1 ) {
+            $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' );
+            $last_depreciation = sprintf( '%d-01-02', $purchase_year + 1 );
+        }
+
         $row = [
             'name'                    => eme_sanitize_request( $data['name'] ?? '' ),
             'description'             => eme_sanitize_request( $data['description'] ?? '' ),
-            'purchase_date'           => eme_sanitize_request( $data['purchase_date'] ?? '' ),
+            'purchase_date'           => $purchase_date,
             'purchase_price'          => $purchase_price,
-            'residual_value'          => (float) ( $data['residual_value'] ?? 0 ),
-            'useful_life_years'       => max( 1, (int) ( $data['useful_life_years'] ?? 5 ) ),
-            'method'                  => $data['method'] ?? 'linear',
+            'residual_value'          => $residual,
+            'useful_life_years'       => $useful_life,
+            'method'                  => $method,
             'account_id'              => ! empty( $data['account_id'] ) ? (int) $data['account_id'] : null,
             'depreciation_account_id' => ! empty( $data['depreciation_account_id'] ) ? (int) $data['depreciation_account_id'] : null,
-            'current_book_value'      => $purchase_price, // Starts at purchase price
+            'current_book_value'      => $current_book_value,
+            'last_depreciation'    => $last_depreciation,
         ];
+
         $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
         if ( $id > 0 ) {
+            // When editing: recalculate only if purchase_date changed
+            $existing = $wpdb->get_row( $wpdb->prepare( "SELECT purchase_date FROM `{$wpdb->prefix}emeacc_depreciation` WHERE id = %d", $id ) );
+            if ( $existing && $existing->purchase_date !== $purchase_date ) {
+                // Recalculate historical depreciation
+                $years_elapsed = 0;
+                if ( $purchase_date ) {
+                    $purchase_ts = strtotime( $purchase_date );
+                    $now_ts     = current_time( 'timestamp' );
+                    $years_elapsed = floor( ( $now_ts - $purchase_ts ) / ( 365.25 * 24 * 3600 ) );
+                }
+
+                if ( $years_elapsed > 0 ) {
+                    $temp_asset = (object) [
+                        'purchase_price'    => $purchase_price,
+                        'residual_value'  => $residual,
+                        'useful_life_years' => $useful_life,
+                        'method'          => $method,
+                        'current_book_value' => $purchase_price,
+                    ];
+
+                    $total_depreciation = 0;
+                    for ( $i = 0; $i < $years_elapsed; $i++ ) {
+                        $annual = self::calculate_annual_amount( $temp_asset );
+                        $total_depreciation += $annual;
+                        $temp_asset->current_book_value = max( $residual, $temp_asset->current_book_value - $annual );
+                    }
+                    $row['current_book_value'] = max( $residual, $purchase_price - $total_depreciation );
+                } else {
+                    $row['current_book_value'] = $purchase_price;
+                }
+
+                if ( $years_elapsed >= 1 ) {
+                    $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' );
+                    $row['last_depreciation'] = sprintf( '%d-01-02', $purchase_year + 1 );
+                } else {
+                    $row['last_depreciation'] = null;
+                }
+            }
             $wpdb->update( $wpdb->prefix . 'emeacc_depreciation', $row, [ 'id' => $id ], null, [ '%d' ] );
             return $id;
         }
@@ -59,51 +225,21 @@ class Depreciation {
         return round( $depreciable / $asset->useful_life_years, 2 );
     }
 
-    /**
-     * Run annual depreciation for all active assets.
-     * Creates journal entries automatically.
-     */
-    public static function run_annual(): void {
-        $assets = self::get_all();
-        foreach ( $assets as $asset ) {
-            $amount = self::calculate_annual_amount( $asset );
-            if ( $amount <= 0 || $asset->current_book_value <= $asset->residual_value ) {
-                continue;
-            }
-            // Create journal entry
-            Journal::save( [
-                'entry_date'  => current_time( 'Y-m-d' ),
-                'description' => sprintf(
-                    __( 'Afschrijving %s – %s', 'eme-accounting' ),
-                    $asset->name,
-                    gmdate( 'Y' )
-                ),
-                'category'    => 'afschrijving',
-                'amount'      => $amount,
-                'direction'   => 'out',
-                'account_id'  => $asset->depreciation_account_id ?: $asset->account_id,
-                'fiscal_year' => (int) gmdate( 'Y' ),
-            ] );
-            // Update book value
-            global $wpdb;
-            $new_value = max( $asset->residual_value, $asset->current_book_value - $amount );
-            $wpdb->update(
-                $wpdb->prefix . 'emeacc_depreciation',
-                [
-                    'current_book_value' => $new_value,
-                    'last_depreciation'  => current_time( 'Y-m-d' ),
-                ],
-                [ 'id' => $asset->id ],
-                [ '%f', '%s' ],
-                [ '%d' ]
-            );
-        }
-    }
-
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
         $r = self::save( $_POST );
         is_wp_error( $r ) ? wp_send_json_error( $r->get_error_message() ) : wp_send_json_success( [ 'id' => $r ] );
+    }
+
+    public static function ajax_delete(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        global $wpdb;
+        $id = (int) ( $_POST['id'] ?? 0 );
+        if ( $id > 0 ) {
+            $wpdb->delete( $wpdb->prefix . 'emeacc_depreciation', [ 'id' => $id ], [ '%d' ] );
+        }
+        wp_send_json_success();
     }
 }

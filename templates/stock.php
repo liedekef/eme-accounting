@@ -6,8 +6,9 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Stock', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Stockartikel toevoegen', 'eme-accounting' ); ?></h2>
+<h2 id="eme-acc-stock-form-title"><?php esc_html_e( 'Stockartikel toevoegen', 'eme-accounting' ); ?></h2>
 <form id="eme-acc-stock-form">
+<input type="hidden" name="id" value="0">
 <div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'Naam', 'eme-accounting' ); ?> *</label><input type="text" name="name" required></div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'SKU', 'eme-accounting' ); ?></label><input type="text" name="sku"></div>
@@ -32,8 +33,14 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 <?php foreach ( $items as $item ):
     $warning = (float) $item->current_qty <= (float) $item->min_qty && (float) $item->min_qty > 0;
 ?>
-<tr>
-    <td><?= esc_html( $item->name ) ?><?= $warning ? ' ⚠️' : '' ?></td>
+<tr data-stock-row="<?= (int) $item->id ?>">
+    <td>
+        <?= esc_html( $item->name ) ?><?= $warning ? ' ⚠️' : '' ?>
+        <div class="row-actions">
+            <a href="#" class="eme-acc-edit-stock" data-id="<?= (int) $item->id ?>" data-name="<?= esc_attr( $item->name ) ?>" data-sku="<?= esc_attr( $item->sku ) ?>" data-unit="<?= esc_attr( $item->unit ) ?>" data-purchase-price="<?= (float) $item->purchase_price ?>" data-sale-price="<?= (float) $item->sale_price ?>" data-min-qty="<?= (float) $item->min_qty ?>"><?php esc_html_e( 'Bewerken', 'eme-accounting' ); ?></a> |
+            <a href="#" class="eme-acc-delete-stock" data-id="<?= (int) $item->id ?>"><?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?></a>
+        </div>
+    </td>
     <td><?= esc_html( $item->sku ) ?></td>
     <td class="amount"><?= number_format( (float) $item->current_qty, 3, ',', '.' ) ?> <?= esc_html( $item->unit ) ?></td>
     <td class="amount"><?= number_format( (float) $item->purchase_price, 2, ',', '.' ) ?> €</td>

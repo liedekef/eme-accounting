@@ -107,6 +107,12 @@
         'btn-load-report':        handleLoadReport,
         'btn-export-csv':         handleExportCsv,
         'eme-acc-edit-row':       handleToggleEditRow,
+        // Stock
+        'eme-acc-edit-stock':    handleStockEdit,
+        'eme-acc-delete-stock': handleStockDelete,
+        // Depreciation / Assets
+        'eme-acc-edit-asset':   handleAssetEdit,
+        'eme-acc-delete-asset': handleAssetDelete,
     };
 
     document.addEventListener('click', function (e) {
@@ -374,6 +380,27 @@
         });
     }
 
+    function handleStockEdit(btn) {
+        const d    = btn.dataset;
+        const form = document.getElementById('eme-acc-stock-form');
+        form.querySelector('[name="id"]').value        = d.id;
+        form.querySelector('[name="name"]').value       = d.name;
+        form.querySelector('[name="sku"]').value        = d.sku;
+        form.querySelector('[name="unit"]').value        = d.unit;
+        form.querySelector('[name="purchase_price"]').value = d.purchasePrice;
+        form.querySelector('[name="sale_price"]').value  = d.salePrice;
+        form.querySelector('[name="min_qty"]').value    = d.minQty;
+        document.getElementById('eme-acc-stock-form-title').textContent = 'Stock bewerken';
+        form.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function handleStockDelete(btn) {
+        if (!confirm(i18n.confirm_delete)) return;
+        ajax('eme_accounting_delete_stock', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`[data-stock-row="${btn.dataset.id}"]`))
+        );
+    }
+
     /* ═══════════════════════════════════════════════════════════════════
      * DEPRECIATION PAGE
      * ═══════════════════════════════════════════════════════════════════ */
@@ -390,6 +417,31 @@
         if (!preview) return;
         const annual = method === 'declining' ? price * (2 / life) : (price - residual) / life;
         preview.textContent = `Jaarlijkse afschrijving: ${formatCurrency(annual)}`;
+    }
+
+    function handleAssetEdit(btn) {
+        const d    = btn.dataset;
+        const form = document.getElementById('eme-acc-asset-form');
+        form.querySelector('[name="id"]').value              = d.id;
+        form.querySelector('[name="name"]').value            = d.name;
+        form.querySelector('[name="purchase_date"]').value    = d.purchaseDate;
+        form.querySelector('[name="purchase_price"]').value   = d.purchasePrice;
+        form.querySelector('[name="residual_value"]').value = d.residualValue;
+        form.querySelector('#current_book_value').value = d.currentBookValue;
+        form.querySelector('[name="useful_life_years"]').value = d.usefulLifeYears;
+        form.querySelector('[name="method"]').value           = d.method;
+        form.querySelector('[name="account_id"]').value     = d.accountId;
+        form.querySelector('[name="depreciation_account_id"]').value = d.depreciationAccountId;
+        form.querySelector('[name="description"]').value = d.description || '';
+        document.getElementById('eme-acc-asset-form-title').textContent = 'Activum bewerken';
+        form.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function handleAssetDelete(btn) {
+        if (!confirm(i18n.confirm_delete)) return;
+        ajax('eme_accounting_delete_asset', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`[data-asset-row="${btn.dataset.id}"]`))
+        );
     }
 
     /* ═══════════════════════════════════════════════════════════════════

@@ -7,8 +7,9 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 <h1><?php esc_html_e( 'Vaste Activa & Afschrijvingen', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Activum toevoegen', 'eme-accounting' ); ?></h2>
+<h2 id="eme-acc-asset-form-title"><?php esc_html_e( 'Activum toevoegen', 'eme-accounting' ); ?></h2>
 <form id="eme-acc-asset-form">
+<input type="hidden" name="id" value="0">
 <div class="eme-acc-row">
     <div class="eme-acc-field" style="flex:2">
         <label><?php esc_html_e( 'Naam', 'eme-accounting' ); ?> *</label>
@@ -25,8 +26,12 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 </div>
 <div class="eme-acc-row">
     <div class="eme-acc-field">
-        <label><?php esc_html_e( 'Restwaarde (€)', 'eme-accounting' ); ?></label>
+        <label><?php esc_html_e( 'Restwaarde na volledige afschrijving (€)', 'eme-accounting' ); ?></label>
         <input type="number" name="residual_value" id="residual_value" step="0.01" min="0" value="0">
+    </div>
+    <div class="eme-acc-field">
+        <label><?php esc_html_e( 'Huidge waarde (€)', 'eme-accounting' ); ?></label>
+        <input type="text" disabled id="current_book_value" value="0">
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Gebruiksduur (jaar)', 'eme-accounting' ); ?></label>
@@ -79,7 +84,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     <th><?php esc_html_e( 'Methode', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Duur', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Jaarl. afschr.', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Laatste afschr.', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Volgende auto', 'eme-accounting' ); ?></th>
 </tr></thead>
 <tbody>
 <?php foreach ( $assets as $asset ):
@@ -88,12 +93,16 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
         ? round( ( 1 - $asset->current_book_value / $asset->purchase_price ) * 100, 1 )
         : 0;
 ?>
-<tr>
+<tr data-asset-row="<?= (int) $asset->id ?>">
     <td>
         <strong><?= esc_html( $asset->name ) ?></strong>
         <?php if ( $asset->description ): ?>
         <br><span style="font-size:11px;color:#646970"><?= esc_html( mb_substr( $asset->description, 0, 60 ) ) ?></span>
         <?php endif; ?>
+        <div class="row-actions">
+            <a href="#" class="eme-acc-edit-asset" data-id="<?= (int) $asset->id ?>" data-name="<?= esc_attr( $asset->name ) ?>" data-purchase-date="<?= esc_attr( $asset->purchase_date ) ?>" data-purchase-price="<?= (float) $asset->purchase_price ?>" data-residual-value="<?= (float) $asset->residual_value ?>" data-current-book-value="<?= (float) $asset->current_book_value ?>" data-useful-life-years="<?= (int) $asset->useful_life_years ?>" data-method="<?= esc_attr( $asset->method ) ?>" data-account-id="<?= (int) $asset->account_id ?>" data-depreciation-account-id="<?= (int) $asset->depreciation_account_id ?>" data-description="<?= esc_attr( $asset->description ) ?>"><?php esc_html_e( 'Bewerken', 'eme-accounting' ); ?></a> |
+            <a href="#" class="eme-acc-delete-asset" data-id="<?= (int) $asset->id ?>"><?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?></a>
+        </div>
     </td>
     <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $asset->purchase_date ) ) ) ?></td>
     <td class="amount"><?= number_format( (float) $asset->purchase_price, 2, ',', '.' ) ?> €</td>
