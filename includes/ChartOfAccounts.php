@@ -275,23 +275,29 @@ $accounts = [
     public static function reorder( array $items ): void {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
+        $parent_id = 0;
+        $parent_code = '';
+        $idx = 0;
         foreach ( $items as $i => $item ) {
-
-            error_log('Processing item: ' . print_r($item, true));
-
-            $row = [];
-            if ( isset( $item['sort_order'] ) ) {
-                $row['sort_order'] = (int) $item['sort_order'];
-            }
-            if ( ! empty( $item['code'] ) ) {
-                $row['code'] = sanitize_text_field( $item['code'] );
-            }
-            if ( array_key_exists( 'parent_id', $item ) ) {
-                $row['parent_id'] = is_numeric( $item['parent_id'] ) ? (int) $item['parent_id'] : null;
-            }
-            if ( empty( $row ) ) {
+            if (empty($item['parent_id'])) {
+                $parent_code = $item['code'];
+                $parent_id = intval($item['id']);
+                $idx = 0;
                 continue;
             }
+            if (empty($parent_code)) {
+                continue;
+            }
+            $idx++;
+            //error_log('Processing item: ' . print_r($item, true));
+
+            $row = [];
+            $row['sort_order'] = $idx;
+            $row['code'] = $parent_code . '-' . str_pad( (string) $idx, 6, '0', STR_PAD_LEFT );
+            $row['parent_id'] = $parent_id;
+            //error_log('Row : ' . print_r($row, true));
+            //continue;
+
             //$wpdb->update( $table, $row, [ 'id' => (int) $item['id'] ] );
             $result = $wpdb->update(
                 $table,

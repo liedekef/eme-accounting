@@ -95,7 +95,7 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <select name="direction">
                         <option value="in"  <?= selected( $edit_entry->direction ?? '', 'in',  false ) ?>><?php esc_html_e( 'Ontvangst (+)', 'eme-accounting' ); ?></option>
                         <option value="out" <?= selected( $edit_entry->direction ?? 'out', 'out', false ) ?>><?php esc_html_e( 'Uitgave (–)', 'eme-accounting' ); ?></option>
-                        <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Overschrijving', 'eme-accounting' ); ?></option>
+                        <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Transfer', 'eme-accounting' ); ?></option>
                     </select>
                 </div>
                 <div class="eme-acc-field">

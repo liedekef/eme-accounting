@@ -230,69 +230,19 @@
             handle: '.handle',
             onEnd(evt) {
                 if (evt.oldIndex === evt.newIndex) return;
-                const to = evt.to;
-                if (!to) return;
-
-                // Get all items in target list
-                const allLi = Array.from(to.querySelectorAll('li'));
-                if (allLi.length === 0) return;
-                const direction = to.dataset.direction || 'in';
-
-                // Separate main vs sub accounts
-                const mainLi = allLi.filter(li => !li.classList.contains('sub'));
-                const subLi = allLi.filter(li => li.classList.contains('sub'));
-
-                // Renumber main accounts: 01, 02, 03...
-                mainLi.forEach((li, idx) => {
-                    li._newCode = String(idx + 1).padStart(2, '0');
-                });
-
-                // Renumber sub accounts grouped by parent
-                const parentGroups = {};
-                subLi.forEach(li => {
-                    const pid = parseInt(li.dataset.parentId) || 0;
-                    if (!parentGroups[pid]) parentGroups[pid] = [];
-                    parentGroups[pid].push(li);
-                });
-                Object.values(parentGroups).forEach(group => {
-                    const parentId = parseInt(group[0].dataset.parentId);
-                    const parentLi = allLi.find(li => parseInt(li.dataset.id) === parentId);
-                    const baseCode = parentLi ? parentLi.querySelector('.code').textContent : '';
-                    group.forEach((li, idx) => {
-                        li._newCode = baseCode + '-' + String(idx + 1).padStart(6, '0');
-                    });
-                });
-
-                // Build items array with all accounts in target list
-                const items = [];
-                allLi.forEach((li, idx) => {
-                    const pid = parseInt(li.dataset.parentId) || 0;
-                    const codeEl = li.querySelector('.code');
-                    const code = li._newCode || (codeEl ? codeEl.textContent : '');
-
-                    items.push({
-                        id: li.dataset.id,
-                        sort_order: idx,
-                        code: code,
-                        parent_id: pid || null
-                    });
-                    delete li._newCode;
-                });
-                // Update UI codes first
-                allLi.forEach((li, idx) => {
-                    const codeSpan = li.querySelector('.code');
-                    if (codeSpan && items[idx] && items[idx].code) {
-                        codeSpan.textContent = items[idx].code;
-                    }
-                });
-
+                const items = Array.from(evt.to.querySelectorAll('li')).map((li, idx) => ({
+                    id:         li.dataset.id,
+                    sort_order: idx,
+                    parent_id:  parseInt(li.dataset.parentId) || null,
+                    code:       li.querySelector('.code')?.textContent ?? '',
+                }));
                 const fd = new FormData();
                 fd.append('action', 'eme_accounting_reorder_coa');
                 fd.append('nonce', nonce);
                 fd.append('items', JSON.stringify(items));
                 fetch(ajaxUrl, { method: 'POST', body: fd })
                     .then(r => r.json())
-                    .then(r => { if (!r.success) alert('Herordenen mislukt.'); else location.reload(); });
+                    .then(r => { if (!r.success) alert('Herordenen mislukt.'); else location.reload();});
             },
         });
     });
