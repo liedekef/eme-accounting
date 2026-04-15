@@ -8,48 +8,91 @@ class Budget {
         add_action( 'wp_ajax_eme_accounting_save_budget_line', [ __CLASS__, 'ajax_save' ] );
     }
 
-    public static function get_year( int $year ): array {
+    /**
+     * Get all budget lines for a year as key-value by coa_id.
+     */
+    public static function get_year_map( int $year ): array {
         global $wpdb;
-        return $wpdb->get_results(
+        $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT b.*, a.name as account_name
-                 FROM `{$wpdb->prefix}emeacc_budget` b
-                 LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = b.account_id
-                 WHERE b.fiscal_year = %d
-                 ORDER BY b.direction DESC, a.name, b.category",
+                "SELECT coa_id, direction, budgeted_amount
+                 FROM `{$wpdb->prefix}emeacc_budget`
+                 WHERE fiscal_year = %d",
                 $year
             )
         );
+        $map = [];
+        foreach ( $rows as $r ) {
+            $key = (int) $r->coa_id . '|' . $r->direction;
+            $map[ $key ] = (float) $r->budgeted_amount;
+        }
+        return $map;
     }
 
     /**
-     * Budget vs actual comparison for a given year.
-     *
-     * @return array{budget: float, actual: float, variance: float, variance_pct: float}[]
+     * Get totals from journal for each COA/category in a year.
+     */
+    public static function get_actual_totals( int $year ): array {
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT coa_id, direction,
+                       COALESCE(SUM(amount), 0) as total
+                FROM `{$wpdb->prefix}emeacc_journal`
+                WHERE fiscal_year = %d AND direction != 'transfer'
+                GROUP BY coa_id, direction",
+                $year
+            )
+        );
+        $totals = [];
+        foreach ( $rows as $r ) {
+            $key = (int) $r->coa_id . '|' . $r->direction;
+            $totals[ $key ] = (float) $r->total;
+        }
+        return $totals;
+    }
+
+    /**
+     * Get comparison for all COA entries in a year.
      */
     public static function get_comparison( int $year ): array {
-        $budget_lines = self::get_year( $year );
-        $out          = [];
+        $budget_map  = self::get_year_map( $year );
+        $actual_map = self::get_actual_totals( $year );
+        $coa       = ChartOfAccounts::get_all();
+        $out       = [];
 
-        foreach ( $budget_lines as $b ) {
-            $actual = (float) Journal::get_totals( [
-                'fiscal_year' => $year,
-                'account_id'  => (int) $b->account_id,
-                'category'    => $b->category ?: null,
-            ] )[ $b->direction === 'in' ? 'income' : 'expenses' ];
+        foreach ( $coa as $account ) {
+            $coa_id = (int) $account->id;
+            $key_in  = $coa_id . '|in';
+            $key_out = $coa_id . '|out';
 
-            $budget   = (float) $b->budgeted_amount;
-            $variance = $actual - $budget;
-            $out[]    = [
-                'id'           => $b->id,
-                'account_name' => $b->account_name,
-                'category'     => $b->category,
-                'direction'    => $b->direction,
-                'budget'       => $budget,
-                'actual'       => $actual,
-                'variance'     => $variance,
-                'variance_pct' => $budget != 0 ? round( $variance / $budget * 100, 1 ) : null,
-            ];
+            // IN
+            $budget_in  = $budget_map[ $key_in ] ?? 0;
+            $actual_in = $actual_map[ $key_in ] ?? 0;
+            if ( $budget_in > 0 || $actual_in > 0 || $account->direction === 'in' ) {
+                $out[] = [
+                    'coa_id'      => $coa_id,
+                    'account_name' => $account->code . ' - ' . $account->name,
+                    'direction' => 'in',
+                    'budget'    => $budget_in,
+                    'actual'   => $actual_in,
+                    'variance'=> $budget_in - $actual_in,
+                ];
+            }
+
+            // OUT
+            $budget_out  = $budget_map[ $key_out ] ?? 0;
+            $actual_out = $actual_map[ $key_out ] ?? 0;
+            if ( $budget_out > 0 || $actual_out > 0 || $account->direction === 'out' ) {
+                $out[] = [
+                    'coa_id'      => $coa_id,
+                    'account_name' => $account->code . ' - ' . $account->name,
+                    'direction' => 'out',
+                    'budget'    => $budget_out,
+                    'actual'   => $actual_out,
+                    'variance'=> $budget_out - $actual_out,
+                ];
+            }
         }
 
         return $out;
@@ -57,20 +100,51 @@ class Budget {
 
     public static function save( array $data ): int|\WP_Error {
         global $wpdb;
-        $row = [
-            'fiscal_year'     => (int) ( $data['fiscal_year'] ?? gmdate( 'Y' ) ),
-            'account_id'      => (int) ( $data['account_id'] ?? 0 ),
-            'category'        => eme_sanitize_request( $data['category'] ?? '' ),
-            'direction'       => in_array( $data['direction'] ?? 'out', [ 'in', 'out' ], true ) ? $data['direction'] : 'out',
-            'budgeted_amount' => (float) ( $data['budgeted_amount'] ?? 0 ),
-            'notes'           => eme_sanitize_request( $data['notes'] ?? '' ),
-        ];
-        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
-        if ( $id > 0 ) {
-            $wpdb->update( $wpdb->prefix . 'emeacc_budget', $row, [ 'id' => $id ], null, [ '%d' ] );
-            return $id;
+        $fiscal_year = (int) ( $data['fiscal_year'] ?? gmdate( 'Y' ) );
+        $coa_id     = (int) ( $data['coa_id'] ?? 0 );
+        $direction = in_array( $data['direction'] ?? 'out', [ 'in', 'out' ], true ) ? $data['direction'] : 'out';
+        $amount    = (float) ( $data['budgeted_amount'] ?? 0 );
+
+        if ( $coa_id <= 0 ) {
+            return new \WP_Error( 'invalid_coa', __( 'Geen rekeningstelsel geselecteerd.', 'eme-accounting' ) );
         }
-        $wpdb->insert( $wpdb->prefix . 'emeacc_budget', $row );
+
+        // Check if exists
+        $existing = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM `{$wpdb->prefix}emeacc_budget`
+                 WHERE fiscal_year = %d AND coa_id = %d AND direction = %s",
+                $fiscal_year,
+                $coa_id,
+                $direction
+            )
+        );
+
+        if ( $existing ) {
+            if ( $amount > 0 ) {
+                $wpdb->update(
+                    $wpdb->prefix . 'emeacc_budget',
+                    [ 'budgeted_amount' => $amount ],
+                    [ 'id' => (int) $existing ],
+                    [ '%f' ],
+                    [ '%d' ]
+                );
+            } else {
+                $wpdb->delete( $wpdb->prefix . 'emeacc_budget', [ 'id' => (int) $existing ], [ '%d' ] );
+            }
+            return (int) $existing;
+        }
+
+        if ( $amount <= 0 ) {
+            return 0;
+        }
+
+        $wpdb->insert( $wpdb->prefix . 'emeacc_budget', [
+            'fiscal_year'     => $fiscal_year,
+            'coa_id'        => $coa_id,
+            'direction'     => $direction,
+            'budgeted_amount' => $amount,
+        ] );
         return (int) $wpdb->insert_id;
     }
 

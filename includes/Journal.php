@@ -238,6 +238,7 @@ class Journal {
             'direction'          => $direction,
             'account_id'         => (int) $data['account_id'],
             'contra_account_id'  => ! empty( $data['contra_account_id'] ) ? (int) $data['contra_account_id'] : null,
+            'coa_id'            => ! empty( $data['coa_id'] ) ? (int) $data['coa_id'] : null,
             // bank_statement_ref: optioneel rekeningnummer / ref van bankafschrift
             'bank_statement_ref' => eme_sanitize_request( $data['bank_statement_ref'] ?? '' ),
             'bank_statement_seq' => eme_sanitize_request( $data['bank_statement_seq'] ?? '' ),
@@ -254,8 +255,37 @@ class Journal {
             'created_by'         => get_current_user_id() ?: null,
         ];
 
-        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
+        // Transfer requires both account_id and contra_account_id
+        if ( $direction === 'transfer' ) {
+            if ( empty( $data['contra_account_id'] ) ) {
+                return new \WP_Error( 'missing_contra_account', __( 'Transfer vereist tegenrekening.', 'eme-accounting' ) );
+            }
+            $account = Accounts::get( (int) $data['account_id'] );
+            $contra_account = Accounts::get( (int) $data['contra_account_id'] );
+            // Create dual booking: out from account_id, in to contra_account_id
+            $out_row = $row;
+            $out_row['direction']  = 'out';
+            $out_row['account_id'] = (int) $data['account_id'];
+            $out_row['contra_account_id'] = (int) $data['contra_account_id'];
+            $out_row['description'] = $row['description'] . " (transfer naar {$contra_account->name})";
+            $wpdb->insert( $table, $out_row );
+            $out_id = (int) $wpdb->insert_id;
 
+            $in_row = $row;
+            $in_row['direction']  = 'in';
+            $in_row['account_id'] = (int) $data['contra_account_id'];
+            $in_row['contra_account_id'] = (int) $data['account_id'];
+            $in_row['description'] = $row['description'] . " (transfer van {$account->name})";
+            $wpdb->insert( $table, $in_row );
+            $in_id = (int) $wpdb->insert_id;
+
+            do_action( 'eme_accounting_journal_created', $out_id, $out_row );
+            do_action( 'eme_accounting_journal_created', $in_id, $in_row );
+            return $out_id;
+        }
+
+        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
+ 
         if ( $id > 0 ) {
             unset( $row['created_by'] );
             $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );

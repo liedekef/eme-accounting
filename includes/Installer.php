@@ -21,13 +21,46 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '1.0.0';
+    const DB_VERSION        = '1.1.0';
 
     public static function activate(): void {
         self::create_tables();
+        self::migrate();
         self::seed_data();
         update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
         flush_rewrite_rules();
+    }
+
+    /**
+     * Run migrations for version upgrades.
+     */
+    private static function migrate(): void {
+        global $wpdb;
+        $current_version = get_option( self::DB_VERSION_OPTION, '0' );
+        if ( $current_version && version_compare( $current_version, '1.1.0', '<' ) ) {
+            // Migrate to 1.1.0: add coa_id to journal, rename account_id to coa_id in budget
+            $has_coa_id = $wpdb->get_var(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = '{$wpdb->prefix}emeacc_journal'
+                AND COLUMN_NAME = 'coa_id'"
+            );
+            if ( ! $has_coa_id ) {
+                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN coa_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
+                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_coa (coa_id)" );
+            }
+
+            $has_budget_coa = $wpdb->get_var(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = '{$wpdb->prefix}emeacc_budget'
+                AND COLUMN_NAME = 'coa_id'"
+            );
+            if ( ! $has_budget_coa ) {
+                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_budget MODIFY COLUMN account_id BIGINT UNSIGNED NOT NULL DEFAULT 0" );
+                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_budget CHANGE COLUMN account_id coa_id BIGINT UNSIGNED NOT NULL" );
+            }
+        }
     }
 
     private static function seed_data(): void {
@@ -103,6 +136,7 @@ class Installer {
             direction           ENUM('in','out','transfer')  NOT NULL DEFAULT 'out',
             account_id          BIGINT UNSIGNED NOT NULL,
             contra_account_id   BIGINT UNSIGNED              DEFAULT NULL,
+            coa_id             BIGINT UNSIGNED              DEFAULT NULL,
             bank_statement_ref  VARCHAR(100)    NOT NULL DEFAULT '',
             bank_statement_seq  VARCHAR(20)     NOT NULL DEFAULT '',
             payment_method      VARCHAR(50)     NOT NULL DEFAULT '',
@@ -122,6 +156,7 @@ class Installer {
             PRIMARY KEY (id),
             KEY idx_date (entry_date),
             KEY idx_account (account_id),
+            KEY idx_coa (coa_id),
             KEY idx_fiscal_year (fiscal_year),
             KEY idx_category (category),
             KEY idx_reconciled (is_reconciled),
@@ -193,17 +228,13 @@ class Installer {
         dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_budget (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             fiscal_year     SMALLINT        NOT NULL,
-            account_id      BIGINT UNSIGNED NOT NULL,
-            category        VARCHAR(100)    NOT NULL DEFAULT '',
-            direction       ENUM('in','out') NOT NULL DEFAULT 'out',
+            coa_id         BIGINT UNSIGNED NOT NULL,
+            direction      ENUM('in','out') NOT NULL DEFAULT 'out',
             budgeted_amount DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
-            notes           VARCHAR(255)    NOT NULL DEFAULT '',
-            approved_by     BIGINT UNSIGNED              DEFAULT NULL,
-            approved_at     DATETIME                     DEFAULT NULL,
             created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uniq_year_account_cat (fiscal_year, account_id, category, direction),
+            UNIQUE KEY uniq_year_coa_dir (fiscal_year, coa_id, direction),
             KEY idx_year (fiscal_year)
         ) $charset;" );
 
