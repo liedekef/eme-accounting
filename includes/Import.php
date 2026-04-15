@@ -30,7 +30,7 @@ class Import {
      */
     public static function delete_log( int $log_id ): void {
         global $wpdb;
-        $wpdb->delete( $wpdb->prefix . 'emeacc_import_lines', [ 'log_id' => $log_id ], [ '%d' ] );
+        $wpdb->delete( $wpdb->prefix . 'emeacc_import_lines', [ 'import_log_id' => $log_id ], [ '%d' ] );
         $wpdb->delete( $wpdb->prefix . 'emeacc_import_log', [ 'id' => $log_id ], [ '%d' ] );
     }
 
