@@ -79,7 +79,11 @@
     };
 
     document.addEventListener('submit', function (e) {
-        const handler = submitHandlers[e.target.id];
+        // If e.target is an input, e.target.form gives the parent form
+        const form = e.target.form || e.target.closest('form');
+        if (!form) return;
+        const formId = form.getAttribute('id');
+        const handler = submitHandlers[formId];
         if (!handler) return;
         e.preventDefault();
         handler(e.target);
