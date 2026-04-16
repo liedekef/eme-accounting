@@ -50,7 +50,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </div>
 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
-                    <select name="coa_id">
+                    <select name="coa_id" id="category_coa_id">
                         <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                         <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                         <?php foreach ( $coa_accounts as $id => $acc ): 
@@ -82,7 +82,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
-                    <select name="direction">
+                    <select name="direction" id="direction">
                         <option value="in"  <?= selected( $edit_entry->direction ?? '', 'in',  false ) ?>><?php esc_html_e( 'Ontvangst (+)', 'eme-accounting' ); ?></option>
                         <option value="out" <?= selected( $edit_entry->direction ?? 'out', 'out', false ) ?>><?php esc_html_e( 'Uitgave (–)', 'eme-accounting' ); ?></option>
                         <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Transfer', 'eme-accounting' ); ?></option>

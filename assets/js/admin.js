@@ -695,4 +695,115 @@
         });
     }
 
+    /* ═══════════════════════════════════════════════════════════════════
+     * JOURNAL PAGE - COA & DIRECTION LINKING
+     * ═══════════════════════════════════════════════════════════════════ */
+
+    function initJournalLinking() {
+        const directionSelect = document.querySelector('#direction');
+        const coaSelect = document.querySelector('#category_coa_id');
+
+        if (!directionSelect || !coaSelect) return;
+
+        // Store original options for filtering
+        const originalOptions = Array.from(coaSelect.options);
+
+        // Get direction from optgroup label
+        function getDirectionFromOptgroup(option) {
+            const parentOptgroup = option.closest('optgroup');
+            if (!parentOptgroup) return null;
+            const label = parentOptgroup.getAttribute('label');
+            if (label === 'Ontvangsten') return 'in';
+            if (label === 'Uitgaven') return 'out';
+            return null;
+        }
+
+        // Filter COA options based on direction
+        function filterCoaByDirection(direction) {
+            // Clear current options
+            coaSelect.innerHTML = '';
+
+            if (direction === 'transfer') {
+                // Add empty option for transfer
+                const emptyOption = document.createElement('option');
+                emptyOption.value = '';
+                emptyOption.textContent = '— Geen rekening voor transfers —';
+                coaSelect.appendChild(emptyOption);
+                coaSelect.disabled = true;
+                return;
+            }
+
+            coaSelect.disabled = false;
+
+            // Filter and add matching options
+            originalOptions.forEach(option => {
+                const optionDirection = getDirectionFromOptgroup(option);
+                if (optionDirection === direction || (direction === null && !optionDirection)) {
+                    coaSelect.appendChild(option.cloneNode(true));
+                }
+            });
+
+            // Reset selected value
+            coaSelect.value = '';
+        }
+
+        // Set direction based on selected COA
+        function setDirectionFromCoa() {
+            const selectedOption = coaSelect.options[coaSelect.selectedIndex];
+            if (!selectedOption || !selectedOption.value) return;
+
+            const direction = getDirectionFromOptgroup(selectedOption);
+            if (direction) {
+                directionSelect.value = direction;
+                directionSelect.disabled = true;
+            }
+        }
+
+        // Handle manual direction change
+        function handleDirectionChange() {
+            const direction = directionSelect.value;
+
+            if (direction === 'in') {
+                filterCoaByDirection('in');
+                directionSelect.disabled = false;
+            } else if (direction === 'out') {
+                filterCoaByDirection('out');
+                directionSelect.disabled = false;
+            } else if (direction === 'transfer') {
+                filterCoaByDirection('transfer');
+                directionSelect.disabled = false;
+            } else {
+                // Show all options if no valid direction
+                filterCoaByDirection(null);
+                directionSelect.disabled = false;
+            }
+
+            // Clear COA value when direction changes
+            coaSelect.value = '';
+        }
+
+        // Event listeners
+        directionSelect.addEventListener('change', handleDirectionChange);
+
+        // Initial setup based on current values
+        const currentDirection = directionSelect.value;
+        if (currentDirection === 'in' || currentDirection === 'out') {
+            filterCoaByDirection(currentDirection);
+            directionSelect.disabled = false;
+        } else if (currentDirection === 'transfer') {
+            filterCoaByDirection('transfer');
+            directionSelect.disabled = false;
+        } else {
+            // not possible currently (currentDirection is in/out/transfer only
+            coaSelect.addEventListener('change', setDirectionFromCoa);
+            filterCoaByDirection(null);
+        }
+
+        // If there's a preselected COA (when editing), set direction accordingly
+        if (coaSelect.value) {
+            setDirectionFromCoa();
+        }
+    }
+    initJournalLinking();
+
 })();
