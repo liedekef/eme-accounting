@@ -848,17 +848,13 @@
 
             if (direction === 'in') {
                 filterCoaByDirection('in');
-                directionSelect.disabled = false;
             } else if (direction === 'out') {
                 filterCoaByDirection('out');
-                directionSelect.disabled = false;
             } else if (direction === 'transfer') {
                 filterCoaByDirection('transfer');
-                directionSelect.disabled = false;
             } else {
                 // Show all options if no valid direction
                 filterCoaByDirection(null);
-                directionSelect.disabled = false;
             }
 
             // Clear COA value when direction changes
@@ -872,10 +868,8 @@
         const currentDirection = directionSelect.value;
         if (currentDirection === 'in' || currentDirection === 'out') {
             filterCoaByDirection(currentDirection);
-            directionSelect.disabled = false;
         } else if (currentDirection === 'transfer') {
             filterCoaByDirection('transfer');
-            directionSelect.disabled = false;
         } else {
             // not possible currently (currentDirection is in/out/transfer only
             coaSelect.addEventListener('change', setDirectionFromCoa);

@@ -250,6 +250,9 @@ class Journal {
 
         // Transfer requires both account_id and contra_account_id
         if ( $direction === 'transfer' ) {
+            if ( !empty( $id) ) {
+                return new \WP_Error( 'no_transfer_update', __( 'Transfer kan niet aangepast worden.', 'eme-accounting' ) );
+            }
             if ( empty( $data['contra_account_id'] ) ) {
                 return new \WP_Error( 'missing_contra_account', __( 'Transfer vereist tegenrekening.', 'eme-accounting' ) );
             }
@@ -257,7 +260,7 @@ class Journal {
             $contra_account = Accounts::get( (int) $data['contra_account_id'] );
             // Create dual booking: out from account_id, in to contra_account_id
             $out_row = $row;
-            $out_row['direction']  = 'out';
+            $out_row['direction']  = 'transfer';
             $out_row['account_id'] = (int) $data['account_id'];
             $out_row['contra_account_id'] = (int) $data['contra_account_id'];
             $out_row['description'] = $row['description'] . " (transfer naar {$contra_account->name})";
@@ -265,7 +268,7 @@ class Journal {
             $out_id = (int) $wpdb->insert_id;
 
             $in_row = $row;
-            $in_row['direction']  = 'in';
+            $in_row['direction']  = 'transfer';
             $in_row['account_id'] = (int) $data['contra_account_id'];
             $in_row['contra_account_id'] = (int) $data['account_id'];
             $in_row['description'] = $row['description'] . " (transfer van {$account->name})";
@@ -367,7 +370,6 @@ class Journal {
 
         $limit  = eme_get_datatables_limit();
         $orderby = eme_get_datatables_orderby();
-
         $entries = self::get_entries_for_ftable( $args, $orderby, $limit );
 
         foreach ( $entries as $entry ) {
