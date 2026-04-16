@@ -9,6 +9,7 @@ class ChartOfAccounts {
         add_action( 'wp_ajax_eme_accounting_save_coa',   [ __CLASS__, 'ajax_save' ] );
         add_action( 'wp_ajax_eme_accounting_delete_coa',   [ __CLASS__, 'ajax_delete' ] );
         add_action( 'wp_ajax_eme_accounting_reorder_coa',  [ __CLASS__, 'ajax_reorder' ] );
+        add_action( 'wp_ajax_eme_accounting_coa_next_seq', [ __CLASS__, 'ajax_next_seq' ] );
     }
 
     public static function seed(): void {
@@ -177,10 +178,10 @@ $accounts = [
         );
     }
 
-    public static function get_by_code( string $code ): ?object {
+    public static function get_by_code_dir( string $code, string $direction ): ?object {
         global $wpdb;
         return $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE code = %s", $code )
+            $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE code = %s AND direction = %s ", $code, $direction )
         );
     }
 
@@ -231,10 +232,31 @@ $accounts = [
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
-        if ( empty( $data['code'] ) || empty( $data['name'] ) ) {
-            return new \WP_Error( 'missing_fields', __( 'Code en naam zijn verplicht.', 'eme-accounting' ) );
+        if ( empty( $data['name'] ) ) {
+            return new \WP_Error( 'missing_fields', __( 'Naam is verplicht.', 'eme-accounting' ) );
         }
 
+        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
+
+        if ( $id > 0 ) {
+            $row = [
+                'name' => eme_sanitize_request( $data['name'] ),
+            ];
+            if ( ! empty( $data['description'] ) ) {
+                $row['description'] = eme_sanitize_request( $data['description'] );
+            }
+            $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
+            return $id;
+        }
+
+        if ( empty( $data['code'] ) ) {
+            return new \WP_Error( 'missing_fields', __( 'Code is verplicht.', 'eme-accounting' ) );
+        }
+
+        $is_used = self::get( $data['code'], $data['direction'] );
+        if ($is_used) {
+            return new \WP_Error( 'missing_fields', __( 'Code reeds in gebruik.', 'eme-accounting' ) );
+        }
         $row = [
             'parent_id'   => ! empty( $data['parent_id'] ) ? (int) $data['parent_id'] : null,
             'code'        => sanitize_text_field( $data['code'] ),
@@ -244,15 +266,28 @@ $accounts = [
             'description' => eme_sanitize_request( $data['description'] ?? '' ),
         ];
 
-        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
-
-        if ( $id > 0 ) {
-            $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
-            return $id;
-        }
-
         $wpdb->insert( $table, $row );
         return (int) $wpdb->insert_id;
+    }
+
+    public static function get_next_sequence( int $parent_id ): string {
+        global $wpdb;
+        $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
+
+        $parent = self::get( $parent_id );
+        if ( ! $parent ) {
+            return '';
+        }
+
+        $max_seq = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT MAX(CAST(SUBSTRING_INDEX(code, '-', -1) AS UNSIGNED)) FROM `$table` WHERE parent_id = %d",
+                $parent_id
+            )
+        );
+
+        $next_seq = $max_seq + 1;
+        return $parent->code . '-' . str_pad( (string) $next_seq, 6, '0', STR_PAD_LEFT );
     }
 
     public static function has_children( int $id ): bool {
@@ -349,5 +384,18 @@ $accounts = [
         $items = json_decode( eme_sanitize_request($_POST['items'] ?? '[]'), true );
         self::reorder( $items );
         wp_send_json_success();
+    }
+
+    public static function ajax_next_seq(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
+        }
+        $parent_id = (int) ( $_POST['parent_id'] ?? 0 );
+        if ( $parent_id <= 0 ) {
+            wp_send_json_error( __( 'Ongeldige hoofdrekening.', 'eme-accounting' ) );
+        }
+        $code = self::get_next_sequence( $parent_id );
+        wp_send_json_success( [ 'code' => $code ] );
     }
 }

@@ -12,18 +12,18 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
 <form id="eme-acc-coa-form">
 <input type="hidden" name="id" value="0">
 <div class="eme-acc-row">
-    <div class="eme-acc-field"><label><?php esc_html_e( 'Code', 'eme-accounting' ); ?> *</label><input type="text" name="code" required maxlength="20" placeholder="01-000001"></div>
-    <div class="eme-acc-field" style="flex:3"><label><?php esc_html_e( 'Naam', 'eme-accounting' ); ?> *</label><input type="text" name="name" required maxlength="200"></div>
+    <div class="eme-acc-field"><label><?php esc_html_e( 'Code', 'eme-accounting' ); ?> *</label><input type="text" name="code" required maxlength="20" placeholder="01-000001" class="eme-acc-code-input"></div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
-        <select name="direction">
-            <option value="out"><?php esc_html_e( 'Uitgave', 'eme-accounting' ); ?></option>
-            <option value="in"><?php esc_html_e( 'Ontvangst', 'eme-accounting' ); ?></option>
-        </select>
+         <select name="direction">
+             <option value="out"><?php esc_html_e( 'Uitgave', 'eme-accounting' ); ?></option>
+             <option value="in"><?php esc_html_e( 'Ontvangst', 'eme-accounting' ); ?></option>
+         </select>
     </div>
+    <div class="eme-acc-field" style="flex:3"><label><?php esc_html_e( 'Naam', 'eme-accounting' ); ?> *</label><input type="text" name="name" required maxlength="200"></div>
 </div>
 <div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'Hoofdrekening', 'eme-accounting' ); ?></label>
-        <select name="parent_id">
+        <select name="parent_id" class="eme-acc-parent-select">
             <option value="">— <?php esc_html_e( 'Geen (hoofdrekening)', 'eme-accounting' ); ?> —</option>
             <?php
             $main_in  = array_filter( $all_accounts, fn( $a ) => empty( $a->parent_id ) && $a->direction === 'in' );
@@ -32,14 +32,14 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
             <?php if ( $main_in ): ?>
             <optgroup label="<?php esc_attr_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                 <?php foreach ( $main_in as $a ): ?>
-                <option value="<?= (int) $a->id ?>"><?= esc_html( $a->code . ' - ' . $a->name ) ?></option>
+                <option value="<?= (int) $a->id ?>" data-direction="in"><?= esc_html( $a->code . ' - ' . $a->name ) ?></option>
                 <?php endforeach; ?>
             </optgroup>
             <?php endif; ?>
             <?php if ( $main_out ): ?>
             <optgroup label="<?php esc_attr_e( 'Uitgaven', 'eme-accounting' ); ?>">
                 <?php foreach ( $main_out as $a ): ?>
-                <option value="<?= (int) $a->id ?>"><?= esc_html( $a->code . ' - ' . $a->name ) ?></option>
+                <option value="<?= (int) $a->id ?>" data-direction="out"><?= esc_html( $a->code . ' - ' . $a->name ) ?></option>
                 <?php endforeach; ?>
             </optgroup>
             <?php endif; ?>

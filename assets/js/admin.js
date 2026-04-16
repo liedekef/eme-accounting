@@ -159,12 +159,20 @@
      * ═══════════════════════════════════════════════════════════════════ */
     function handleAccountSave(form) {
         const btn = form.querySelector('.submit-btn');
+        const originalText = btn.textContent;
         btn.textContent = i18n.saving;
         btn.disabled = true;
-        ajax('eme_accounting_save_account', formToObj(form), () => {
-            flashButton(btn, i18n.saved);
-            location.reload();
-        });
+        ajax('eme_accounting_save_account', formToObj(form),
+            () => {
+                flashButton(btn, i18n.saved);
+                location.reload();
+            },
+            (errorMsg) => {  // Error callback met message
+                alert(errorMsg);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        );
     }
 
     function handleAccountEdit(btn) {
@@ -203,14 +211,22 @@
      * ═══════════════════════════════════════════════════════════════════ */
     function handleCoaSave(form) {
         const btn  = form.querySelector('.submit-btn');
+        const originalText = btn.textContent;
         btn.textContent = i18n.saving;
         btn.disabled = true;
         const data = formToObj(form);
         if (!data.parent_id) data.parent_id = '';
-        ajax('eme_accounting_save_coa', data, () => {
-            flashButton(btn, i18n.saved);
-            location.reload();
-        });
+        ajax('eme_accounting_save_coa', data,
+            () => {
+                flashButton(btn, i18n.saved);
+                location.reload();
+            },
+            (errorMsg) => {  // Error callback met message
+                alert(errorMsg);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        );
     }
 
     function handleCoaEdit(btn) {
@@ -220,9 +236,12 @@
         const form = document.getElementById('eme-acc-coa-form');
         form.querySelector('[name="id"]').value          = d.id;
         form.querySelector('[name="code"]').value        = d.code;
+        form.querySelector('[name="code"]').disabled = true;
+        form.querySelector('[name="direction"]').value        = d.direction;
+        form.querySelector('[name="direction"]').disabled = true;
         form.querySelector('[name="name"]').value        = d.name;
-        form.querySelector('[name="direction"]').value   = d.direction || 'out';
-        form.querySelector('[name="parent_id"]').value   = parseInt(d.parentId) || '';
+        form.querySelector('[name="parent_id"]').disabled = true;
+        form.querySelector('[name="parent_id"]').value = d.parentId;
         form.querySelector('[name="description"]').value = d.description || '';
         document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening bewerken';
         document.getElementById('eme-acc-coa-cancel').style.display = '';
@@ -240,8 +259,40 @@
         const form = document.getElementById('eme-acc-coa-form');
         form.reset();
         form.querySelector('[name="id"]').value = '0';
+        form.querySelector('[name="code"]').readOnly = false;
+        form.querySelector('[name="code"]').disabled = false;
+        form.querySelector('[name="parent_id"]').disabled = false;
+        form.querySelector('[name="direction"]').disabled = false;
         document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening toevoegen';
         document.getElementById('eme-acc-coa-cancel').style.display = 'none';
+    }
+
+    /* ── COA auto-generate code on parent change ─────────────────── */
+    const coaParentSelect = document.querySelector('.eme-acc-parent-select');
+    const coaCodeInput = document.querySelector('.eme-acc-code-input');
+    if (coaParentSelect && coaCodeInput) {
+        coaParentSelect.addEventListener('change', function() {
+            const parentId = this.value;
+            const form = document.getElementById('eme-acc-coa-form');
+            const idField = form.querySelector('[name="id"]');
+            if (idField && idField.value !== '0') return;
+
+            if (!parentId) {
+                coaCodeInput.value = '';
+                coaCodeInput.placeholder = '01-000001';
+                return;
+            }
+
+            const selectedOption = this.options[this.selectedIndex];
+            const direction = selectedOption.dataset.direction;
+            const parentCode = selectedOption.textContent.split(' - ')[0];
+
+            if (parentId) {
+                ajax('eme_accounting_coa_next_seq', { parent_id: parentId }, (data) => {
+                    coaCodeInput.value = data.code;
+                });
+            }
+        });
     }
 
     /* ── COA drag-and-drop reorder ──────────────────────────────── */
@@ -272,12 +323,20 @@
      * ═══════════════════════════════════════════════════════════════════ */
     function handleJournalSave(form) {
         const btn = form.querySelector('.submit-btn');
+        const originalText = btn.textContent;
         btn.textContent = i18n.saving;
         btn.disabled = true;
-        ajax('eme_accounting_save_entry', formToObj(form), (data) => {
-            flashButton(btn, i18n.saved);
-            JournalTable.reload();
-        });
+        ajax('eme_accounting_save_entry', formToObj(form),
+            (data) => {
+                flashButton(btn, i18n.saved);
+                JournalTable.reload();
+            },
+            (errorMsg) => {  // Error callback met message
+                alert(errorMsg);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        );
     }
 
     function handleJournalSearch(form) {
@@ -332,6 +391,7 @@
     }
 
     function handleAutoReconcile(btn) {
+        const originalText = btn.textContent;
         btn.textContent = 'Bezig…';
         btn.disabled = true;
         ajax('eme_accounting_auto_reconcile',
@@ -340,6 +400,11 @@
                 btn.textContent = `Auto-reconciliatie (${data.matched} gematcht)`;
                 btn.disabled = false;
                 location.reload();
+            },
+            (errorMsg) => {  // Error callback met message
+                alert(errorMsg);
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         );
     }

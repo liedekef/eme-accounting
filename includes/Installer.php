@@ -106,7 +106,7 @@ class Installer {
 
         // ── Journal entries ─────────────────────────────────────────────
         // Each entry = one financial transaction (may have multiple lines)
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_journal (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_journal (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             entry_date          DATE            NOT NULL,
             booking_date        DATE                         DEFAULT NULL,
@@ -145,7 +145,7 @@ class Installer {
         ) $charset;" );
 
         // ── Stock items ─────────────────────────────────────────────────
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name            VARCHAR(150)    NOT NULL,
             sku             VARCHAR(50)     NOT NULL DEFAULT '',
@@ -165,7 +165,7 @@ class Installer {
         ) $charset;" );
 
         // ── Stock movements ─────────────────────────────────────────────
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock_movements (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock_movements (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             stock_id        BIGINT UNSIGNED NOT NULL,
             movement_date   DATE            NOT NULL,
@@ -183,7 +183,7 @@ class Installer {
         ) $charset;" );
 
         // ── Depreciable assets ──────────────────────────────────────────
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_depreciation (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_depreciation (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name                VARCHAR(150)    NOT NULL,
             description         TEXT,
@@ -205,7 +205,7 @@ class Installer {
         ) $charset;" );
 
         // ── Budget lines ────────────────────────────────────────────────
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_budget (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_budget (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             fiscal_year     SMALLINT        NOT NULL,
             coa_id          BIGINT UNSIGNED NOT NULL,
@@ -218,7 +218,7 @@ class Installer {
         ) $charset;" );
 
         // ── Bank import batches ─────────────────────────────────────────
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_log (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_log (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             account_id      BIGINT UNSIGNED NOT NULL,
             import_date     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -234,7 +234,7 @@ class Installer {
         ) $charset;" );
 
         // ── Individual bank statement lines ─────────────────────────────
-        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_lines (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_lines (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             import_log_id       BIGINT UNSIGNED NOT NULL,
             account_id          BIGINT UNSIGNED NOT NULL,
