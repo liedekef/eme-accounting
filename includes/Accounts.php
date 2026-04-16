@@ -72,7 +72,15 @@ class Accounts {
         $sum = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT
-                    COALESCE(SUM( CASE WHEN direction = 'in' THEN amount ELSE -amount END ), 0)
+                    COALESCE(SUM(
+                        CASE
+                        WHEN direction = 'in' THEN amount
+                        WHEN direction = 'out' THEN -amount
+                        WHEN direction = 'transfer' AND account_id = %d THEN -amount
+                        WHEN direction = 'transfer' AND contra_account_id = %d THEN amount
+                        ELSE 0
+                        END
+                    ), 0)
                  FROM `{$wpdb->prefix}emeacc_journal`
                  WHERE account_id = %d
                    AND direction != 'transfer'

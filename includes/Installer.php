@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
  * Tables created:
  *  - {prefix}emeacc_accounts         Financial accounts (bank, cash, savings…)
  *  - {prefix}emeacc_journal          Journal entries (income / expense / transfer)
- *  - {prefix}emeacc_journal_lines    Split bookings (one journal → many lines)
+ *  - {prefix}emeacc_journal_lines    TODO: Split bookings (one journal → many lines)
  *  - {prefix}emeacc_stock            Stock items
  *  - {prefix}emeacc_stock_movements  Stock in/out history
  *  - {prefix}emeacc_depreciation     Depreciable assets + rules

@@ -185,7 +185,7 @@ class FiscalYear {
         $year_result = self::get_year_result( $year );
         $label = $year_result >= 0 
             ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency($year_result, 'EUR' ) )
-            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency(abs($year_result, 'EUR' ) ) );
+            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency(abs($year_result), 'EUR' ) );
 
         wp_send_json_success( [ 'message' => __( 'Boekjaar afgesloten.', 'eme-accounting' ), 'result' => $label ] );
     }
