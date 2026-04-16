@@ -90,8 +90,12 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
                 <td style="font-size:11px;color:#646970"><?= esc_html( $entry->bank_statement_ref ); ?></td>
                 <td><?= esc_html( $entry->account_name ?? '' ); ?></td>
                 <td class="amount <?= esc_attr( $entry->direction ) ?>">
-                    <?= $entry->direction === 'in' ? '+' : '–'; ?>
-                    <?= $formatter->formatCurrency($entry->amount, 'EUR' ); ?>
+                    <?php if ($entry->direction === 'out')
+                            $real_amount = -1 * $entry->amount;
+                          else
+                            $real_amount = $entry->amount;
+                          echo $formatter->formatCurrency($real_amount, 'EUR' );
+                    ?>
                 </td>
                 <td>
                     <?php if ( $entry->is_reconciled ): ?>
