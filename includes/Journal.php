@@ -312,10 +312,10 @@ class Journal {
         $table = $wpdb->prefix . 'emeacc_journal';
 
         // If this is one leg of a transfer pair, delete the linked leg too.
-        $entry = $wpdb->get_row( $wpdb->prepare( "SELECT direction, transfer_id FROM `$table` WHERE id = %d", $id ) );
-        if ( $entry && $entry->direction === 'transfer' && ! empty( $entry->transfer_id ) ) {
-            $wpdb->delete( $table, [ 'id' => (int) $entry->transfer_id ], [ '%d' ] );
-            do_action( 'eme_accounting_journal_deleted', (int) $entry->transfer_id );
+        $transfer_id = $wpdb->get_var( $wpdb->prepare( "SELECT transfer_id FROM `$table` WHERE id = %d AND direction='transfer'", $id ) );
+        if ( $transfer_id ) {
+            $wpdb->delete( $table, [ 'id' => (int) $transfer_id ], [ '%d' ] );
+            do_action( 'eme_accounting_journal_deleted', (int) $transfer_id );
         }
 
         $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );

@@ -325,13 +325,12 @@
      * ═══════════════════════════════════════════════════════════════════ */
     function handleJournalSave(form) {
         const btn = form.querySelector('.submit-btn');
-        const originalText = btn.textContent;
-        btn.textContent = i18n.saving;
         btn.disabled = true;
         ajax('eme_accounting_save_entry', formToObj(form),
             (data) => {
-                flashButton(btn, i18n.saved);
+                flashButton(btn, i18n.saving);
                 JournalTable.reload();
+                form.reset();
             },
             (errorMsg) => {  // Error callback met message
                 alert(errorMsg);
@@ -688,6 +687,10 @@
             actions: {
                 listAction: ajaxUrl + '?action=eme_accounting_journal_list&nonce=' + nonce,
                 deleteAction: ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + nonce
+            },
+            recordDeleted: function(eventArgs) {
+                // since sometimes 2 lines are deleted in one go (linked transfers), we do a reload
+                JournalTable.reload();
             },
             fields: {
                 id: {
