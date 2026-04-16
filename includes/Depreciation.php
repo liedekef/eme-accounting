@@ -58,7 +58,6 @@ class Depreciation {
                         $asset->name,
                         gmdate( 'Y' )
                     ),
-                    'category'      => 'afschrijving',
                     'amount'      => $amount,
                     'direction'   => 'out',
                     'account_id'   => $asset->depreciation_account_id,
@@ -72,7 +71,6 @@ class Depreciation {
                         $asset->name,
                         gmdate( 'Y' )
                     ),
-                    'category'      => 'afschrijving',
                     'amount'      => $amount,
                     'direction'   => 'in',
                     'account_id'   => $asset->account_id,

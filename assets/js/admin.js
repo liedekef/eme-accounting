@@ -1,10 +1,12 @@
 /* eme-accounting/assets/js/admin.js */
-/* global emeAccounting, Sortable */
+/* global emeAccounting, Sortable, FTable */
 
 (function () {
     'use strict';
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
+
+    let JournalTable;
 
     /* ═══════════════════════════════════════════════════════════════════
      * UTILITIES
@@ -71,6 +73,7 @@
         'eme-acc-account-form':        handleAccountSave,
         'eme-acc-coa-form':            handleCoaSave,
         'eme-acc-journal-form':        handleJournalSave,
+        'eme-acc-filter-form':         handleJournalSearch,
         'eme-acc-import-form':         handleImportUpload,
         'eme-acc-stock-form':          handleStockSave,
         'eme-acc-stock-movement-form': handleStockMovement,
@@ -272,10 +275,13 @@
             if (existing) {
                 existing.classList.add('updated');
                 setTimeout(() => existing.classList.remove('updated'), 1500);
-            } else {
-                location.reload();
             }
+            JournalTable.reload();
         });
+    }
+
+    function handleJournalSearch(form) {
+        JournalTable.reload();
     }
 
     function handleJournalDelete(btn) {
@@ -484,7 +490,6 @@
             if (!form) return;
             Object.keys(data).forEach(coaId => {
                 const input = document.querySelector(`name="lines[${coaId}][budgeted_amount]"]`);
-                console.log(input);
                 if (input) input.value = data[coaId] || '';
             });
             document.getElementById('copy-status').textContent = i18n.loaded;
@@ -604,6 +609,84 @@
     if (yearSel) {
         const saved = localStorage.getItem('eme_acc_year');
         if (saved) yearSel.value = saved;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * JOURNAL FTABLE
+     * ═══════════════════════════════════════════════════════════════════ */
+    const JournalTableContainer = document.querySelector('#JournalTableContainer');
+    if (JournalTableContainer) {
+        JournalTable = new FTable('#JournalTableContainer', {
+            title: '',
+            paging: true,
+            sorting: true,
+            sortingResetButton: true,
+            multiSorting: true,
+            defaultSorting: 'entry_date DESC',
+            selecting: false,
+            multiselect: false,
+            actions: {
+                listAction: ajaxUrl + '?action=eme_accounting_journal_list&nonce=' + nonce,
+                deleteAction: ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + nonce
+            },
+            fields: {
+                id: {
+                    key: true,
+                    width: '1%',
+                    columnResizable: false,
+                    list: false
+                },
+                entry_date: {
+                    title: i18n.date || 'Datum',
+                    sortable: true
+                },
+                description: {
+                    title: i18n.description || 'Omschrijving',
+                    sortable: true
+                },
+                coa_name: {
+                    title: i18n.category || 'Categorie',
+                    sortable: false,
+                    searchable: false
+                },
+                bank_statement_ref: {
+                    title: i18n.bankref || 'Bankref.',
+                    sortable: false,
+                    searchable: false
+                },
+                account_name: {
+                    title: i18n.account || 'Rekening',
+                    sortable: false,
+                    searchable: false
+                },
+                amount_formatted: {
+                    title: i18n.amount || 'Bedrag',
+                    sortable: true,
+                    searchable: false
+                },
+                is_reconciled: {
+                    title: i18n.reconciled || 'V',
+                    width: '1%',
+                    sortable: false,
+                    searchable: false
+                }
+            },
+            listQueryParams: () => ({
+                fiscal_year: document.querySelector('#eme-acc-year-filter')?.value || '',
+                account_id: document.querySelector('#eme-acc-account-filter')?.value || '',
+                direction: document.querySelector('#eme-acc-direction-filter')?.value || '',
+                coa_id: document.querySelector('#eme-acc-coa-filter')?.value || '',
+                search: document.querySelector('#eme-acc-search-filter')?.value || ''
+            })
+        });
+
+        JournalTable.load();
+
+        document.querySelectorAll('#eme-acc-filter-form select').forEach(function(sel) {
+            sel.addEventListener('change', function() {
+                JournalTable.reload();
+            });
+        });
     }
 
 })();

@@ -16,10 +16,11 @@ class EMEBridge {
      * @param  array $payment     EME payment data
      */
     public static function on_payment( int $payment_id, array $payment ): void {
-        // Only auto-book if a default income account is configured
+        // Only auto-book if a default income account and COA are configured
         $settings         = get_option( 'eme_accounting_settings', [] );
         $default_account  = (int) ( $settings['default_income_account'] ?? 0 );
-        if ( ! $default_account ) {
+        $default_coa     = (int) ( $settings['default_coa'] ?? 0 );
+        if ( ! $default_account || ! $default_coa ) {
             return;
         }
 
@@ -38,7 +39,7 @@ class EMEBridge {
                 $payment_id,
                 $payment['event_name'] ?? ''
             ),
-            'category'       => 'eme-inschrijving',
+            'coa_id'         => $default_coa,
             'amount'         => (float) ( $payment['amount'] ?? 0 ),
             'direction'      => 'in',
             'account_id'     => $default_account,

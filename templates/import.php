@@ -1,6 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 $accounts  = EMEAccounting\Accounts::get_dropdown( 'asset' );
+$coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $log_id    = isset( $_GET['log_id'] ) ? (int) $_GET['log_id'] : 0;
 $lines     = $log_id ? EMEAccounting\Import::get_all_lines( $log_id ) : [];
 
@@ -86,7 +87,32 @@ $import_logs = $wpdb->get_results(
         <div style="display:flex;gap:4px;flex-wrap:wrap">
             <input type="number" class="journal-id-input" placeholder="Dagboek ID" style="width:80px;padding:2px 4px">
             <button class="button button-small btn-reconcile-manual" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Link', 'eme-accounting' ); ?></button>
-            <input type="text" class="category-input" placeholder="<?php esc_attr_e( 'Categorie', 'eme-accounting' ); ?>" style="width:100px;padding:2px 4px">
+             <select name="coa_id" required>
+                 <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                 <?php if ($line->amount >= 0): ?>
+                        <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
+                        <?php foreach ( $coa_accounts as $id => $acc ):
+                            if ( $acc && $acc->direction === 'in' ):
+                        ?>
+                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+                        </option>
+                        <?php endif; endforeach; ?>
+                        </optgroup>
+                 <?php endif; ?>
+                 <?php if ($line->amount < 0): ?>
+                        <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
+                        <?php foreach ( $coa_accounts as $id => $acc ):
+                            if ( $acc && $acc->direction === 'out' ):
+                        ?>
+                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+                        </option>
+                        <?php endif; endforeach; ?>
+                        </optgroup>
+                 <?php endif; ?>
+             </select>
+
             <button class="button button-small btn-create-from-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?></button>
             <button class="button button-small btn-ignore-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Negeer', 'eme-accounting' ); ?></button>
         </div>

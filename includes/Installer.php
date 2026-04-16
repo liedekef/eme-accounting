@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '1.1.0';
+    const DB_VERSION        = '11';
 
     public static function activate(): void {
         self::create_tables();
@@ -37,18 +37,9 @@ class Installer {
     private static function migrate(): void {
         global $wpdb;
         $current_version = get_option( self::DB_VERSION_OPTION, '0' );
-        if ( $current_version && version_compare( $current_version, '1.1.0', '<' ) ) {
-            // Migrate to 1.1.0: add coa_id to journal, rename account_id to coa_id in budget, remove direction from budget
-            $has_coa_id = $wpdb->get_var(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = '{$wpdb->prefix}emeacc_journal'
-                AND COLUMN_NAME = 'coa_id'"
-            );
-            if ( ! $has_coa_id ) {
-                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN coa_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
-                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_coa (coa_id)" );
-            }
+        if ( $current_version && $current_version < 11 ) {
+            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN coa_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
+            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_coa (coa_id)" );
         }
     }
 
@@ -80,7 +71,7 @@ class Installer {
         $charset = $wpdb->get_charset_collate();
 
         // ── Financial accounts ──────────────────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_accounts (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_accounts (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name            VARCHAR(150)    NOT NULL,
             iban            VARCHAR(34)     NOT NULL DEFAULT '',
@@ -97,7 +88,7 @@ class Installer {
         ) $charset;" );
 
         // ── Chart of accounts (rekeningstelsel) ───────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_chart_of_accounts (
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_chart_of_accounts (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             parent_id           BIGINT UNSIGNED              DEFAULT NULL,
             code                VARCHAR(20)     NOT NULL,
@@ -115,7 +106,7 @@ class Installer {
 
         // ── Journal entries ─────────────────────────────────────────────
         // Each entry = one financial transaction (may have multiple lines)
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_journal (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_journal (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             entry_date          DATE            NOT NULL,
             booking_date        DATE                         DEFAULT NULL,
@@ -154,7 +145,7 @@ class Installer {
         ) $charset;" );
 
         // ── Stock items ─────────────────────────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_stock (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name            VARCHAR(150)    NOT NULL,
             sku             VARCHAR(50)     NOT NULL DEFAULT '',
@@ -174,7 +165,7 @@ class Installer {
         ) $charset;" );
 
         // ── Stock movements ─────────────────────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_stock_movements (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock_movements (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             stock_id        BIGINT UNSIGNED NOT NULL,
             movement_date   DATE            NOT NULL,
@@ -192,7 +183,7 @@ class Installer {
         ) $charset;" );
 
         // ── Depreciable assets ──────────────────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_depreciation (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_depreciation (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name                VARCHAR(150)    NOT NULL,
             description         TEXT,
@@ -214,7 +205,7 @@ class Installer {
         ) $charset;" );
 
         // ── Budget lines ────────────────────────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_budget (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_budget (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             fiscal_year     SMALLINT        NOT NULL,
             coa_id          BIGINT UNSIGNED NOT NULL,
@@ -227,7 +218,7 @@ class Installer {
         ) $charset;" );
 
         // ── Bank import batches ─────────────────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_import_log (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_log (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             account_id      BIGINT UNSIGNED NOT NULL,
             import_date     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -243,7 +234,7 @@ class Installer {
         ) $charset;" );
 
         // ── Individual bank statement lines ─────────────────────────────
-        dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_import_lines (
+        $wpdb->query(( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_lines (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             import_log_id       BIGINT UNSIGNED NOT NULL,
             account_id          BIGINT UNSIGNED NOT NULL,

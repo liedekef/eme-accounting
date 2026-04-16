@@ -552,7 +552,7 @@ class Import {
             'bank_statement_ref'=> $line->bank_ref ?: $line->structured_ref,
             'import_line_id'    => $line->id,
             'is_reconciled'     => 1,
-            'category'          => eme_sanitize_request( $_POST['category'] ?? '' ),
+            'coa_id'            => (int) ( $_POST['coa_id'] ?? 0 ),
         ] );
 
         if ( is_wp_error( $journal_id ) ) {

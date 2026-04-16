@@ -1,24 +1,16 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-$year       = isset( $_GET['year'] )      ? (int) $_GET['year']                : (int) gmdate( 'Y' );
-$account_id = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']          : 0;
-$direction  = isset( $_GET['direction'] )  ? sanitize_key( $_GET['direction'] ) : '';
-$search     = isset( $_GET['s'] )          ? sanitize_text_field( $_GET['s'] )  : '';
-$edit_id    = isset( $_GET['edit'] )       ? (int) $_GET['edit']                : 0;
+$year        = isset( $_GET['year'] )       ? (int) $_GET['year']                : (int) gmdate( 'Y' );
+$account_id  = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']          : 0;
+$direction   = isset( $_GET['direction'] )  ? sanitize_key( $_GET['direction'] ) : '';
+$edit_id     = isset( $_GET['edit'] )       ? (int) $_GET['edit']                : 0;
 
-$entries    = EMEAccounting\Journal::get_entries( [
-    'fiscal_year' => $year,
-    'account_id'  => $account_id ?: null,
-    'direction'   => $direction ?: null,
-    'search'      => $search ?: null,
-    'limit'       => 200,
-] );
-$accounts   = EMEAccounting\Accounts::get_dropdown();
+$accounts    = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
-$edit_entry = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
-$years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
-$totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
+$edit_entry  = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
+$years       = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
+$totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 ?>
 <div class="wrap eme-acc-wrap">
     <h1><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></h1>
@@ -181,49 +173,48 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 
     <!-- Filters -->
     <div class="eme-acc-toolbar">
-        <form method="get">
-            <input type="hidden" name="page" value="eme-accounting-journal">
-            <select name="year" id="eme-acc-year-select" onchange="this.form.submit()">
+        <form method="get" id="eme-acc-filter-form">
+            <select name="year" id="eme-acc-year-filter">
+                <option value=""></option>
                 <?php foreach ( $years as $y ): ?>
-                <option value="<?= $y ?>" <?= selected( $y, $year, false ) ?>><?= $y ?></option>
+                <option value="<?= $y ?>" ><?= $y ?></option>
                 <?php endforeach; ?>
             </select>
-            <select name="account_id" onchange="this.form.submit()">
+            <input type="search" placeholder="Filter op omschrijving" name="eme-acc-search-filter" id="eme-acc-search-filter">
+            <select name="account_id" id="eme-acc-account-filter">
                 <option value="0"><?php esc_html_e( 'Alle rekeningen', 'eme-accounting' ); ?></option>
                 <?php foreach ( $accounts as $aid => $aname ): ?>
                 <option value="<?= $aid ?>" <?= selected( $aid, $account_id, false ) ?>><?= esc_html( $aname ) ?></option>
                 <?php endforeach; ?>
             </select>
-            <select name="direction" onchange="this.form.submit()">
+            <select name="direction" id="eme-acc-direction-filter">
                 <option value=""><?php esc_html_e( 'Alle richtingen', 'eme-accounting' ); ?></option>
                 <option value="in"  <?= selected( 'in',  $direction, false ) ?>><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?></option>
                 <option value="out" <?= selected( 'out', $direction, false ) ?>><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></option>
             </select>
-                    <select name="coa_id">
-                        <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
-                        <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
-                        <?php foreach ( $coa_accounts as $id => $acc ):
-                            if ( $acc && $acc->direction === 'in' ):
-                        ?>
-                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
-                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
-                        </option>
-                        <?php endif; endforeach; ?>
-                        </optgroup>
-                        <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
-                        <?php foreach ( $coa_accounts as $id => $acc ):
-                            if ( $acc && $acc->direction === 'out' ):
-                        ?>
-                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
-                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
-                        </option>
-                        <?php endif; endforeach; ?>
-                        </optgroup>
-                    </select>
-            <input type="text" name="s" placeholder="<?php esc_attr_e( 'Zoeken…', 'eme-accounting' ); ?>" value="<?= esc_attr( $search ) ?>">
-            <button type="submit" class="button"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
+            <select name="coa_id" id="eme-acc-coa-filter">
+                <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
+                <?php foreach ( $coa_accounts as $id => $acc ): 
+                    if ( $acc && $acc->direction === 'in' ):
+                ?>
+                <option value="<?= (int) $id ?>" <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                    <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+                </option>
+                <?php endif; endforeach; ?>
+                </optgroup>
+                <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
+                <?php foreach ( $coa_accounts as $id => $acc ): 
+                    if ( $acc && $acc->direction === 'out' ):
+                ?>
+                <option value="<?= (int) $id ?>" <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                    <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+                </option>
+                <?php endif; endforeach; ?>
+                </optgroup>
+            </select>
             <div class="spacer"></div>
-            <strong>
+            <strong id="eme-acc-totals">
                 <?php printf(
                     esc_html__( 'O: %s  |  U: %s  |  Resultaat: %s', 'eme-accounting' ),
                     number_format( $totals['income'],   2, ',', '.' ) . ' €',
@@ -234,53 +225,6 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
         </form>
     </div>
 
-    <!-- Entries table -->
-    <table class="eme-acc-table">
-        <thead>
-            <tr>
-                <th><?php esc_html_e( 'Datum', 'eme-accounting' ); ?></th>
-                <th><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?></th>
-                <th><?php esc_html_e( 'Categorie', 'eme-accounting' ); ?></th>
-                <th><?php esc_html_e( 'Bankref.', 'eme-accounting' ); ?></th>
-                <th><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?></th>
-                <th class="amount"><?php esc_html_e( 'Bedrag', 'eme-accounting' ); ?></th>
-                <th><?php esc_html_e( 'V', 'eme-accounting' ); ?></th>
-                <th><?php esc_html_e( 'Acties', 'eme-accounting' ); ?></th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php if ( empty( $entries ) ): ?>
-            <tr><td colspan="8"><?php esc_html_e( 'Geen boekingen gevonden.', 'eme-accounting' ); ?></td></tr>
-        <?php else: ?>
-            <?php foreach ( $entries as $e ): ?>
-            <tr data-journal-row="<?= (int) $e->id ?>">
-                <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $e->entry_date ) ) ) ?></td>
-                <td><?= esc_html( $e->description ) ?></td>
-                <td><?= $e->coa_id ? '<span class="tag">' . esc_html( $coa_accounts[$e->coa_id]->name ) . '</span>' : '' ?></td>
-                <td style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= esc_attr( $e->bank_statement_ref ) ?>">
-                    <?= esc_html( $e->bank_statement_ref ) ?>
-                </td>
-                <td><?= esc_html( $e->account_name ?? '' ) ?></td>
-                <td class="amount <?= esc_attr( $e->direction ) ?>">
-                    <?= $e->direction === 'in' ? '+' : '–' ?>
-                    <?= number_format( (float) $e->amount, 2, ',', '.' ) ?> €
-                </td>
-                <td>
-                    <?php if ( $e->is_reconciled ): ?>
-                    <span class="tag reconciled" title="<?= esc_attr( date_i18n( 'd/m/Y', strtotime( $e->reconciled_at ?? '' ) ) ) ?>">✓</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-journal&edit=' . $e->id ) ) ?>" class="button button-small">
-                        <?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?>
-                    </a>
-                    <button class="button button-small eme-acc-delete-entry" data-id="<?= (int) $e->id ?>">
-                        <?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?>
-                    </button>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        <?php endif; ?>
-        </tbody>
-    </table>
+    <!-- Journal entries table -->
+    <div id="JournalTableContainer"></div>
 </div>

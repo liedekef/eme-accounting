@@ -16,6 +16,7 @@ class Journal {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_entry',   [ __CLASS__, 'ajax_save' ] );
         add_action( 'wp_ajax_eme_accounting_delete_entry', [ __CLASS__, 'ajax_delete' ] );
+        add_action( 'wp_ajax_eme_accounting_journal_list',  [ __CLASS__, 'ajax_list' ] );
     }
 
     /* ------------------------------------------------------------------
@@ -102,10 +103,11 @@ class Journal {
         $prepare[] = (int) $args['offset'];
 
         $sql = $wpdb->prepare(
-            "SELECT j.*, a.name as account_name, ca.name as contra_account_name
+            "SELECT j.*, a.name as account_name, ca.name as contra_account_name, coa.name as coa_name
              FROM `{$table}` j
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a  ON a.id = j.account_id
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` ca ON ca.id = j.contra_account_id
+             LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
              {$where_sql}
              ORDER BY {$order_clause}
              LIMIT %d OFFSET %d",
@@ -333,6 +335,155 @@ class Journal {
             wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
         }
         self::delete( (int) ( $_POST['id'] ?? 0 ) );
-        wp_send_json_success();
+        wp_send_json(['Result' => 'OK']); //ftable expects Result
+    }
+
+    public static function ajax_list(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
+        }
+
+        header( 'Content-type: application/json; charset=utf-8' );
+
+        $result = [
+            'Result'           => 'OK',
+            'Records'          => [],
+            'TotalRecordCount' => 0,
+        ];
+
+        $args = [
+            'fiscal_year'    => isset( $_POST['fiscal_year'] ) ? (int) $_POST['fiscal_year'] : null,
+            'account_id'      => isset( $_POST['account_id'] ) && $_POST['account_id'] > 0 ? (int) $_POST['account_id'] : null,
+            'direction'       => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
+            'coa_id'          => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
+            'search'          => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
+        ];
+
+        $total = self::count_entries( $args );
+        $result['TotalRecordCount'] = $total;
+
+        $limit  = eme_get_datatables_limit();
+        $orderby = eme_get_datatables_orderby();
+
+        $entries = self::get_entries_for_ftable( $args, $orderby, $limit );
+
+        foreach ( $entries as $entry ) {
+            $edit_url = esc_url( admin_url( 'admin.php?page=eme-accounting-journal&edit=' . $entry->id ) );
+            $amount_class = $entry->direction === 'in' ? 'in' : 'out';
+            $sign = $entry->direction === 'in' ? '+' : '–';
+
+            $result['Records'][] = [
+                'id'                 => $entry->id,
+                'entry_date'         => eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
+                'description'        => "<a href='{$edit_url}'>" . esc_html( $entry->description ) . '</a>',
+                'coa_name'           => $entry->coa_name ? '<span class="tag">' . esc_html( $entry->coa_name ) . '</span>' : '',
+                'bank_statement_ref' => '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' . esc_attr( $entry->bank_statement_ref ) . '">' . esc_html( $entry->bank_statement_ref ) . '</span>',
+                'account_name'       => esc_html( $entry->account_name ?? '' ),
+                'amount_formatted'   => '<span class="amount ' . $amount_class . '">' . $sign . ' ' . number_format_i18n( (float) $entry->amount, 2 ) . ' €</span>',
+                'is_reconciled'      => $entry->is_reconciled ? '<span class="tag reconciled" title="' . esc_attr( $entry->reconciled_at ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE ) : '' ) . '">✓</span>' : '',
+            ];
+        }
+
+        print wp_json_encode( $result );
+        wp_die();
+    }
+
+    public static function count_entries( array $args = [] ): int {
+        global $wpdb;
+        $table = $wpdb->prefix . 'emeacc_journal';
+
+        $where   = [];
+        $prepare = [];
+
+        if ( ! empty( $args['fiscal_year'] ) ) {
+            $where[]   = 'fiscal_year = %d';
+            $prepare[] = (int) $args['fiscal_year'];
+        }
+        if ( ! empty( $args['account_id'] ) ) {
+            $where[]   = '(account_id = %d OR contra_account_id = %d)';
+            $prepare[] = (int) $args['account_id'];
+            $prepare[] = (int) $args['account_id'];
+        }
+        if ( ! empty( $args['direction'] ) ) {
+            $where[]   = 'direction = %s';
+            $prepare[] = $args['direction'];
+        }
+        if ( ! empty( $args['coa_id'] ) ) {
+            $where[]   = 'coa_id = %d';
+            $prepare[] = (int) $args['coa_id'];
+        }
+        if ( ! empty( $args['search'] ) ) {
+            $like      = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+            $where[]   = '(description LIKE %s OR bank_statement_ref LIKE %s)';
+            $prepare[] = $like;
+            $prepare[] = $like;
+        }
+
+        $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
+
+        if ( empty( $prepare ) ) {
+            return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+        }
+
+        $sql = $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} {$where_sql}",
+            ...$prepare
+        );
+
+        return (int) $wpdb->get_var( $sql );
+    }
+
+    public static function get_entries_for_ftable( array $args = [], string $orderby = '', string $limit = '' ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'emeacc_journal';
+
+        $where   = [];
+        $prepare = [];
+
+        if ( ! empty( $args['fiscal_year'] ) ) {
+            $where[]   = 'j.fiscal_year = %d';
+            $prepare[] = (int) $args['fiscal_year'];
+        }
+        if ( ! empty( $args['account_id'] ) ) {
+            $where[]   = '(j.account_id = %d OR j.contra_account_id = %d)';
+            $prepare[] = (int) $args['account_id'];
+            $prepare[] = (int) $args['account_id'];
+        }
+        if ( ! empty( $args['direction'] ) ) {
+            $where[]   = 'j.direction = %s';
+            $prepare[] = $args['direction'];
+        }
+        if ( ! empty( $args['coa_id'] ) ) {
+            $where[]   = 'j.coa_id = %d';
+            $prepare[] = (int) $args['coa_id'];
+        }
+        if ( ! empty( $args['search'] ) ) {
+            $like      = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+            $where[]   = '(j.description LIKE %s OR j.bank_statement_ref LIKE %s)';
+            $prepare[] = $like;
+            $prepare[] = $like;
+        }
+        $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
+
+        $order_clause = $orderby ?: 'j.entry_date DESC, j.id DESC';
+        if ( stripos( $order_clause, 'ORDER BY' ) !== 0 ) {
+            $order_clause = 'ORDER BY ' . $order_clause;
+        }
+
+        $sql = "SELECT j.*, a.name as account_name, ca.name as contra_account_name, coa.name as coa_name
+                FROM `{$table}` j
+                LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a  ON a.id = j.account_id
+                LEFT JOIN `{$wpdb->prefix}emeacc_accounts` ca ON ca.id = j.contra_account_id
+                LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
+                {$where_sql}
+                {$order_clause}
+                {$limit}";
+
+        if ( empty( $prepare ) ) {
+            return $wpdb->get_results( $sql );
+        }
+
+        return $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) );
     }
 }

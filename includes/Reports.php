@@ -18,12 +18,13 @@ class Reports {
 
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT direction, category,
-                        COALESCE(SUM(amount), 0) as total
-                 FROM `{$wpdb->prefix}emeacc_journal`
-                 WHERE fiscal_year = %d AND direction != 'transfer'
-                 GROUP BY direction, category
-                 ORDER BY direction DESC, category",
+                "SELECT j.direction, j.coa_id, coa.name, coa.code,
+                        COALESCE(SUM(j.amount), 0) as total
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
+                 WHERE j.fiscal_year = %d AND j.direction != 'transfer'
+                 GROUP BY j.direction, j.coa_id
+                 ORDER BY j.direction DESC, coa.code",
                 $year
             )
         );
@@ -31,10 +32,13 @@ class Reports {
         $income   = [];
         $expenses = [];
         foreach ( $rows as $row ) {
+            $label = $row->code && $row->name 
+                ? $row->code . ' - ' . $row->name 
+                : __( '(zonder rekeningstelsel)', 'eme-accounting' );
             if ( $row->direction === 'in' ) {
-                $income[ $row->category ?: __( '(zonder categorie)', 'eme-accounting' ) ] = (float) $row->total;
+                $income[ $label ] = (float) $row->total;
             } else {
-                $expenses[ $row->category ?: __( '(zonder categorie)', 'eme-accounting' ) ] = (float) $row->total;
+                $expenses[ $label ] = (float) $row->total;
             }
         }
 

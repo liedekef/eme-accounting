@@ -10,7 +10,12 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
         'currency'                => strtoupper( sanitize_text_field( $_POST['currency'] ?? 'EUR' ) ),
         'delete_on_uninstall'     => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
         'eme_auto_booking'        => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
+        'default_coa'             => (int)    ( $_POST['default_coa'] ?? 0 ),
     ];
+    if ($settings['eme_auto_booking'] && !$settings['default_coa']) {
+        echo '<div class="notice notice-error"><p>' . esc_html__( 'Kies een resultatenrekening aub.', 'eme-accounting' ) . '</p></div>';
+        return;
+    }
     update_option( 'eme_accounting_settings', $settings );
     update_option( 'eme_accounting_delete_on_uninstall', $settings['delete_on_uninstall'] );
     echo '<div class="notice notice-success"><p>' . esc_html__( 'Instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
@@ -22,9 +27,11 @@ $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'default_fiscal_year'     => (int) gmdate( 'Y' ),
     'currency'                => 'EUR',
     'delete_on_uninstall'     => 'no',
+    'default_coa'             => 0,
     'eme_auto_booking'        => 0,
 ] );
 $accounts = EMEAccounting\Accounts::get_dropdown();
+$coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Instellingen – EME Boekhouding', 'eme-accounting' ); ?></h1>
@@ -81,7 +88,22 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
             <input type="checkbox" name="eme_auto_booking" value="1" <?= checked( 1, $settings['eme_auto_booking'] ) ?>>
             <?php esc_html_e( 'Maak automatisch een journaalboeking aan wanneer een EME-betaling als betaald wordt gemarkeerd.', 'eme-accounting' ); ?>
         </label>
-        <p class="description"><?php esc_html_e( 'Vereist een standaard ontvangstrekening hierboven.', 'eme-accounting' ); ?></p>
+        <p class="description"><?php esc_html_e( 'Vereist een standaard ontvangstrekening (hierboven) en een standaard resultatenrekening (hieronder).', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Standaard resultatenrekening', 'eme-accounting' ); ?></th>
+    <td>
+        <select name="default_coa">
+           <option value='0'><?php esc_html_e( '— Kies ontvangstenrekening —', 'eme-accounting' ); ?></option>
+            <?php foreach ( $coa_accounts as $id => $acc ):
+                     if ( $acc && $acc->direction === 'in' ):
+            ?>
+                         <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                         <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+            </option>
+            <?php endif; endforeach; ?>
+        </select>
     </td>
 </tr>
 </table>

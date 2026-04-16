@@ -84,7 +84,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             <tr data-journal-row="<?= (int) $entry->id ?>">
                 <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $entry->entry_date ) ) ); ?></td>
                 <td><?= esc_html( $entry->description ); ?></td>
-                <td><?= $entry->category ? '<span class="tag">' . esc_html( $entry->category ) . '</span>' : ''; ?></td>
+                <td><?= $entry->coa_name ? '<span class="tag">' . esc_html( $entry->coa_name ) . '</span>' : ''; ?></td>
                 <td style="font-size:11px;color:#646970"><?= esc_html( $entry->bank_statement_ref ); ?></td>
                 <td><?= esc_html( $entry->account_name ?? '' ); ?></td>
                 <td class="amount <?= esc_attr( $entry->direction ) ?>">
