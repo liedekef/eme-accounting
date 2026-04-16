@@ -267,21 +267,27 @@ class Journal {
             $account = Accounts::get( (int) $data['account_id'] );
             $contra_account = Accounts::get( (int) $data['contra_account_id'] );
             // Create dual booking: out from account_id, in to contra_account_id
+            // Insert out-leg first (without transfer_id), then link both legs.
             $out_row = $row;
-            $out_row['direction']  = 'transfer';
-            $out_row['account_id'] = (int) $data['account_id'];
+            $out_row['direction']         = 'transfer';
+            $out_row['account_id']        = (int) $data['account_id'];
             $out_row['contra_account_id'] = (int) $data['contra_account_id'];
-            $out_row['description'] = $row['description'] . " (transfer naar {$contra_account->name})";
+            $out_row['description']       = $row['description'] . " (transfer naar {$contra_account->name})";
             $wpdb->insert( $table, $out_row );
             $out_id = (int) $wpdb->insert_id;
 
             $in_row = $row;
-            $in_row['direction']  = 'transfer';
-            $in_row['account_id'] = (int) $data['contra_account_id'];
+            $in_row['direction']         = 'transfer';
+            $in_row['account_id']        = (int) $data['contra_account_id'];
             $in_row['contra_account_id'] = (int) $data['account_id'];
-            $in_row['description'] = $row['description'] . " (transfer van {$account->name})";
+            $in_row['transfer_id']        = $out_id; // link to out-leg
+            $in_row['description']        = $row['description'] . " (transfer van {$account->name})";
             $wpdb->insert( $table, $in_row );
             $in_id = (int) $wpdb->insert_id;
+
+            // Back-fill transfer_id on out-leg so both legs point to each other's pair.
+            $wpdb->update( $table, [ 'transfer_id' => $in_id ], [ 'id' => $out_id ], [ '%d' ], [ '%d' ] );
+            $out_row['transfer_id'] = $in_id;
 
             do_action( 'eme_accounting_journal_created', $out_id, $out_row );
             do_action( 'eme_accounting_journal_created', $in_id, $in_row );
@@ -303,7 +309,16 @@ class Journal {
 
     public static function delete( int $id ): bool {
         global $wpdb;
-        $wpdb->delete( $wpdb->prefix . 'emeacc_journal', [ 'id' => $id ], [ '%d' ] );
+        $table = $wpdb->prefix . 'emeacc_journal';
+
+        // If this is one leg of a transfer pair, delete the linked leg too.
+        $entry = $wpdb->get_row( $wpdb->prepare( "SELECT direction, transfer_id FROM `$table` WHERE id = %d", $id ) );
+        if ( $entry && $entry->direction === 'transfer' && ! empty( $entry->transfer_id ) ) {
+            $wpdb->delete( $table, [ 'id' => (int) $entry->transfer_id ], [ '%d' ] );
+            do_action( 'eme_accounting_journal_deleted', (int) $entry->transfer_id );
+        }
+
+        $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
         do_action( 'eme_accounting_journal_deleted', $id );
         return true;
     }

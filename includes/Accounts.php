@@ -83,8 +83,9 @@ class Accounts {
                     ), 0)
                  FROM `{$wpdb->prefix}emeacc_journal`
                  WHERE account_id = %d
-                   AND direction != 'transfer'
                    {$date_clause}",
+                $account_id,
+                $account_id,
                 $account_id
             )
         );

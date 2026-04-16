@@ -37,7 +37,15 @@ class FiscalYear {
 
     /**
      * Close a fiscal year by creating closing entries.
-     * This transfers all income and expense balances to a "resultaten" account.
+     *
+     * Groups all income/expense entries by coa_id and creates one closing
+     * entry per coa_id on the "Resultaten" account (plus one catch-all entry
+     * for any bookings that have no coa_id assigned).
+     *
+     * Income  → 'out' entry on Resultaten (income is absorbed into equity).
+     * Expense → 'in'  entry on Resultaten (expense is absorbed into equity).
+     *
+     * Transfers are never included in closing entries.
      */
     public static function close_year( int $year ): bool|\WP_Error {
         if ( self::is_closed( $year ) ) {
@@ -49,53 +57,90 @@ class FiscalYear {
             return new \WP_Error( 'no_entries', __( 'Geen boekingen in dit boekjaar.', 'eme-accounting' ) );
         }
 
-        global $wpdb;
-
-        // Get or create "Resultaten" account (balans)
         $result_acc = self::get_or_create_result_account();
 
-        // Close income: create expense entry to transfer income to result
-        if ( $totals['income'] > 0 ) {
-            $income_accounts = self::get_income_accounts_by_category( $year );
-            foreach ( $income_accounts as $category => $total ) {
-                if ( $total <= 0 ) continue;
-                Journal::save( [
-                    'entry_date'    => $year . '-12-31',
-                    'description'   => sprintf( __( 'Afsluiten ontvangsten %d', 'eme-accounting' ), $year ),
-                    'category'      => $category,
-                    'amount'        => $total,
-                    'direction'     => 'out',
-                    'account_id'    => $result_acc->id,
-                    'contra_account_id' => null,
-                    'fiscal_year'   => $year,
-                ] );
-            }
+        // Close income: one 'out' entry per coa_id on the Resultaten account.
+        foreach ( self::get_totals_by_coa( $year, 'in' ) as $group ) {
+            if ( $group['total'] <= 0 ) continue;
+            Journal::save( [
+                'entry_date'        => $year . '-12-31',
+                'description'       => sprintf(
+                    __( 'Afsluiten ontvangsten %d%s', 'eme-accounting' ),
+                    $year,
+                    $group['coa_name'] !== '' ? ' \u2013 ' . $group['coa_name'] : ''
+                ),
+                'amount'            => $group['total'],
+                'direction'         => 'out',
+                'account_id'        => $result_acc->id,
+                'coa_id'            => $group['coa_id'],
+                'contra_account_id' => null,
+                'fiscal_year'       => $year,
+            ] );
         }
 
-        // Close expenses: create income entry to transfer expenses to result
-        if ( $totals['expenses'] > 0 ) {
-            $expense_accounts = self::get_expense_accounts_by_category( $year );
-            foreach ( $expense_accounts as $category => $total ) {
-                if ( $total <= 0 ) continue;
-                Journal::save( [
-                    'entry_date'    => $year . '-12-31',
-                    'description'   => sprintf( __( 'Afsluiten uitgaven %d', 'eme-accounting' ), $year ),
-                    'category'      => $category,
-                    'amount'        => $total,
-                    'direction'     => 'in',
-                    'account_id'    => $result_acc->id,
-                    'contra_account_id' => null,
-                    'fiscal_year'   => $year,
-                ] );
-            }
+        // Close expenses: one 'in' entry per coa_id on the Resultaten account.
+        foreach ( self::get_totals_by_coa( $year, 'out' ) as $group ) {
+            if ( $group['total'] <= 0 ) continue;
+            Journal::save( [
+                'entry_date'        => $year . '-12-31',
+                'description'       => sprintf(
+                    __( 'Afsluiten uitgaven %d%s', 'eme-accounting' ),
+                    $year,
+                    $group['coa_name'] !== '' ? ' \u2013 ' . $group['coa_name'] : ''
+                ),
+                'amount'            => $group['total'],
+                'direction'         => 'in',
+                'account_id'        => $result_acc->id,
+                'coa_id'            => $group['coa_id'],
+                'contra_account_id' => null,
+                'fiscal_year'       => $year,
+            ] );
         }
 
-        // Mark year as closed
-        $closed = self::get_closed_years();
+        // Mark year as closed.
+        $closed   = self::get_closed_years();
         $closed[] = $year;
         update_option( self::OPTION_KEY, array_unique( $closed ) );
 
         return true;
+    }
+
+    /**
+     * Return per-coa_id totals for a given direction and fiscal year.
+     *
+     * Entries without a coa_id are grouped as a single catch-all row
+     * with coa_id = null and coa_name = ''.
+     *
+     * @return array<int, array{coa_id: int|null, coa_name: string, total: float}>
+     */
+    private static function get_totals_by_coa( int $year, string $direction ): array {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.coa_id,
+                        coa.name  AS coa_name,
+                        SUM(j.amount) AS total
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
+                 WHERE j.fiscal_year = %d
+                   AND j.direction   = %s
+                 GROUP BY j.coa_id
+                 ORDER BY coa.code",
+                $year,
+                $direction
+            )
+        );
+
+        $result = [];
+        foreach ( $rows as $row ) {
+            $result[] = [
+                'coa_id'   => $row->coa_id !== null ? (int) $row->coa_id : null,
+                'coa_name' => (string) ( $row->coa_name ?? '' ),
+                'total'    => (float) $row->total,
+            ];
+        }
+        return $result;
     }
 
     private static function get_or_create_result_account(): object {
@@ -120,52 +165,16 @@ class FiscalYear {
         return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$table` WHERE id = %d", $wpdb->insert_id ) );
     }
 
-    private static function get_income_accounts_by_category( int $year ): array {
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT category, SUM(amount) as total
-                 FROM `{$wpdb->prefix}emeacc_journal`
-                 WHERE fiscal_year = %d AND direction = 'in' AND category != ''
-                 GROUP BY category",
-                $year
-            )
-        );
-        $result = [];
-        foreach ( $rows as $row ) {
-            $result[ $row->category ] = (float) $row->total;
-        }
-        return $result;
-    }
-
-    private static function get_expense_accounts_by_category( int $year ): array {
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT category, SUM(amount) as total
-                 FROM `{$wpdb->prefix}emeacc_journal`
-                 WHERE fiscal_year = %d AND direction = 'out' AND category != ''
-                 GROUP BY category",
-                $year
-            )
-        );
-        $result = [];
-        foreach ( $rows as $row ) {
-            $result[ $row->category ] = (float) $row->total;
-        }
-        return $result;
-    }
-
     /**
-     * Get the result for a closed year (surplus or deficit).
+     * Get the result for a fiscal year (positive = surplus, negative = deficit).
      */
     public static function get_year_result( int $year ): float {
         $totals = Journal::get_totals( [ 'fiscal_year' => $year ] );
         return $totals['income'] - $totals['expenses'];
     }
 
-    public static function ajax_close(): void { 
-        $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+    public static function ajax_close(): void {
+        $formatter = new \NumberFormatter( 'nl_BE', \NumberFormatter::CURRENCY );
 
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
@@ -183,9 +192,9 @@ class FiscalYear {
         }
 
         $year_result = self::get_year_result( $year );
-        $label = $year_result >= 0 
-            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency($year_result, 'EUR' ) )
-            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency(abs($year_result), 'EUR' ) );
+        $label = $year_result >= 0
+            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency( $year_result, 'EUR' ) )
+            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency( abs( $year_result ), 'EUR' ) );
 
         wp_send_json_success( [ 'message' => __( 'Boekjaar afgesloten.', 'eme-accounting' ), 'result' => $label ] );
     }

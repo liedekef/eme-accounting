@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '11';
+    const DB_VERSION        = '12';
 
     public static function activate(): void {
         self::create_tables();
@@ -37,9 +37,9 @@ class Installer {
     private static function migrate(): void {
         global $wpdb;
         $current_version = get_option( self::DB_VERSION_OPTION, '0' );
-        if ( $current_version && $current_version < 11 ) {
-            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN coa_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
-            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_coa (coa_id)" );
+        if ( $current_version && $current_version < 12 ) {
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS transfer_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_transfer (transfer_id)" );
         }
     }
 
@@ -116,6 +116,7 @@ class Installer {
             direction           ENUM('in','out','transfer')  NOT NULL DEFAULT 'out',
             account_id          BIGINT UNSIGNED NOT NULL,
             contra_account_id   BIGINT UNSIGNED              DEFAULT NULL,
+            transfer_id         BIGINT UNSIGNED              DEFAULT NULL,
             coa_id             BIGINT UNSIGNED              DEFAULT NULL,
             bank_statement_ref  VARCHAR(100)    NOT NULL DEFAULT '',
             bank_statement_seq  VARCHAR(20)     NOT NULL DEFAULT '',
@@ -141,7 +142,8 @@ class Installer {
             KEY idx_category (category),
             KEY idx_reconciled (is_reconciled),
             KEY idx_eme_payment (eme_payment_id),
-            KEY idx_bank_ref (bank_statement_ref)
+            KEY idx_bank_ref (bank_statement_ref),
+            KEY idx_transfer (transfer_id)
         ) $charset;" );
 
         // ── Stock items ─────────────────────────────────────────────────
