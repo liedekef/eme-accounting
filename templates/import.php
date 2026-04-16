@@ -82,7 +82,7 @@ $import_logs = $wpdb->get_results(
     <td style="font-size:11px"><?= esc_html( $line->counterparty_name ) ?><br><span style="color:#646970"><?= esc_html( $line->counterparty_iban ) ?></span></td>
     <td style="font-size:11px"><?= esc_html( $line->bank_ref ?: $line->structured_ref ) ?></td>
     <td class="amount <?= (float) $line->amount >= 0 ? 'in' : 'out' ?>"><?= $formatter->formatCurrency( $line->amount, 'EUR' ) ?></td>
-    <td><span class="tag <?= esc_attr( $status_class[ $line->status ] ?? '' ) ?>"><?= esc_html( $status_label[ $line->status ] ?? $line->status ) ?></span>
+    <td><span class="eme-acc-tag <?= esc_attr( $status_class[ $line->status ] ?? '' ) ?>"><?= esc_html( $status_label[ $line->status ] ?? $line->status ) ?></span>
         <?php if ( $line->journal_id ): ?><br><span style="font-size:11px;color:#646970">#<?= (int) $line->journal_id ?></span><?php endif; ?></td>
     <td>
         <?php if ( $line->status === 'pending' ): ?>
@@ -145,10 +145,10 @@ $import_logs = $wpdb->get_results(
     <td><?= (int) $log->id ?></td>
     <td><?= esc_html( date_i18n( 'd/m/Y H:i', strtotime( $log->import_date ) ) ) ?></td>
     <td><?= esc_html( $log->account_name ) ?></td>
-    <td style="font-size:11px"><?= esc_html( $log->filename ) ?> <span class="tag"><?= esc_html( $log->format ) ?></span></td>
+    <td style="font-size:11px"><?= esc_html( $log->filename ) ?> <span class="eme-acc-tag"><?= esc_html( $log->format ) ?></span></td>
     <td><?= (int) $log->total_lines ?></td>
-    <td><span class="tag reconciled"><?= (int) $log->matched_lines ?></span></td>
-    <td><?= $log->unmatched_lines > 0 ? '<span class="tag pending">' . (int) $log->unmatched_lines . '</span>' : '–' ?></td>
+    <td><span class="eme-acc-tag eme-acc-reconciled"><?= (int) $log->matched_lines ?></span></td>
+    <td><?= $log->unmatched_lines > 0 ? '<span class="eme-acc-tag eme-acc-pending">' . (int) $log->unmatched_lines . '</span>' : '–' ?></td>
     <td>
         <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
         <a href="#" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>

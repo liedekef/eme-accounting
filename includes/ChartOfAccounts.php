@@ -253,7 +253,7 @@ $accounts = [
             return new \WP_Error( 'missing_fields', __( 'Code is verplicht.', 'eme-accounting' ) );
         }
 
-        $is_used = self::get( $data['code'], $data['direction'] );
+        $is_used = self::get_by_code_dir( $data['code'], $data['direction'] );
         if ($is_used) {
             return new \WP_Error( 'missing_fields', __( 'Code reeds in gebruik.', 'eme-accounting' ) );
         }

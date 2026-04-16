@@ -29,7 +29,7 @@ class Assets {
                 'bankref'        => __( 'Bankref.', 'eme-accounting' ),
                 'account'         => __( 'Rekening', 'eme-accounting' ),
                 'amount'         => __( 'Bedrag', 'eme-accounting' ),
-                'reconciled'     => __( 'V', 'eme-accounting' ),
+                'reconciled'     => __( 'Vereffend', 'eme-accounting' ),
             ],
         ] );
         wp_enqueue_script( 'eme-ftable', EME_PLUGIN_URL . 'js/ftable/ftable.min.js', [ ], EME_VERSION );

@@ -76,7 +76,7 @@
 .eme-acc-table .amount { text-align: right; font-variant-numeric: tabular-nums; }
 .eme-acc-table .amount.in, .eme-acc-table .amount.green  { color: #00a32a; }
 .eme-acc-table .amount.out, .eme-acc-table .amount.red { color: #d63638; }
-.eme-acc-table .tag {
+.eme-acc-tag {
     display: inline-block;
     background: #e0f0ff;
     color: #0073aa;
@@ -84,11 +84,11 @@
     padding: 1px 6px;
     font-size: 11px;
 }
-.eme-acc-table .tag.reconciled {
+.eme-acc-reconciled {
     background: #edfaef;
     color: #00a32a;
 }
-.eme-acc-table .tag.pending {
+.eme-acc-pending {
     background: #fff8e5;
     color: #996800;
 }

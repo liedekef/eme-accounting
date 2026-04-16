@@ -114,7 +114,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
             <div class="budget-bar-fill <?= $pct >= 100 ? 'over' : '' ?>" style="width:<?= min(100,$pct) ?>%"></div>
         </div>
     </td>
-    <td><span class="tag"><?= $asset->method === 'linear' ? esc_html__( 'Lineair', 'eme-accounting' ) : esc_html__( 'Degressief', 'eme-accounting' ) ?></span></td>
+    <td><span class="eme-acc-tag"><?= $asset->method === 'linear' ? esc_html__( 'Lineair', 'eme-accounting' ) : esc_html__( 'Degressief', 'eme-accounting' ) ?></span></td>
     <td><?= (int) $asset->useful_life_years ?> <?php esc_html_e( 'jaar', 'eme-accounting' ); ?></td>
     <td class="amount out"><?= $formatter->formatCurrency( $annual, 'EUR' ) ?></td>
     <td style="font-size:11px;color:#646970">

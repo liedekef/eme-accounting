@@ -86,7 +86,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             <tr data-journal-row="<?= (int) $entry->id ?>">
                 <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $entry->entry_date ) ) ); ?></td>
                 <td><?= esc_html( $entry->description ); ?></td>
-                <td><?= $entry->coa_name ? '<span class="tag">' . esc_html( $entry->coa_name ) . '</span>' : ''; ?></td>
+                <td><?= $entry->coa_name ? '<span class="eme-acc-tag">' . esc_html( $entry->coa_name ) . '</span>' : ''; ?></td>
                 <td style="font-size:11px;color:#646970"><?= esc_html( $entry->bank_statement_ref ); ?></td>
                 <td><?= esc_html( $entry->account_name ?? '' ); ?></td>
                 <td class="amount <?= esc_attr( $entry->direction ) ?>">
@@ -99,9 +99,9 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
                 </td>
                 <td>
                     <?php if ( $entry->is_reconciled ): ?>
-                        <span class="tag reconciled">✓</span>
+                        <span class="eme-acc-tag eme-acc-reconciled">✓</span>
                     <?php else: ?>
-                        <span class="tag pending"><?php esc_html_e( 'Openstaand', 'eme-accounting' ); ?></span>
+                        <span class="eme-acc-tag eme-acc-pending"><?php esc_html_e( 'Openstaand', 'eme-accounting' ); ?></span>
                     <?php endif; ?>
                 </td>
             </tr>

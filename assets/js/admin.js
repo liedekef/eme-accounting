@@ -654,7 +654,7 @@
                     <td style="font-size:11px;color:#646970">${esc(e.bank_statement_ref)}</td>
                     <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${sign} ${formatCurrency(e.amount)}</td>
                     <td>${esc(e.account_name)}</td>
-                    <td>${e.is_reconciled ? '<span class="tag reconciled">✓</span>' : ''}</td>
+                    <td>${e.is_reconciled ? '<span class="eme-acc-tag eme-acc-reconciled">✓</span>' : ''}</td>
                 </tr>`;
             });
         }
@@ -731,7 +731,7 @@
                     }
                 },
                 is_reconciled: {
-                    title: i18n.reconciled || 'V',
+                    title: i18n.reconciled || 'Vereffend',
                     width: '1%',
                     sortable: false,
                     searchable: false

@@ -383,12 +383,12 @@ class Journal {
                 'id'                 => $entry->id,
                 'entry_date'         => eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
                 'description'        => "<a href='{$edit_url}'>" . esc_html( $entry->description ) . '</a>',
-                'coa_name'           => $entry->coa_name ? '<span class="tag">' . esc_html( $entry->coa_name ) . '</span>' : '',
+                'coa_name'           => $entry->coa_name ? '<span class="eme-acc-tag">' . esc_html( $entry->coa_name ) . '</span>' : '',
                 'bank_statement_ref' => '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' . esc_attr( $entry->bank_statement_ref ) . '">' . esc_html( $entry->bank_statement_ref ) . '</span>',
                 'account_name'       => esc_html( $entry->account_name ?? '' ),
                 'amount_formatted'   => '<span class="amount ' . $amount_class . '">' . $sign . ' ' . $formatter->formatCurrency( $entry->amount, 'EUR' ) . '</span>',
                 'amount'             => $signed_amount,
-                'is_reconciled'      => $entry->is_reconciled ? '<span class="tag reconciled" title="' . esc_attr( $entry->reconciled_at ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE ) : '' ) . '">✓</span>' : '',
+                'is_reconciled'      => $entry->is_reconciled ? '<span class="eme-acc-tag eme-acc-reconciled" title="' . esc_attr( $entry->reconciled_at ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE ) : '' ) . '">✓</span>' : '<span class="eme-acc-tag eme-acc-pending">'.esc_html( 'Openstaand', 'eme-accounting' ).'</span>',
             ];
         }
 

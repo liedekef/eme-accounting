@@ -45,7 +45,7 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
     $balance = EMEAccounting\Accounts::get_balance( (int) $a->id );
 ?>
 <tr data-account-row="<?= (int) $a->id ?>">
-    <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
+    <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
     <td><?= esc_html( $a->iban ) ?></td>
     <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $balance, 'EUR') ?></td>
     <td>
