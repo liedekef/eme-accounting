@@ -82,11 +82,18 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
-                    <select name="direction" id="direction" <?= $edit_entry ? 'disabled' : '' ?>>
+                    <?php if ($edit_entry) : ?>
+                    <input type="hidden" name="direction" id="direction" value="<?=$edit_entry->direction ?? '' ?>">
+                    <?= $edit_entry->direction == "in" ? esc_html_e( 'Ontvangst (+)', 'eme-accounting' ) : '' ?>
+                    <?= $edit_entry->direction == "out" ? esc_html_e( 'Uitgave (-)', 'eme-accounting' ) : '' ?>
+                    <?= $edit_entry->direction == "transfer" ? esc_html_e( 'Transfer', 'eme-accounting' ) : '' ?>
+                    <?php else: ?>
+                    <select name="direction" id="direction">
                         <option value="in"  <?= selected( $edit_entry->direction ?? '', 'in',  false ) ?>><?php esc_html_e( 'Ontvangst (+)', 'eme-accounting' ); ?></option>
                         <option value="out" <?= selected( $edit_entry->direction ?? 'out', 'out', false ) ?>><?php esc_html_e( 'Uitgave (–)', 'eme-accounting' ); ?></option>
                         <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Transfer', 'eme-accounting' ); ?></option>
                     </select>
+                    <?php endif; ?>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>

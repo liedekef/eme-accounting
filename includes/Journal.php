@@ -248,6 +248,14 @@ class Journal {
             'created_by'         => get_current_user_id() ?: null,
         ];
 
+        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
+
+        if ( !empty( $id) ) {
+            $orig_entry = self::get($id);
+            if ($orig_entry->direction != $direction) {
+                return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$orig_entry->direction,$direction) );
+            }
+        }
         // Transfer requires both account_id and contra_account_id
         if ( $direction === 'transfer' ) {
             if ( !empty( $id) ) {
@@ -280,8 +288,6 @@ class Journal {
             return $out_id;
         }
 
-        $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
- 
         if ( $id > 0 ) {
             unset( $row['created_by'] );
             $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
