@@ -16,7 +16,6 @@ $entries    = EMEAccounting\Journal::get_entries( [
 ] );
 $accounts   = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
-$categories = EMEAccounting\Journal::get_categories();
 $edit_entry = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
 $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
 $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
@@ -56,27 +55,25 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <input type="text" name="description" required maxlength="255"
                            value="<?= esc_attr( $edit_entry->description ?? '' ) ?>">
                 </div>
-                <div class="eme-acc-field">
+<div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
-                    <select name="category" list="eme-categories">
+                    <select name="coa_id">
                         <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                         <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
-                        <?php foreach ( $coa_accounts as $id => $name ): 
-                            $acc = EMEAccounting\ChartOfAccounts::get( (int) $id );
+                        <?php foreach ( $coa_accounts as $id => $acc ): 
                             if ( $acc && $acc->direction === 'in' ):
                         ?>
-                        <option value="<?= esc_attr( $name ) ?>" <?= selected( $edit_entry->category ?? '', $name, false ) ?>>
-                            <?= esc_html( $name ) ?>
+                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
                         </option>
                         <?php endif; endforeach; ?>
                         </optgroup>
                         <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
-                        <?php foreach ( $coa_accounts as $id => $name ): 
-                            $acc = EMEAccounting\ChartOfAccounts::get( (int) $id );
+                        <?php foreach ( $coa_accounts as $id => $acc ): 
                             if ( $acc && $acc->direction === 'out' ):
                         ?>
-                        <option value="<?= esc_attr( $name ) ?>" <?= selected( $edit_entry->category ?? '', $name, false ) ?>>
-                            <?= esc_html( $name ) ?>
+                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
                         </option>
                         <?php endif; endforeach; ?>
                         </optgroup>
@@ -202,6 +199,27 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <option value="in"  <?= selected( 'in',  $direction, false ) ?>><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?></option>
                 <option value="out" <?= selected( 'out', $direction, false ) ?>><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></option>
             </select>
+                    <select name="coa_id">
+                        <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                        <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
+                        <?php foreach ( $coa_accounts as $id => $acc ):
+                            if ( $acc && $acc->direction === 'in' ):
+                        ?>
+                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+                        </option>
+                        <?php endif; endforeach; ?>
+                        </optgroup>
+                        <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
+                        <?php foreach ( $coa_accounts as $id => $acc ):
+                            if ( $acc && $acc->direction === 'out' ):
+                        ?>
+                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
+                        </option>
+                        <?php endif; endforeach; ?>
+                        </optgroup>
+                    </select>
             <input type="text" name="s" placeholder="<?php esc_attr_e( 'Zoeken…', 'eme-accounting' ); ?>" value="<?= esc_attr( $search ) ?>">
             <button type="submit" class="button"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
             <div class="spacer"></div>
@@ -238,7 +256,7 @@ $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
             <tr data-journal-row="<?= (int) $e->id ?>">
                 <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $e->entry_date ) ) ) ?></td>
                 <td><?= esc_html( $e->description ) ?></td>
-                <td><?= $e->category ? '<span class="tag">' . esc_html( $e->category ) . '</span>' : '' ?></td>
+                <td><?= $e->coa_id ? '<span class="tag">' . esc_html( $coa_accounts[$e->coa_id]->name ) . '</span>' : '' ?></td>
                 <td style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= esc_attr( $e->bank_statement_ref ) ?>">
                     <?= esc_html( $e->bank_statement_ref ) ?>
                 </td>

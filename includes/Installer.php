@@ -38,7 +38,7 @@ class Installer {
         global $wpdb;
         $current_version = get_option( self::DB_VERSION_OPTION, '0' );
         if ( $current_version && version_compare( $current_version, '1.1.0', '<' ) ) {
-            // Migrate to 1.1.0: add coa_id to journal, rename account_id to coa_id in budget
+            // Migrate to 1.1.0: add coa_id to journal, rename account_id to coa_id in budget, remove direction from budget
             $has_coa_id = $wpdb->get_var(
                 "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE()
@@ -48,17 +48,6 @@ class Installer {
             if ( ! $has_coa_id ) {
                 $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN coa_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
                 $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_coa (coa_id)" );
-            }
-
-            $has_budget_coa = $wpdb->get_var(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = '{$wpdb->prefix}emeacc_budget'
-                AND COLUMN_NAME = 'coa_id'"
-            );
-            if ( ! $has_budget_coa ) {
-                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_budget MODIFY COLUMN account_id BIGINT UNSIGNED NOT NULL DEFAULT 0" );
-                $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_budget CHANGE COLUMN account_id coa_id BIGINT UNSIGNED NOT NULL" );
             }
         }
     }
@@ -228,13 +217,12 @@ class Installer {
         dbDelta( "CREATE TABLE {$wpdb->prefix}emeacc_budget (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             fiscal_year     SMALLINT        NOT NULL,
-            coa_id         BIGINT UNSIGNED NOT NULL,
-            direction      ENUM('in','out') NOT NULL DEFAULT 'out',
+            coa_id          BIGINT UNSIGNED NOT NULL,
             budgeted_amount DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
             created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uniq_year_coa_dir (fiscal_year, coa_id, direction),
+            UNIQUE KEY uniq_year_coa (fiscal_year, coa_id),
             KEY idx_year (fiscal_year)
         ) $charset;" );
 

@@ -36,7 +36,6 @@ class Journal {
             'fiscal_year'    => null,
             'account_id'     => null,
             'direction'      => null,
-            'category'       => null,
             'date_from'      => null,
             'date_to'        => null,
             'is_reconciled'  => null,
@@ -45,6 +44,7 @@ class Journal {
             'order'          => 'DESC',
             'limit'          => 100,
             'offset'         => 0,
+            'coa_id'         => 0,
         ];
         $args = wp_parse_args( $args, $defaults );
 
@@ -64,9 +64,9 @@ class Journal {
             $where[]   = 'direction = %s';
             $prepare[] = $args['direction'];
         }
-        if ( $args['category'] !== null ) {
-            $where[]   = 'category = %s';
-            $prepare[] = $args['category'];
+        if ( $args['coa_id'] > 0 ) {
+            $where[]   = 'coa_id = %d';
+            $prepare[] = $args['coa_id'];
         }
         if ( $args['date_from'] !== null ) {
             $where[]   = 'entry_date >= %s';
@@ -82,15 +82,14 @@ class Journal {
         }
         if ( ! empty( $args['search'] ) ) {
             $like      = '%' . $wpdb->esc_like( $args['search'] ) . '%';
-            $where[]   = '(description LIKE %s OR bank_statement_ref LIKE %s OR category LIKE %s)';
-            $prepare[] = $like;
+            $where[]   = '(description LIKE %s OR bank_statement_ref LIKE %s)';
             $prepare[] = $like;
             $prepare[] = $like;
         }
 
         $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
 
-        $allowed_order = [ 'entry_date', 'id', 'amount', 'category', 'description', 'created_at' ];
+        $allowed_order = [ 'entry_date', 'id', 'amount', 'description', 'created_at' ];
         $orderby       = in_array( $args['orderby'], $allowed_order, true ) ? $args['orderby'] : 'entry_date';
         $order         = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
 
@@ -141,7 +140,7 @@ class Journal {
             'account_id'  => null,
             'date_from'   => null,
             'date_to'     => null,
-            'category'    => null,
+            'coa_id'      => null,
         ];
         $args    = wp_parse_args( $args, $defaults );
         $where   = [];
@@ -163,9 +162,9 @@ class Journal {
             $where[]   = 'entry_date <= %s';
             $prepare[] = $args['date_to'];
         }
-        if ( $args['category'] !== null ) {
-            $where[]   = 'category = %s';
-            $prepare[] = $args['category'];
+        if ( $args['coa_id'] !== null ) {
+            $where[]   = 'coa_id = %d';
+            $prepare[] = $args['coa_id'];
         }
 
         $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) . " AND direction != 'transfer'" : "WHERE direction != 'transfer'";
@@ -189,18 +188,6 @@ class Journal {
             'expenses' => $expenses,
             'net'      => $income - $expenses,
         ];
-    }
-
-    /**
-     * Get distinct categories from journal.
-     *
-     * @return string[]
-     */
-    public static function get_categories(): array {
-        global $wpdb;
-        return $wpdb->get_col(
-            "SELECT DISTINCT category FROM `{$wpdb->prefix}emeacc_journal` WHERE category != '' ORDER BY category"
-        );
     }
 
     /* ------------------------------------------------------------------
@@ -238,12 +225,11 @@ class Journal {
             'entry_date'         => $entry_date,
             'booking_date'       => ! empty( $data['booking_date'] ) ? eme_sanitize_request( $data['booking_date'] ) : null,
             'description'        => eme_sanitize_request( $data['description'] ?? '' ),
-            'category'           => eme_sanitize_request( $data['category'] ?? '' ),
             'amount'             => round( (float) $data['amount'], 2 ),
             'direction'          => $direction,
             'account_id'         => (int) $data['account_id'],
             'contra_account_id'  => ! empty( $data['contra_account_id'] ) ? (int) $data['contra_account_id'] : null,
-            'coa_id'            => ! empty( $data['coa_id'] ) ? (int) $data['coa_id'] : null,
+            'coa_id'             => ! empty( $data['coa_id'] ) ? (int) $data['coa_id'] : null,
             // bank_statement_ref: optioneel rekeningnummer / ref van bankafschrift
             'bank_statement_ref' => eme_sanitize_request( $data['bank_statement_ref'] ?? '' ),
             'bank_statement_seq' => eme_sanitize_request( $data['bank_statement_seq'] ?? '' ),

@@ -196,7 +196,7 @@ $accounts = [
         $accounts = $direction ? self::get_by_direction( $direction ) : self::get_all();
         $out      = [];
         foreach ( $accounts as $a ) {
-            $out[ (int) $a->id ] = $a->code . ' - ' . $a->name;
+            $out[ (int) $a->id ] = $a;
         }
         return $out;
     }
@@ -286,30 +286,12 @@ $accounts = [
                 continue;
             }
             $idx++;
-            //error_log('Processing item: ' . print_r($item, true));
 
             $row = [];
             $row['code'] = $parent_code . '-' . str_pad( (string) $idx, 6, '0', STR_PAD_LEFT );
             $row['parent_id'] = $parent_id;
-            //error_log('Row : ' . print_r($row, true));
-            //continue;
 
-            //$wpdb->update( $table, $row, [ 'id' => (int) $item['id'] ] );
-            $result = $wpdb->update(
-                $table,
-                $row,
-                [ 'id' => (int) $item['id'] ]
-            );
-
-            // Debug: check resultaat
-            if ( $result === false ) {
-                error_log('Update failed for ID ' . $item['id'] . ': ' . $wpdb->last_error);
-                error_log('SQL: ' . $wpdb->last_query);
-            } elseif ( $result === 0 ) {
-                error_log('No rows updated for ID ' . $item['id'] . ' (maybe same values or ID not found)');
-            } else {
-                error_log('Successfully updated ' . $result . ' row(s) for ID ' . $item['id']);
-            }
+            $wpdb->update( $table, $row, [ 'id' => (int) $item['id'] ] );
         }
     }
 

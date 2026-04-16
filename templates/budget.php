@@ -27,10 +27,10 @@ $prev_years = range( $year - 5, $year - 1 );
 </p>
 
 <?php // Group by direction: IN first, then OUT ?>
+<form id="eme-acc-budget-form">
 <?php foreach ( [ 'in', 'out' ] as $dir ): ?>
 <div class="eme-acc-form-box">
 <h2><?php esc_html_e( $dir === 'in' ? 'Ontvangsten' : 'Uitgaven', 'eme-accounting' ); ?></h2>
-<form class="eme-acc-budget-form" data-direction="<?= $dir ?>">
 <table class="eme-acc-table">
 <thead><tr>
     <th><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?></th>
@@ -43,9 +43,9 @@ $prev_years = range( $year - 5, $year - 1 );
 <?php foreach ( $coa as $c ):
     if ( $c->direction !== $dir ) continue;
 
-    $key = $c->id . '|' . $dir;
+    $key = $c->id;
     $budget = $budget_map[ $key ] ?? 0;
-    $actual  = EMEAccounting\Budget::get_actual_for_coa( $year, $c->id, $dir );
+    $actual  = EMEAccounting\Budget::get_actual_for_coa( $year, $c->id );
     $variance = $budget - $actual;
     $pct     = $budget > 0 ? min( 150, (int) ( $actual / $budget * 100 ) ) : 0;
     $over    = $pct > 100;
@@ -54,7 +54,6 @@ $prev_years = range( $year - 5, $year - 1 );
     <td>
         <?= esc_html( $c->code . ' - ' . $c->name ) ?>
         <input type="hidden" name="lines[<?= $c->id ?>][coa_id]" value="<?= (int) $c->id ?>">
-        <input type="hidden" name="lines[<?= $c->id ?>][direction]" value="<?= $dir ?>">
     </td>
     <td>
         <input type="number" name="lines[<?= $c->id ?>][budgeted_amount]" 
@@ -74,10 +73,9 @@ $prev_years = range( $year - 5, $year - 1 );
 <?php endforeach; ?>
 </tbody>
 </table>
-<input type="hidden" name="fiscal_year" value="<?= $year ?>">
-<input type="hidden" name="direction" value="<?= $dir ?>">
-<p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
-</form>
 </div>
 <?php endforeach; ?>
+<input type="hidden" name="fiscal_year" value="<?= $year ?>">
+<p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
+</form>
 </div>

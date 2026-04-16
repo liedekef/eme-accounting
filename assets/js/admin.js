@@ -461,7 +461,6 @@
     function handleBudgetSave(form) {
         const data = {
             fiscal_year: form.querySelector('[name="fiscal_year"]')?.value,
-            direction: form.dataset.direction,
             lines: []
         };
         const rows = form.querySelectorAll('tbody tr');
@@ -471,7 +470,6 @@
             if (coaId && amount && coaId.value) {
                 data.lines.push({
                     coa_id: coaId.value,
-                    direction: data.direction,
                     budgeted_amount: amount.value
                 });
             }
@@ -482,40 +480,14 @@
     function handleCopyActualFromYear(year) {
         if (!year) return;
         ajax('eme_accounting_get_budget_year', { year }, (data) => {
-            // Apply actual totals from previous year to budget inputs
-            Object.keys(data).forEach(key => {
-                const [coaId, dir] = key.split('|');
-                const forms = document.querySelectorAll('.eme-acc-budget-form');
-                forms.forEach(form => {
-                    if (form.dataset.direction === dir) {
-                        const row = form.querySelector(`tr[data-coa-id="${coaId}"]`);
-                        if (row) {
-                            const input = row.querySelector('[name$="[budgeted_amount]"]');
-                            if (input) {
-                                input.value = data[key] || '';
-                            }
-                        }
-                    }
-                });
+            const form = document.getElementById('eme-acc-budget-form');
+            if (!form) return;
+            Object.keys(data).forEach(coaId => {
+                const input = document.querySelector(`name="lines[${coaId}][budgeted_amount]"]`);
+                console.log(input);
+                if (input) input.value = data[coaId] || '';
             });
-            document.getElementById('copy-status').textContent = i18n.saved;
-        });
-    }
-
-    function handleCopyBudgetFromYear(year) {
-        if (!year) return;
-        ajax('eme_accounting_get_budget_year', { year }, (budget) => {
-            const rows = document.querySelectorAll('#eme-acc-budget-form tbody tr');
-            rows.forEach(row => {
-                const coaId = row.dataset.coaId;
-                const inKey = coaId + '|in';
-                const outKey = coaId + '|out';
-                const inInput = row.querySelector('[name^="budget[in]"]');
-                const outInput = row.querySelector('[name^="budget[out]"]');
-                if (budget[inKey] && inInput) inInput.value = budget[inKey];
-                if (budget[outKey] && outInput) outInput.value = budget[outKey];
-            });
-            document.getElementById('copy-status').textContent = i18n.saved;
+            document.getElementById('copy-status').textContent = i18n.loaded;
         });
     }
 
