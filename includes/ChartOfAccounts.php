@@ -185,17 +185,22 @@ $accounts = [
         );
     }
 
-    public static function get_by_direction( string $direction ): array {
+    public static function get_by_direction( string $direction, bool $active_only = true ): array {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
+        if ( $active_only ) {
+            return $wpdb->get_results(
+                $wpdb->prepare( "SELECT * FROM `$table` WHERE direction = %s AND is_active = 1 ORDER BY code", $direction )
+            );
+        }
         return $wpdb->get_results(
             $wpdb->prepare( "SELECT * FROM `$table` WHERE direction = %s ORDER BY code", $direction )
         );
     }
 
-    public static function get_dropdown( ?string $direction = null ): array {
-        $accounts = $direction ? self::get_by_direction( $direction ) : self::get_all();
-        $out      = [];
+    public static function get_dropdown( ?string $direction = null, bool $active_only = true ): array {
+        $accounts = $direction ? self::get_by_direction( $direction, $active_only ) : self::get_all();
+        $out = [];
         foreach ( $accounts as $a ) {
             $out[ (int) $a->id ] = $a;
         }
@@ -242,10 +247,13 @@ $accounts = [
             $row = [
                 'name' => eme_sanitize_request( $data['name'] ),
             ];
+            if ( array_key_exists( 'is_active', $data ) ) {
+                $row['is_active'] = (int) (bool) $data['is_active'];
+            }
             if ( ! empty( $data['description'] ) ) {
                 $row['description'] = eme_sanitize_request( $data['description'] );
             }
-            $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
+            $wpdb->update( $table, $row, [ 'id' => $id ] );
             return $id;
         }
 

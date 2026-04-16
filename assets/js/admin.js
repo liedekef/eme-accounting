@@ -242,6 +242,7 @@
         form.querySelector('[name="name"]').value        = d.name;
         form.querySelector('[name="parent_id"]').disabled = true;
         form.querySelector('[name="parent_id"]').value = d.parentId;
+        form.querySelector('[name="is_active"]').value = d.isActive || '1';
         form.querySelector('[name="description"]').value = d.description || '';
         document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening bewerken';
         document.getElementById('eme-acc-coa-cancel').style.display = '';
@@ -263,6 +264,7 @@
         form.querySelector('[name="code"]').disabled = false;
         form.querySelector('[name="parent_id"]').disabled = false;
         form.querySelector('[name="direction"]').disabled = false;
+        form.querySelector('[name="is_active"]').value = '1';
         document.getElementById('eme-acc-coa-form-title').textContent = 'Rekening toevoegen';
         document.getElementById('eme-acc-coa-cancel').style.display = 'none';
     }

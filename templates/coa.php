@@ -19,6 +19,9 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
              <option value="in"><?php esc_html_e( 'Ontvangst', 'eme-accounting' ); ?></option>
          </select>
     </div>
+    <div class="eme-acc-field"><label><?php esc_html_e( 'Actief', 'eme-accounting' ); ?></label>
+        <select name="is_active"><option value="1"><?php esc_html_e( 'Ja', 'eme-accounting' ); ?></option><option value="0"><?php esc_html_e( 'Nee', 'eme-accounting' ); ?></option></select>
+    </div>
     <div class="eme-acc-field" style="flex:3"><label><?php esc_html_e( 'Naam', 'eme-accounting' ); ?> *</label><input type="text" name="name" required maxlength="200"></div>
 </div>
 <div class="eme-acc-row">
@@ -26,8 +29,8 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
         <select name="parent_id" class="eme-acc-parent-select">
             <option value="">— <?php esc_html_e( 'Geen (hoofdrekening)', 'eme-accounting' ); ?> —</option>
             <?php
-            $main_in  = array_filter( $all_accounts, fn( $a ) => empty( $a->parent_id ) && $a->direction === 'in' );
-            $main_out = array_filter( $all_accounts, fn( $a ) => empty( $a->parent_id ) && $a->direction === 'out' );
+            $main_in  = array_filter( $all_accounts, fn( $a ) => empty( $a->parent_id ) && $a->direction === 'in' && ! empty( $a->is_active ) );
+            $main_out = array_filter( $all_accounts, fn( $a ) => empty( $a->parent_id ) && $a->direction === 'out' && ! empty( $a->is_active ) );
             ?>
             <?php if ( $main_in ): ?>
             <optgroup label="<?php esc_attr_e( 'Ontvangsten', 'eme-accounting' ); ?>">
@@ -68,12 +71,13 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
     data-code="<?= esc_attr( $a->code ) ?>"
     data-name="<?= esc_attr( $a->name ) ?>"
     data-description="<?= esc_attr( $a->description ?? '' ) ?>"
+    data-is-active="<?= (int) ( $a->is_active ?? 1 ) ?>"
     style="margin-left: <?= (int) ( $a->depth * 20 ) ?>px">
     <?php if ($a->parent_id) : ?>
         <span class="handle">☰</span>
     <?php endif; ?>
     <span class="code"><?= esc_html( $a->code ) ?></span>
-    <span class="name"><?= esc_html( $a->name ) ?></span>
+    <span class="name"><?= esc_html( $a->name ) ?><?= empty( $a->is_active ) ? ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' : '' ?></span>
     <span class="actions">
         <button class="button button-small eme-acc-edit-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
         <?php if ( ! $a->has_children ) : ?>
@@ -95,12 +99,13 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
     data-code="<?= esc_attr( $a->code ) ?>"
     data-name="<?= esc_attr( $a->name ) ?>"
     data-description="<?= esc_attr( $a->description ?? '' ) ?>"
+    data-is-active="<?= (int) ( $a->is_active ?? 1 ) ?>"
     style="margin-left: <?= (int) ( $a->depth * 20 ) ?>px">
     <?php if ($a->parent_id) : ?>
         <span class="handle">☰</span>
     <?php endif; ?>
     <span class="code"><?= esc_html( $a->code ) ?></span>
-    <span class="name"><?= esc_html( $a->name ) ?></span>
+    <span class="name"><?= esc_html( $a->name ) ?><?= empty( $a->is_active ) ? ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' : '' ?></span>
     <span class="actions">
         <button class="button button-small eme-acc-edit-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
         <?php if ( ! $a->has_children ) : ?>
