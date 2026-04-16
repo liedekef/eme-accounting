@@ -217,7 +217,8 @@ $accounts = [
                 return $result;
             }
             foreach ( $by_parent[ $parent_id ] as $item ) {
-                $item->depth = $depth;
+                $item->depth       = $depth;
+                $item->has_children = isset( $by_parent[ (int) $item->id ] );
                 $result[] = $item;
                 $result = array_merge( $result, $flatten( (int) $item->id, $depth + 1 ) );
             }
@@ -254,15 +255,36 @@ $accounts = [
         return (int) $wpdb->insert_id;
     }
 
+    public static function has_children( int $id ): bool {
+        global $wpdb;
+        return (int) $wpdb->get_var(
+            $wpdb->prepare( "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE parent_id = %d", $id )
+        ) > 0;
+    }
+
+    public static function is_used_in_journal( int $id ): bool {
+        global $wpdb;
+        return (int) $wpdb->get_var(
+            $wpdb->prepare( "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_journal` WHERE coa_id = %d", $id )
+        ) > 0;
+    }
+
     public static function delete( int $id ): bool|\WP_Error {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
-        $has_children = (int) $wpdb->get_var(
-            $wpdb->prepare( "SELECT COUNT(*) FROM `$table` WHERE parent_id = %d", $id )
-        );
-        if ( $has_children > 0 ) {
-            return new \WP_Error( 'has_children', __( 'Kan subrekeningen niet verwijderen. Verwijder eerst de subrekeningen.', 'eme-accounting' ) );
+        $account = self::get( $id );
+        if ( ! $account ) {
+            return new \WP_Error( 'not_found', __( 'Rekening niet gevonden.', 'eme-accounting' ) );
+        }
+
+        $has_children = self::has_children( $id );
+        if ( ! $account->parent_id && $has_children ) {
+            return new \WP_Error( 'has_children', __( 'Kan hoofdrekening niet verwijderen. Verwijder eerst de subrekeningen.', 'eme-accounting' ) );
+        }
+
+        if ( self::is_used_in_journal( $id ) ) {
+            return new \WP_Error( 'in_use', __( 'Deze rekening wordt gebruikt in dagboek entries. Verwijder of wijzig eerst de gekoppelde entries.', 'eme-accounting' ) );
         }
 
         $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );

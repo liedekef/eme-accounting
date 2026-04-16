@@ -76,7 +76,9 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
     <span class="name"><?= esc_html( $a->name ) ?></span>
     <span class="actions">
         <button class="button button-small eme-acc-edit-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
+        <?php if ( ! $a->has_children ) : ?>
         <button class="button button-small eme-acc-delete-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
+        <?php endif; ?>
     </span>
 </li>
 <?php endif; endforeach; ?>
@@ -101,7 +103,9 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
     <span class="name"><?= esc_html( $a->name ) ?></span>
     <span class="actions">
         <button class="button button-small eme-acc-edit-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
+        <?php if ( ! $a->has_children ) : ?>
         <button class="button button-small eme-acc-delete-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
+        <?php endif; ?>
     </span>
 </li>
 <?php endif; endforeach; ?>
