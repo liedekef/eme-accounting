@@ -1,6 +1,8 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+
 $year       = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 $accounts   = EMEAccounting\Accounts::get_all();
@@ -35,19 +37,19 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
         <div class="eme-acc-card">
             <h3><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?> <?= $year ?></h3>
             <div class="card-value positive">
-                <?= number_format( $totals['income'], 2, ',', '.' ); ?> €
+                <?= $formatter->formatCurrency( $totals['income'], 'EUR' ); ?>
             </div>
         </div>
         <div class="eme-acc-card">
             <h3><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?> <?= $year ?></h3>
             <div class="card-value negative">
-                <?= number_format( $totals['expenses'], 2, ',', '.' ); ?> €
+                <?= $formatter->formatCurrency( $totals['expenses'], 'EUR' ); ?>
             </div>
         </div>
         <div class="eme-acc-card">
             <h3><?php esc_html_e( 'Resultaat', 'eme-accounting' ); ?> <?= $year ?></h3>
             <div class="card-value <?= $totals['net'] >= 0 ? 'positive' : 'negative' ?>">
-                <?= number_format( $totals['net'], 2, ',', '.' ); ?> €
+                <?= $formatter->formatCurrency( $totals['net'], 'EUR' ); ?>
             </div>
         </div>
         <?php foreach ( array_slice( $accounts, 0, 3 ) as $acc ): ?>
@@ -55,7 +57,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             <h3><?= esc_html( $acc->name ); ?></h3>
             <?php $bal = EMEAccounting\Accounts::get_balance( (int) $acc->id ); ?>
             <div class="card-value <?= $bal >= 0 ? '' : 'negative' ?>">
-                <?= number_format( $bal, 2, ',', '.' ); ?> €
+                <?= $formatter->formatCurrency( $totals['bal'], 'EUR' ); ?>
             </div>
             <div class="card-sub"><?= esc_html( $acc->iban ); ?></div>
         </div>
@@ -89,7 +91,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
                 <td><?= esc_html( $entry->account_name ?? '' ); ?></td>
                 <td class="amount <?= esc_attr( $entry->direction ) ?>">
                     <?= $entry->direction === 'in' ? '+' : '–'; ?>
-                    <?= number_format( (float) $entry->amount, 2, ',', '.' ); ?> €
+                    <?= $formatter->formatCurrency($entry->amount, 'EUR' ); ?>
                 </td>
                 <td>
                     <?php if ( $entry->is_reconciled ): ?>

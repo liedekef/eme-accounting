@@ -1,5 +1,7 @@
 <?php // eme-accounting/templates/stock.php
 defined( 'ABSPATH' ) || exit;
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+
 $items    = EMEAccounting\Stock::get_all();
 $accounts = EMEAccounting\Accounts::get_dropdown();
 ?>
@@ -43,12 +45,12 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     </td>
     <td><?= esc_html( $item->sku ) ?></td>
     <td class="amount"><?= number_format( (float) $item->current_qty, 3, ',', '.' ) ?> <?= esc_html( $item->unit ) ?></td>
-    <td class="amount"><?= number_format( (float) $item->purchase_price, 2, ',', '.' ) ?> €</td>
-    <td class="amount"><?= number_format( (float) $item->current_qty * (float) $item->purchase_price, 2, ',', '.' ) ?> €</td>
+    <td class="amount"><?= $formatter->formatCurrency($item->purchase_price, 'EUR') ?></td>
+    <td class="amount"><?= $formatter->formatCurrency( (float) $item->current_qty * (float) $item->purchase_price, 'EUR' ) ?></td>
     <td>
         <form id="eme-acc-stock-movement-form" style="display:flex;gap:4px;align-items:center">
             <input type="hidden" name="stock_id" value="<?= (int) $item->id ?>">
-            <select name="type" style="padding:2px 4px">
+            <select name="type" >
                 <option value="in"><?php esc_html_e( 'Aankomst', 'eme-accounting' ); ?></option>
                 <option value="out"><?php esc_html_e( 'Afgang', 'eme-accounting' ); ?></option>
                 <option value="adjustment"><?php esc_html_e( 'Correctie', 'eme-accounting' ); ?></option>

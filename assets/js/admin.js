@@ -6,6 +6,12 @@
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
 
+    // the euro format for amounts
+    let euro = Intl.NumberFormat('nl-BE', {
+        style: 'currency',
+        currency: 'EUR',
+    });
+
     let JournalTable;
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -135,7 +141,6 @@
             if (fy && !fy.value) fy.value = e.target.value.substring(0, 4);
         }
         if (e.target.id === 'eme-acc-year-select') {
-            localStorage.setItem('eme_acc_year', e.target.value);
             e.target.closest('form')?.submit();
         }
         if (e.target.id === 'eme-acc-copy-year') {
@@ -489,7 +494,7 @@
             const form = document.getElementById('eme-acc-budget-form');
             if (!form) return;
             Object.keys(data).forEach(coaId => {
-                const input = document.querySelector(`name="lines[${coaId}][budgeted_amount]"]`);
+                const input = document.querySelector(`[name="lines[${coaId}][budgeted_amount]"]`);
                 if (input) input.value = data[coaId] || '';
             });
             document.getElementById('copy-status').textContent = i18n.loaded;
@@ -604,13 +609,6 @@
         if (target) target.style.display = target.style.display === 'none' ? '' : 'none';
     }
 
-    /* ── Year selector persistence ──────────────────────────────── */
-    const yearSel = document.querySelector('#eme-acc-year-select');
-    if (yearSel) {
-        const saved = localStorage.getItem('eme_acc_year');
-        if (saved) yearSel.value = saved;
-    }
-
     /* ═══════════════════════════════════════════════════════════════════
      * JOURNAL FTABLE
      * ═══════════════════════════════════════════════════════════════════ */
@@ -659,10 +657,18 @@
                     sortable: false,
                     searchable: false
                 },
-                amount_formatted: {
+                amount: {
                     title: i18n.amount || 'Bedrag',
                     sortable: true,
-                    searchable: false
+                    searchable: false,
+                    display: function(data) {
+                        const formatted_val = euro.format(data.value);
+                        if (data.value<0) {
+                            return '<span style="color: red; font-weight: bold;">' + formatted_val + '</span>';
+                        } else {
+                            return '<span style="color: green; font-weight: bold;">' + formatted_val + '</span>';
+                        }
+                    }
                 },
                 is_reconciled: {
                     title: i18n.reconciled || 'V',

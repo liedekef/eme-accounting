@@ -1,5 +1,6 @@
 <?php
 defined( 'ABSPATH' ) || exit;
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 
 $year        = isset( $_GET['year'] )       ? (int) $_GET['year']                : (int) gmdate( 'Y' );
 $account_id  = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']          : 0;
@@ -217,9 +218,9 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
             <strong id="eme-acc-totals">
                 <?php printf(
                     esc_html__( 'O: %s  |  U: %s  |  Resultaat: %s', 'eme-accounting' ),
-                    number_format( $totals['income'],   2, ',', '.' ) . ' €',
-                    number_format( $totals['expenses'], 2, ',', '.' ) . ' €',
-                    number_format( $totals['net'],      2, ',', '.' ) . ' €'
+                    $formatter->formatCurrency( $totals['income'], 'EUR'),
+                    $formatter->formatCurrency( $totals['expenses'], 'EUR' ),
+                    $formatter->formatCurrency( $totals['net'], 'EUR' )
                 ); ?>
             </strong>
         </form>

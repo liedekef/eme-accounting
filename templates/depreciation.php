@@ -1,5 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+
 $assets   = EMEAccounting\Depreciation::get_all();
 $accounts = EMEAccounting\Accounts::get_dropdown();
 ?>
@@ -105,16 +107,16 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
         </div>
     </td>
     <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $asset->purchase_date ) ) ) ?></td>
-    <td class="amount"><?= number_format( (float) $asset->purchase_price, 2, ',', '.' ) ?> €</td>
+    <td class="amount"><?= $formatter->formatCurrency( $asset->purchase_price, 'EUR' ) ?></td>
     <td class="amount">
-        <?= number_format( (float) $asset->current_book_value, 2, ',', '.' ) ?> €
+        <?= $formatter->formatCurrency( (float) $asset->current_book_value, 'EUR' ) ?>
         <div class="budget-bar-wrap" title="<?= $pct ?>% afgeschreven">
             <div class="budget-bar-fill <?= $pct >= 100 ? 'over' : '' ?>" style="width:<?= min(100,$pct) ?>%"></div>
         </div>
     </td>
     <td><span class="tag"><?= $asset->method === 'linear' ? esc_html__( 'Lineair', 'eme-accounting' ) : esc_html__( 'Degressief', 'eme-accounting' ) ?></span></td>
     <td><?= (int) $asset->useful_life_years ?> <?php esc_html_e( 'jaar', 'eme-accounting' ); ?></td>
-    <td class="amount out"><?= number_format( $annual, 2, ',', '.' ) ?> €</td>
+    <td class="amount out"><?= $formatter->formatCurrency( $annual, 'EUR' ) ?></td>
     <td style="font-size:11px;color:#646970">
         <?= $asset->last_depreciation
             ? esc_html( date_i18n( 'd/m/Y', strtotime( $asset->last_depreciation ) ) )

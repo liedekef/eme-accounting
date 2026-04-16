@@ -4,6 +4,7 @@ defined( 'ABSPATH' ) || exit;
 $years        = EMEAccounting\FiscalYear::get_available_years();
 $closed_years = EMEAccounting\FiscalYear::get_closed_years();
 $current_year = EMEAccounting\FiscalYear::get_current_year();
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 
 if ( ! in_array( $current_year, $years, true ) ) {
     $years[] = $current_year;
@@ -58,7 +59,7 @@ $years = array_reverse( $years );
     <td><?= $y ?></td>
     <td class="amount <?= $is_surplus ? 'in' : 'out' ?>">
         <?= $is_surplus ? '+' : '–' ?>
-        <?= number_format( abs( $result ), 2, ',', '.' ) ?> €
+        <?= $formatter->formatCurrency( abs( $result ), 'EUR' ) ?>
         (<?= $is_surplus ? esc_html__( 'overschot', 'eme-accounting' ) : esc_html__( 'tekort', 'eme-accounting' ) ?>)
     </td>
 </tr>

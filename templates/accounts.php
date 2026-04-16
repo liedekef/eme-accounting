@@ -1,6 +1,8 @@
 <?php // eme-accounting/templates/accounts.php
 defined( 'ABSPATH' ) || exit;
 $accounts = EMEAccounting\Accounts::get_all();
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Financiële Rekeningen', 'eme-accounting' ); ?></h1>
@@ -45,7 +47,7 @@ $accounts = EMEAccounting\Accounts::get_all();
 <tr data-account-row="<?= (int) $a->id ?>">
     <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
     <td><?= esc_html( $a->iban ) ?></td>
-    <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= number_format( $balance, 2, ',', '.' ) ?> €</td>
+    <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $balance, 'EUR') ?></td>
     <td>
         <button class="button button-small eme-acc-edit-account"
                 data-id="<?= (int) $a->id ?>"

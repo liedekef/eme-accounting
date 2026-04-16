@@ -132,12 +132,11 @@ class Budget {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
 
-        $year = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
+        $year = (int) ( $_POST['year'] ?? gmdate( 'Y' ) );
         $actuals = [];
         $coa = ChartOfAccounts::get_all();
         foreach ( $coa as $c ) {
             $actual = self::get_actual_for_coa( $year, $c->id );
-            error_log("$year {$c->id} $actual");
             if ( $actual > 0 ) {
                 $actuals[ $c->id ] = $actual;
             }

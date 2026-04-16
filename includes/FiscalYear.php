@@ -164,7 +164,9 @@ class FiscalYear {
         return $totals['income'] - $totals['expenses'];
     }
 
-    public static function ajax_close(): void {
+    public static function ajax_close(): void { 
+        $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
@@ -182,8 +184,8 @@ class FiscalYear {
 
         $year_result = self::get_year_result( $year );
         $label = $year_result >= 0 
-            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), number_format( $year_result, 2, ',', '.' ) . ' €' )
-            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), number_format( abs( $year_result ), 2, ',', '.' ) . ' €' );
+            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency($year_result, 'EUR' ) )
+            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency(abs($year_result, 'EUR' ) ) );
 
         wp_send_json_success( [ 'message' => __( 'Boekjaar afgesloten.', 'eme-accounting' ), 'result' => $label ] );
     }

@@ -4,6 +4,7 @@ $year        = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' 
 $coa        = EMEAccounting\ChartOfAccounts::get_all();
 $budget_map = EMEAccounting\Budget::get_year_map( $year );
 $prev_years = range( $year - 5, $year - 1 );
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?= $year ?></h1>
@@ -46,23 +47,40 @@ $prev_years = range( $year - 5, $year - 1 );
     $key = $c->id;
     $budget = $budget_map[ $key ] ?? 0;
     $actual  = EMEAccounting\Budget::get_actual_for_coa( $year, $c->id );
-    $variance = $budget - $actual;
-    $pct     = $budget > 0 ? min( 150, (int) ( $actual / $budget * 100 ) ) : 0;
-    $over    = $pct > 100;
+    if ($dir === 'out') {
+        $variance = $budget - $actual;
+    } else {
+        $variance = $actual - $budget;
+    }
+    if ($variance<0) {
+        $var_class="red";
+        $pct  = $actual > 0 ? min( 150, (int) ( $budget / $actual * 100 ) ) : 0;
+        $over = $pct > 100;
+    } else {
+        $var_class="green";
+        $pct  = $budget > 0 ? min( 150, (int) ( $actual / $budget * 100 ) ) : 0;
+        $over = false;
+    }
 ?>
 <tr data-coa-id="<?= (int) $c->id ?>">
     <td>
-        <?= esc_html( $c->code . ' - ' . $c->name ) ?>
+        <?php if ($c->parent_id)
+                echo esc_html( '&nbsp;&nbsp;&nbsp;'.$c->code . ' - ' . $c->name );
+              else
+                echo esc_html( $c->code . ' - ' . $c->name );
+        ?>
         <input type="hidden" name="lines[<?= $c->id ?>][coa_id]" value="<?= (int) $c->id ?>">
     </td>
     <td>
+        <?php if ($c->parent_id): ?>
         <input type="number" name="lines[<?= $c->id ?>][budgeted_amount]" 
                value="<?= $budget > 0 ? $budget : '' ?>" 
                step="0.01" min="0" style="width:120px"
                data-orig="<?= $budget > 0 ? $budget : '' ?>">
+        <?php endif; ?>
     </td>
-    <td class="amount <?= $dir ?>"><?= number_format( $actual, 2, ',', '.' ) ?> EUR</td>
-    <td class="amount <?= $dir ?>"><?= number_format( $variance, 2, ',', '.' ) ?> EUR</td>
+    <td><?php if ($c->parent_id) echo $formatter->formatCurrency($actual, 'EUR'); ?> </td>
+    <td class="amount <?= $var_class ?>"><?php if ($c->parent_id) echo $formatter->formatCurrency($variance, 'EUR'); ?></td>
     <td>
         <div class="budget-bar-wrap">
             <div class="budget-bar-fill <?= $over ? 'over' : '' ?>" style="width:<?= min( 100, $pct ) ?>%"></div>

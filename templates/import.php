@@ -1,5 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+
 $accounts  = EMEAccounting\Accounts::get_dropdown( 'asset' );
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $log_id    = isset( $_GET['log_id'] ) ? (int) $_GET['log_id'] : 0;
@@ -79,7 +81,7 @@ $import_logs = $wpdb->get_results(
     <td><?= esc_html( mb_substr( $line->description, 0, 60 ) ) ?></td>
     <td style="font-size:11px"><?= esc_html( $line->counterparty_name ) ?><br><span style="color:#646970"><?= esc_html( $line->counterparty_iban ) ?></span></td>
     <td style="font-size:11px"><?= esc_html( $line->bank_ref ?: $line->structured_ref ) ?></td>
-    <td class="amount <?= (float) $line->amount >= 0 ? 'in' : 'out' ?>"><?= number_format( (float) $line->amount, 2, ',', '.' ) ?> €</td>
+    <td class="amount <?= (float) $line->amount >= 0 ? 'in' : 'out' ?>"><?= $formatter->formatCurrency( $line->amount, 'EUR' ) ?></td>
     <td><span class="tag <?= esc_attr( $status_class[ $line->status ] ?? '' ) ?>"><?= esc_html( $status_label[ $line->status ] ?? $line->status ) ?></span>
         <?php if ( $line->journal_id ): ?><br><span style="font-size:11px;color:#646970">#<?= (int) $line->journal_id ?></span><?php endif; ?></td>
     <td>

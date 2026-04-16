@@ -344,6 +344,8 @@ class Journal {
             wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
         }
 
+        $formatter = new \NumberFormatter('nl_BE', \NumberFormatter::CURRENCY);
+
         header( 'Content-type: application/json; charset=utf-8' );
 
         $result = [
@@ -370,7 +372,11 @@ class Journal {
 
         foreach ( $entries as $entry ) {
             $edit_url = esc_url( admin_url( 'admin.php?page=eme-accounting-journal&edit=' . $entry->id ) );
-            $amount_class = $entry->direction === 'in' ? 'in' : 'out';
+            if ($entry->direction === 'in') 
+                $signed_amount = $entry->amount;
+            else
+                $signed_amount = -1*$entry->amount;
+
             $sign = $entry->direction === 'in' ? '+' : '–';
 
             $result['Records'][] = [
@@ -380,7 +386,8 @@ class Journal {
                 'coa_name'           => $entry->coa_name ? '<span class="tag">' . esc_html( $entry->coa_name ) . '</span>' : '',
                 'bank_statement_ref' => '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' . esc_attr( $entry->bank_statement_ref ) . '">' . esc_html( $entry->bank_statement_ref ) . '</span>',
                 'account_name'       => esc_html( $entry->account_name ?? '' ),
-                'amount_formatted'   => '<span class="amount ' . $amount_class . '">' . $sign . ' ' . number_format_i18n( (float) $entry->amount, 2 ) . ' €</span>',
+                'amount_formatted'   => '<span class="amount ' . $amount_class . '">' . $sign . ' ' . $formatter->formatCurrency( $entry->amount, 'EUR' ) . '</span>',
+                'amount'             => $signed_amount,
                 'is_reconciled'      => $entry->is_reconciled ? '<span class="tag reconciled" title="' . esc_attr( $entry->reconciled_at ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE ) : '' ) . '">✓</span>' : '',
             ];
         }

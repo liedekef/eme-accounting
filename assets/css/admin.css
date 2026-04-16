@@ -74,8 +74,8 @@
 .eme-acc-table tr:last-child td { border-bottom: none; }
 .eme-acc-table tr:hover td { background: #f6f7f7; }
 .eme-acc-table .amount { text-align: right; font-variant-numeric: tabular-nums; }
-.eme-acc-table .amount.in  { color: #00a32a; }
-.eme-acc-table .amount.out { color: #d63638; }
+.eme-acc-table .amount.in, .eme-acc-table .amount.green  { color: #00a32a; }
+.eme-acc-table .amount.out, .eme-acc-table .amount.red { color: #d63638; }
 .eme-acc-table .tag {
     display: inline-block;
     background: #e0f0ff;
