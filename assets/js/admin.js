@@ -688,6 +688,13 @@
                 listAction: ajaxUrl + '?action=eme_accounting_journal_list&nonce=' + nonce,
                 deleteAction: ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + nonce
             },
+            deleteConfirmation: function(data) {
+                if (data.record.direction=='transfer') {
+                    data.deleteConfirmMessage = "Weet u zeker dat u deze transfer van " + euro.format(data.record.amount) + " wil verwijderen? Dit zal beide entries van de transfer verwijderen."; 
+                } else {
+                    data.deleteConfirmMessage = "Weet u zeker dat u deze boeking van " + euro.format(data.record.amount) + " wil verwijderen?"; 
+                }
+            },
             recordDeleted: function(eventArgs) {
                 // since sometimes 2 lines are deleted in one go (linked transfers), we do a reload
                 JournalTable.reload();
