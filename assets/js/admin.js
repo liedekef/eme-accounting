@@ -682,7 +682,7 @@
             sorting: true,
             sortingResetButton: true,
             multiSorting: true,
-            defaultSorting: 'entry_date DESC',
+            defaultSorting: 'entry_date DESC, id DESC',
             selecting: false,
             multiselect: false,
             actions: {
