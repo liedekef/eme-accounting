@@ -43,6 +43,7 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 <tbody>
 <?php foreach ( $coa as $c ):
     if ( $c->direction !== $dir ) continue;
+    if (empty($c->is_active)) continue;
 
     $key = $c->id;
     $budget = $budget_map[ $key ] ?? 0;
@@ -81,11 +82,12 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
     </td>
     <td><?php if ($c->parent_id) echo $formatter->formatCurrency($actual, 'EUR'); ?> </td>
     <td class="amount <?= $var_class ?>"><?php if ($c->parent_id) echo $formatter->formatCurrency($variance, 'EUR'); ?></td>
-    <td>
+    <td><?php if ($c->parent_id): ?>
         <div class="budget-bar-wrap">
             <div class="budget-bar-fill <?= $over ? 'over' : '' ?>" style="width:<?= min( 100, $pct ) ?>%"></div>
         </div>
         <span style="font-size:11px;margin-left:4px"><?= $pct ?>%</span>
+        <?php endif; ?>
     </td>
 </tr>
 <?php endforeach; ?>
