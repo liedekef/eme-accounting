@@ -57,7 +57,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             <h3><?= esc_html( $acc->name ); ?></h3>
             <?php $bal = EMEAccounting\Accounts::get_balance( (int) $acc->id ); ?>
             <div class="card-value <?= $bal >= 0 ? '' : 'negative' ?>">
-                <?= $formatter->formatCurrency( $totals['bal'], 'EUR' ); ?>
+                <?= $formatter->formatCurrency( $bal, 'EUR' ); ?>
             </div>
             <div class="card-sub"><?= esc_html( $acc->iban ); ?></div>
         </div>
