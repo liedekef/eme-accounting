@@ -217,7 +217,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
             <div class="spacer"></div>
             <strong id="eme-acc-totals">
                 <?php printf(
-                    esc_html__( 'O: %s  |  U: %s  |  Resultaat: %s', 'eme-accounting' ),
+                    esc_html__( 'Ontvangen: %s  |  Uitgaven: %s  |  Resultaat: %s', 'eme-accounting' ),
                     $formatter->formatCurrency( $totals['income'], 'EUR'),
                     $formatter->formatCurrency( $totals['expenses'], 'EUR' ),
                     $formatter->formatCurrency( $totals['net'], 'EUR' )
