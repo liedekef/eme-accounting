@@ -56,7 +56,7 @@
         const orig = btn.textContent;
         btn.textContent = text;
         btn.disabled = true;
-        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1800);
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 500);
     }
 
     function formToObj(form) {
@@ -276,11 +276,6 @@
         btn.disabled = true;
         ajax('eme_accounting_save_entry', formToObj(form), (data) => {
             flashButton(btn, i18n.saved);
-            const existing = document.querySelector(`[data-journal-row="${data?.id}"]`);
-            if (existing) {
-                existing.classList.add('updated');
-                setTimeout(() => existing.classList.remove('updated'), 1500);
-            }
             JournalTable.reload();
         });
     }
@@ -397,7 +392,7 @@
     function handleStockMovement(form) {
         ajax('eme_accounting_stock_movement', formToObj(form), () => {
             const btn = form.querySelector('.submit-btn');
-            if (btn) flashButton(btn, 'Opgeslagen ✓');
+            if (btn) flashButton(btn, i18n.saved);
             setTimeout(() => location.reload(), 900);
         });
     }
@@ -735,13 +730,34 @@
 
             coaSelect.disabled = false;
 
+            // Loop through original options and rebuild with optgroups
+            let currentOptgroup = null;
+
             // Filter and add matching options
             originalOptions.forEach(option => {
+                const parentOptgroup = option.parentElement;
                 const optionDirection = getDirectionFromOptgroup(option);
                 if (optionDirection === direction || (direction === null && !optionDirection)) {
-                    coaSelect.appendChild(option.cloneNode(true));
+                    // Check if we need to create a new optgroup
+                    if (parentOptgroup && parentOptgroup.tagName === 'OPTGROUP') {
+                        const groupLabel = parentOptgroup.getAttribute('label');
+                        if (!currentOptgroup || currentOptgroup.label !== groupLabel) {
+                            currentOptgroup = document.createElement('optgroup');
+                            currentOptgroup.label = groupLabel;
+                            coaSelect.appendChild(currentOptgroup);
+                        }
+                        currentOptgroup.appendChild(option.cloneNode(true));
+                    } else {
+                        coaSelect.appendChild(option.cloneNode(true));
+                    }
                 }
             });
+
+            // Add empty option at the beginning
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = '— Kies rekening —';
+            coaSelect.insertBefore(emptyOption, coaSelect.firstChild);
 
             // Reset selected value
             coaSelect.value = '';
