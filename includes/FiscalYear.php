@@ -13,6 +13,10 @@ class FiscalYear {
         add_action( 'wp_ajax_eme_accounting_check_fiscal_year', [ __CLASS__, 'ajax_check' ] );
     }
 
+    private static function days_in_month( int $month, int $year ): int {
+        return cal_days_in_month( CAL_GREGORIAN, $month, $year );
+    }
+
     public static function get_all(): array {
         global $wpdb;
         return $wpdb->get_results(
@@ -209,8 +213,8 @@ class FiscalYear {
         $end_month   = (int) ( $settings['fiscal_year_end_month'] ?? 12 );
         $end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
 
-        $start_date = sprintf( '%04d-%02d-%02d', $year, $start_month, min( $start_day, days_in_month( $start_month, $year ) ) );
-        $end_date   = sprintf( '%04d-%02d-%02d', $year, $end_month, min( $end_day, days_in_month( $end_month, $year ) ) );
+        $start_date = sprintf( '%04d-%02d-%02d', $year, $start_month, min( $start_day, self::days_in_month( $start_month, $year ) ) );
+        $end_date   = sprintf( '%04d-%02d-%02d', $year, $end_month, min( $end_day, self::days_in_month( $end_month, $year ) ) );
 
         $fy = self::get( $year );
         if ( ! $fy ) {
@@ -557,8 +561,8 @@ class FiscalYear {
             $end_month   = (int) ( $settings['fiscal_year_end_month'] ?? 12 );
             $end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
 
-            $start_date = sprintf( '%04d-%02d-%02d', $current, $start_month, min( $start_day, days_in_month( $start_month, $current ) ) );
-            $end_date   = sprintf( '%04d-%02d-%02d', $current, $end_month, min( $end_day, days_in_month( $end_month, $current ) ) );
+            $start_date = sprintf( '%04d-%02d-%02d', $current, $start_month, min( $start_day, self::days_in_month( $start_month, $current ) ) );
+            $end_date   = sprintf( '%04d-%02d-%02d', $current, $end_month, min( $end_day, self::days_in_month( $end_month, $current ) ) );
 
             $wpdb->insert(
                 $wpdb->prefix . 'emeacc_fiscal_years',
@@ -571,8 +575,4 @@ class FiscalYear {
             );
         }
     }
-}
-
-function days_in_month( int $month, int $year ): int {
-    return cal_days_in_month( CAL_GREGORIAN, $month, $year );
 }

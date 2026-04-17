@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '13';
+    const DB_VERSION        = '14';
 
     public static function activate(): void {
         self::create_tables();
@@ -36,7 +36,7 @@ class Installer {
      */
     private static function migrate(): void {
         global $wpdb;
-        $current_version = get_option( self::DB_VERSION_OPTION, '0' );
+        $current_version = (int) get_option( self::DB_VERSION_OPTION, '0' );
         if ( $current_version && $current_version < 12 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS transfer_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_transfer (transfer_id)" );
@@ -44,6 +44,9 @@ class Installer {
         if ( $current_version && $current_version < 13 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS is_closing_entry TINYINT(1) NOT NULL DEFAULT 0 AFTER fiscal_year" );
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing (is_closing_entry)" );
+        }
+        if ( (int) $current_version < 14 ) {
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS updated_by BIGINT UNSIGNED DEFAULT NULL" );
         }
     }
 
@@ -157,6 +160,7 @@ class Installer {
             notes               TEXT,
             created_by          BIGINT UNSIGNED              DEFAULT NULL,
             created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_by          BIGINT UNSIGNED              DEFAULT NULL,
             updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY idx_date (entry_date),

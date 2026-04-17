@@ -711,19 +711,32 @@
                     title: i18n.date || 'Datum',
                     sortable: true
                 },
+                edit_url: {
+                    list: false
+                },
                 description: {
                     title: i18n.description || 'Omschrijving',
-                    sortable: true
+                    sortable: true,
+                    display: function(data) {
+                        return '<a href="' + esc(data.record.edit_url) + '">' + esc(data.value) + '</a>';
+                    }
                 },
                 coa_name: {
                     title: i18n.category || 'Categorie',
                     sortable: false,
-                    searchable: false
+                    searchable: false,
+                    display: function(data) {
+                        return data.value ? '<span class="eme-acc-tag">' + esc(data.value) + '</span>' : '';
+                    }
                 },
                 bank_statement_ref: {
                     title: i18n.bankref || 'Bankref.',
                     sortable: false,
-                    searchable: false
+                    searchable: false,
+                    display: function(data) {
+                        if (!data.value) return '';
+                        return '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
+                    }
                 },
                 account_name: {
                     title: i18n.account || 'Rekening',
@@ -747,7 +760,14 @@
                     title: i18n.reconciled || 'Vereffend',
                     width: '1%',
                     sortable: false,
-                    searchable: false
+                    searchable: false,
+                    display: function(data) {
+                        if (data.value) {
+                            const title = data.record.reconciled_at ? esc(data.record.reconciled_at) : '';
+                            return '<span class="eme-acc-tag eme-acc-reconciled" title="' + title + '">✓</span>';
+                        }
+                        return '<span class="eme-acc-tag eme-acc-pending">' + esc(i18n.pending || 'Openstaand') + '</span>';
+                    }
                 }
             },
             listQueryParams: () => ({
