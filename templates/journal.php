@@ -47,7 +47,22 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <input type="text" name="description" required maxlength="255"
                            value="<?= esc_attr( $edit_entry->description ?? '' ) ?>">
                 </div>
-<div class="eme-acc-field">
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
+                    <?php if ($edit_entry) : ?>
+                    <input type="hidden" name="direction" id="direction" value="<?=$edit_entry->direction ?? '' ?>">
+                    <?= $edit_entry->direction == "in" ? esc_html_e( 'Ontvangst (+)', 'eme-accounting' ) : '' ?>
+                    <?= $edit_entry->direction == "out" ? esc_html_e( 'Uitgave (-)', 'eme-accounting' ) : '' ?>
+                    <?= $edit_entry->direction == "transfer" ? esc_html_e( 'Transfer', 'eme-accounting' ) : '' ?>
+                    <?php else: ?>
+                    <select name="direction" id="direction">
+                        <option value="in"  <?= selected( $edit_entry->direction ?? '', 'in',  false ) ?>><?php esc_html_e( 'Ontvangst (+)', 'eme-accounting' ); ?></option>
+                        <option value="out" <?= selected( $edit_entry->direction ?? '', 'out', false ) ?>><?php esc_html_e( 'Uitgave (–)', 'eme-accounting' ); ?></option>
+                        <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Transfer', 'eme-accounting' ); ?></option>
+                    </select>
+                    <?php endif; ?>
+                </div>
+                <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
                     <select name="coa_id" id="category_coa_id" required>
                         <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
@@ -78,21 +93,6 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <label><?php esc_html_e( 'Bedrag (€)', 'eme-accounting' ); ?> *</label>
                     <input type="number" name="amount" required step="0.01" min="0.01"
                            value="<?= esc_attr( $edit_entry->amount ?? '' ) ?>">
-                </div>
-                <div class="eme-acc-field">
-                    <label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
-                    <?php if ($edit_entry) : ?>
-                    <input type="hidden" name="direction" id="direction" value="<?=$edit_entry->direction ?? '' ?>">
-                    <?= $edit_entry->direction == "in" ? esc_html_e( 'Ontvangst (+)', 'eme-accounting' ) : '' ?>
-                    <?= $edit_entry->direction == "out" ? esc_html_e( 'Uitgave (-)', 'eme-accounting' ) : '' ?>
-                    <?= $edit_entry->direction == "transfer" ? esc_html_e( 'Transfer', 'eme-accounting' ) : '' ?>
-                    <?php else: ?>
-                    <select name="direction" id="direction">
-                        <option value="in"  <?= selected( $edit_entry->direction ?? '', 'in',  false ) ?>><?php esc_html_e( 'Ontvangst (+)', 'eme-accounting' ); ?></option>
-                        <option value="out" <?= selected( $edit_entry->direction ?? '', 'out', false ) ?>><?php esc_html_e( 'Uitgave (–)', 'eme-accounting' ); ?></option>
-                        <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Transfer', 'eme-accounting' ); ?></option>
-                    </select>
-                    <?php endif; ?>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
