@@ -10,6 +10,9 @@ class Assets {
 
     public static function enqueue( string $hook ): void {
         global $plugin_page;
+        if (empty($plugin_page)) {
+            return;
+        }
         if ( strpos( $plugin_page, 'eme-accounting' ) === false && strpos( $plugin_page, 'eme_accounting' ) === false ) {
             return;
         }
