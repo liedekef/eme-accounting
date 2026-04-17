@@ -11,7 +11,7 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
         <label><?php esc_html_e( 'Rapporttype', 'eme-accounting' ); ?></label>
         <select id="report_type">
             <option value="income_expenditure"><?php esc_html_e( 'Staat van Ontvangsten en Uitgaven', 'eme-accounting' ); ?></option>
-            <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen', 'eme-accounting' ); ?></option>
+            <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen (intern)', 'eme-accounting' ); ?></option>
             <option value="diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
         </select>
     </div>
@@ -30,6 +30,7 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
     <div>
         <button id="btn-load-report" class="button button-primary"><?php esc_html_e( 'Rapport laden', 'eme-accounting' ); ?></button>
         <button id="btn-export-csv" class="button"><?php esc_html_e( 'Exporteren CSV', 'eme-accounting' ); ?></button>
+        <button id="btn-export-pdf" class="button"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
     </div>
 </div>
 </div>

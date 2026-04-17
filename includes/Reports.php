@@ -11,34 +11,68 @@ class Reports {
     /**
      * Staat van Ontvangsten en Uitgaven (income & expenditure statement).
      *
+     * Alle actieve hoofdrekeningen (parent_id IS NULL) worden getoond, ook
+     * wanneer er voor het gevraagde jaar geen boekingen zijn (bedrag = 0).
+     * Boekingen op kindrekeningen worden opgerold naar hun ouder;
+     * boekingen rechtstreeks op een hoofdrekening tellen gewoon mee.
+     * Boekingen zonder rekeningstelsel (coa_id IS NULL) worden apart getoond.
+     *
      * @return array{fiscal_year: int, income: array, expenses: array, totals: array}
      */
     public static function income_expenditure( int $year ): array {
         global $wpdb;
+        $coa_table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT j.direction, j.coa_id, coa.name, coa.code,
-                        COALESCE(SUM(j.amount), 0) as total
-                 FROM `{$wpdb->prefix}emeacc_journal` j
-                 LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
-                 WHERE j.fiscal_year = %d AND j.direction != 'transfer'
-                 GROUP BY j.direction, j.coa_id
-                 ORDER BY j.direction DESC, coa.code",
-                $year
-            )
+        // ── Step 1: all active main accounts, pre-seeded at 0.00 ─────────
+        $main_accounts = $wpdb->get_results(
+            "SELECT id, code, name, direction
+             FROM `{$coa_table}`
+             WHERE parent_id IS NULL AND is_active = 1
+             ORDER BY direction DESC, code"
         );
 
         $income   = [];
         $expenses = [];
+        foreach ( $main_accounts as $acc ) {
+            $label = $acc->code . ' - ' . $acc->name;
+            if ( $acc->direction === 'in' ) {
+                $income[ $label ] = 0.0;
+            } else {
+                $expenses[ $label ] = 0.0;
+            }
+        }
+
+        // ── Step 2: actual totals from the journal for this year ──────────
+        // COALESCE(parent.id, coa.id) resolves the main account regardless of
+        // whether the booking was made on a child or directly on the main account.
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.direction,
+                        COALESCE(parent.id,   coa.id)   AS main_id,
+                        COALESCE(parent.code, coa.code) AS main_code,
+                        COALESCE(parent.name, coa.name) AS main_name,
+                        COALESCE(SUM(j.amount), 0)      AS total
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 LEFT JOIN `{$coa_table}` coa    ON coa.id    = j.coa_id
+                 LEFT JOIN `{$coa_table}` parent ON parent.id = coa.parent_id
+                 WHERE j.fiscal_year = %d
+                   AND j.direction  != 'transfer'
+                   AND j.is_closing_entry = 0
+                 GROUP BY j.direction, main_id
+                 ORDER BY j.direction DESC, main_code",
+                $year
+            )
+        );
+
+        // ── Step 3: overlay totals onto the pre-seeded arrays ────────────
         foreach ( $rows as $row ) {
-            $label = $row->code && $row->name 
-                ? $row->code . ' - ' . $row->name 
+            $label = $row->main_code && $row->main_name
+                ? $row->main_code . ' - ' . $row->main_name
                 : __( '(zonder rekeningstelsel)', 'eme-accounting' );
             if ( $row->direction === 'in' ) {
-                $income[ $label ] = (float) $row->total;
+                $income[ $label ] = ( $income[ $label ] ?? 0.0 ) + (float) $row->total;
             } else {
-                $expenses[ $label ] = (float) $row->total;
+                $expenses[ $label ] = ( $expenses[ $label ] ?? 0.0 ) + (float) $row->total;
             }
         }
 
@@ -151,6 +185,8 @@ class Reports {
 
         if ( $format === 'csv' ) {
             self::output_csv( $data, $type . '_' . $year );
+        } elseif ( $format === 'pdf' && $type=='income_expenditure' ) {
+            self::ajax_download_income_expenditure_pdf( $data, $year );
         } else {
             wp_send_json_success( $data );
         }
@@ -179,4 +215,41 @@ class Reports {
             }
         }
     }
+
+    private static function generate_pdf_html( array $data, int $year ): string {
+        $config =  \EMEVzw\Config::get();
+        if ( ! $data || ! $config ) return '';
+
+        ob_start();
+        include EME_ACCOUNTING_DIR . 'templates/pdf/income_expenditure.php';
+        return ob_get_clean();
+    }
+
+    public static function ajax_download_income_expenditure_pdf( array $data, int $year): void {
+        $html = self::generate_pdf_html( $data, $year );
+
+        if ( empty( $html ) ) {
+            wp_send_json_error();
+        }
+
+        $dompdf_autoload = WP_PLUGIN_DIR . '/events-made-easy/includes/dompdf/vendor/autoload.php';
+        if ( ! file_exists( $dompdf_autoload ) ) {
+            wp_send_json_error();
+        }
+        require_once $dompdf_autoload;
+
+        $options = new \Dompdf\Options();
+        $options->set( 'isHtml5ParserEnabled', true );
+        $options->set( 'isRemoteEnabled', false );
+        $options->set( 'defaultFont', 'helvetica' );
+
+        $dompdf = new \Dompdf\Dompdf( $options );
+        $dompdf->loadHtml( '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head><body>'
+            . $html . '</body></html>' );
+        $dompdf->setPaper( 'A4', 'portrait' );
+        $dompdf->render();
+        $dompdf->stream( 'StaatVanOntvangstenUitgaven' . $year . '.pdf', [ 'Attachment' => false ] );
+        exit;
+    }
+
 }

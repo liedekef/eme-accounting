@@ -110,6 +110,7 @@
         'btn-delete-import-log': handleDeleteImportLog,
         'btn-load-report':        handleLoadReport,
         'btn-export-csv':         handleExportCsv,
+        'btn-export-pdf':         handleExportPDF,
         'eme-acc-edit-row':       handleToggleEditRow,
         // Stock
         'eme-acc-edit-stock':    handleStockEdit,
@@ -584,6 +585,11 @@
     function handleExportCsv() {
         const { type, year, date } = getReportParams();
         window.location = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=csv`;
+    }
+
+    function handleExportPDF() {
+        const { type, year, date } = getReportParams();
+        window.location = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=pdf`;
     }
 
     function renderReport(type, data, container) {
