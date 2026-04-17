@@ -28,7 +28,7 @@ class Installer {
         self::migrate();
         self::seed_data();
         update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
-        //flush_rewrite_rules();
+        flush_rewrite_rules();
     }
 
     /**
@@ -45,7 +45,7 @@ class Installer {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS is_closing_entry TINYINT(1) NOT NULL DEFAULT 0 AFTER fiscal_year" );
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing (is_closing_entry)" );
         }
-        if ( $current_version < 14 ) {
+        if ( (int) $current_version < 14 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS updated_by BIGINT UNSIGNED DEFAULT NULL" );
         }
     }
@@ -55,7 +55,7 @@ class Installer {
     }
 
     public static function deactivate(): void {
-        //flush_rewrite_rules();
+        flush_rewrite_rules();
     }
 
     public static function uninstall(): void {

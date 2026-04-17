@@ -6,12 +6,6 @@
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
 
-    // the euro format for amounts
-    let euro = Intl.NumberFormat('nl-BE', {
-        style: 'currency',
-        currency: 'EUR',
-    });
-
     let JournalTable;
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -691,9 +685,9 @@
             },
             deleteConfirmation: function(data) {
                 if (data.record.direction=='transfer') {
-                    data.deleteConfirmMessage = "Weet u zeker dat u deze transfer van " + euro.format(data.record.amount) + " wil verwijderen? Dit zal beide entries van de transfer verwijderen."; 
+                    data.deleteConfirmMessage = "Weet u zeker dat u deze transfer van " + formatCurrency(data.record.amount) + " wil verwijderen? Dit zal beide entries van de transfer verwijderen."; 
                 } else {
-                    data.deleteConfirmMessage = "Weet u zeker dat u deze boeking van " + euro.format(data.record.amount) + " wil verwijderen?"; 
+                    data.deleteConfirmMessage = "Weet u zeker dat u deze boeking van " + formatCurrency(data.record.amount) + " wil verwijderen?"; 
                 }
             },
             recordDeleted: function(eventArgs) {
@@ -748,7 +742,7 @@
                     sortable: true,
                     searchable: false,
                     display: function(data) {
-                        const formatted_val = euro.format(data.value);
+                        const formatted_val = formatCurrency(data.value);
                         if (data.value<0) {
                             return '<span style="color: red; font-weight: bold;">' + formatted_val + '</span>';
                         } else {
