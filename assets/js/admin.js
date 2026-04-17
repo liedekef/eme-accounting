@@ -569,6 +569,12 @@
         };
     }
 
+    document.getElementById('report_type').addEventListener('change', function() {
+        document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
+        document.getElementById('report_year_div').style.display = this.value === 'patrimony' ? 'none' : '';
+        document.getElementById('btn-export-pdf').style.display = this.value === 'income_expenditure' ? '' : 'none';
+    });
+
     function handleLoadReport() {
         const { type, year, date } = getReportParams();
         const output = document.querySelector('#report-output');

@@ -15,7 +15,7 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
             <option value="diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
         </select>
     </div>
-    <div class="eme-acc-field">
+    <div class="eme-acc-field" id="report_year_div">
         <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
         <select id="report_year">
             <?php foreach ( $years as $y ): ?>
@@ -36,9 +36,4 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
 </div>
 <div id="report-output" style="margin-top:20px"></div>
 
-<script>
-document.getElementById('report_type').addEventListener('change', function() {
-    document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
-});
-</script>
 </div>
