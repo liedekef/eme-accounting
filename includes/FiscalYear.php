@@ -5,50 +5,241 @@ defined( 'ABSPATH' ) || exit;
 
 class FiscalYear {
 
-    const OPTION_KEY = 'emeacc_fiscal_years';
-
     public static function init(): void {
-        add_action( 'wp_ajax_eme_accounting_close_year', [ __CLASS__, 'ajax_close' ] );
+        add_action( 'wp_ajax_eme_accounting_save_fiscal_year', [ __CLASS__, 'ajax_save' ] );
+        add_action( 'wp_ajax_eme_accounting_close_fiscal_year', [ __CLASS__, 'ajax_close' ] );
+        add_action( 'wp_ajax_eme_accounting_reopen_fiscal_year', [ __CLASS__, 'ajax_reopen' ] );
+        add_action( 'wp_ajax_eme_accounting_delete_fiscal_year', [ __CLASS__, 'ajax_delete' ] );
+        add_action( 'wp_ajax_eme_accounting_check_fiscal_year', [ __CLASS__, 'ajax_check' ] );
     }
 
-    public static function get_closed_years(): array {
-        return get_option( self::OPTION_KEY, [] );
+    public static function get_all(): array {
+        global $wpdb;
+        return $wpdb->get_results(
+            "SELECT * FROM `{$wpdb->prefix}emeacc_fiscal_years` ORDER BY year DESC"
+        );
+    }
+
+    public static function get( int $year ): ?object {
+        global $wpdb;
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_fiscal_years` WHERE year = %d",
+                $year
+            )
+        );
+    }
+
+    public static function get_by_id( int $id ): ?object {
+        global $wpdb;
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_fiscal_years` WHERE id = %d",
+                $id
+            )
+        );
+    }
+
+    public static function create( array $data ): int|\WP_Error {
+        global $wpdb;
+
+        $year       = (int) ( $data['year'] ?? 0 );
+        $start_date = sanitize_text_field( $data['start_date'] ?? '' );
+        $end_date   = sanitize_text_field( $data['end_date'] ?? '' );
+
+        if ( $year < 1900 || $year > 2100 ) {
+            return new \WP_Error( 'invalid_year', __( 'Ongeldig boekjaar.', 'eme-accounting' ) );
+        }
+
+        if ( empty( $start_date ) || empty( $end_date ) ) {
+            return new \WP_Error( 'missing_dates', __( 'Start- en einddatum zijn verplicht.', 'eme-accounting' ) );
+        }
+
+        $existing = self::get( $year );
+        if ( $existing ) {
+            return new \WP_Error( 'year_exists', __( 'Boekjaar bestaat al.', 'eme-accounting' ) );
+        }
+
+        $result = $wpdb->insert(
+            $wpdb->prefix . 'emeacc_fiscal_years',
+            [
+                'year'       => $year,
+                'start_date' => $start_date,
+                'end_date'   => $end_date,
+                'status'     => 'open',
+            ]
+        );
+
+        if ( $result === false ) {
+            return new \WP_Error( 'db_error', __( 'Kon boekjaar niet aanmaken.', 'eme-accounting' ) );
+        }
+
+        return (int) $wpdb->insert_id;
+    }
+
+    public static function update( int $year, array $data ): bool|\WP_Error {
+        global $wpdb;
+
+        $existing = self::get( $year );
+        if ( ! $existing ) {
+            return new \WP_Error( 'not_found', __( 'Boekjaar niet gevonden.', 'eme-accounting' ) );
+        }
+
+        if ( $existing->status === 'closed' ) {
+            return new \WP_Error( 'year_closed', __( 'Kan geen gesloten boekjaar bewerken.', 'eme-accounting' ) );
+        }
+
+        $update = [];
+        if ( ! empty( $data['start_date'] ) ) {
+            $update['start_date'] = sanitize_text_field( $data['start_date'] );
+        }
+        if ( ! empty( $data['end_date'] ) ) {
+            $update['end_date'] = sanitize_text_field( $data['end_date'] );
+        }
+
+        if ( empty( $update ) ) {
+            return true;
+        }
+
+        $result = $wpdb->update(
+            $wpdb->prefix . 'emeacc_fiscal_years',
+            $update,
+            [ 'year' => $year ]
+        );
+
+        return $result !== false;
+    }
+
+    public static function update_by_id( int $id, array $data ): bool|\WP_Error {
+        global $wpdb;
+
+        $existing = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_fiscal_years` WHERE id = %d",
+                $id
+            )
+        );
+        if ( ! $existing ) {
+            return new \WP_Error( 'not_found', __( 'Boekjaar niet gevonden.', 'eme-accounting' ) );
+        }
+
+        if ( $existing->status === 'closed' ) {
+            return new \WP_Error( 'year_closed', __( 'Kan geen gesloten boekjaar bewerken.', 'eme-accounting' ) );
+        }
+
+        $update = [];
+        if ( ! empty( $data['start_date'] ) ) {
+            $update['start_date'] = sanitize_text_field( $data['start_date'] );
+        }
+        if ( ! empty( $data['end_date'] ) ) {
+            $update['end_date'] = sanitize_text_field( $data['end_date'] );
+        }
+
+        if ( empty( $update ) ) {
+            return true;
+        }
+
+        $result = $wpdb->update(
+            $wpdb->prefix . 'emeacc_fiscal_years',
+            $update,
+            [ 'id' => $id ]
+        );
+
+        return $result !== false;
+    }
+
+    public static function delete( int $year ): bool|\WP_Error {
+        global $wpdb;
+
+        $existing = self::get( $year );
+        if ( ! $existing ) {
+            return new \WP_Error( 'not_found', __( 'Boekjaar niet gevonden.', 'eme-accounting' ) );
+        }
+
+        if ( $existing->status === 'closed' ) {
+            return new \WP_Error( 'year_closed', __( 'Kan geen gesloten boekjaar verwijderen.', 'eme-accounting' ) );
+        }
+
+        $has_entries = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_journal` WHERE fiscal_year = %d",
+                $year
+            )
+        );
+
+        if ( $has_entries > 0 ) {
+            return new \WP_Error( 'has_entries', __( 'Boekjaar heeft nog boekingen en kan niet verwijderd worden.', 'eme-accounting' ) );
+        }
+
+        $result = $wpdb->delete(
+            $wpdb->prefix . 'emeacc_fiscal_years',
+            [ 'year' => $year ]
+        );
+
+        return $result !== false;
     }
 
     public static function is_closed( int $year ): bool {
-        $closed = self::get_closed_years();
-        return in_array( $year, $closed, true );
+        $fy = self::get( $year );
+        return $fy && $fy->status === 'closed';
     }
 
-    public static function get_current_year(): int {
-        return (int) gmdate( 'Y' );
-    }
-
-    public static function get_available_years(): array {
+    public static function get_for_date( string $date ): ?object {
         global $wpdb;
-        $years = $wpdb->get_col(
-            "SELECT DISTINCT fiscal_year FROM `{$wpdb->prefix}emeacc_journal` ORDER BY fiscal_year DESC"
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_fiscal_years`
+                 WHERE %s BETWEEN start_date AND end_date",
+                $date
+            )
         );
-        if ( empty( $years ) ) {
-            $years = [ self::get_current_year() ];
-        }
-        return $years;
     }
 
-    /**
-     * Close a fiscal year by creating closing entries.
-     *
-     * Groups all income/expense entries by coa_id and creates one closing
-     * entry per coa_id on the "Resultaten" account (plus one catch-all entry
-     * for any bookings that have no coa_id assigned).
-     *
-     * Income  → 'out' entry on Resultaten (income is absorbed into equity).
-     * Expense → 'in'  entry on Resultaten (expense is absorbed into equity).
-     *
-     * Transfers are never included in closing entries.
-     */
-    public static function close_year( int $year ): bool|\WP_Error {
-        if ( self::is_closed( $year ) ) {
+    public static function get_or_create_for_date( string $date ): ?object {
+        $fy = self::get_for_date( $date );
+        if ( $fy ) {
+            return $fy;
+        }
+
+        $settings = get_option( 'eme_accounting_settings', [] );
+        $year     = (int) date( 'Y', strtotime( $date ) );
+
+        $start_month = (int) ( $settings['fiscal_year_start_month'] ?? 1 );
+        $start_day   = (int) ( $settings['fiscal_year_start_day'] ?? 1 );
+        $end_month   = (int) ( $settings['fiscal_year_end_month'] ?? 12 );
+        $end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
+
+        $start_date = sprintf( '%04d-%02d-%02d', $year, $start_month, min( $start_day, days_in_month( $start_month, $year ) ) );
+        $end_date   = sprintf( '%04d-%02d-%02d', $year, $end_month, min( $end_day, days_in_month( $end_month, $year ) ) );
+
+        $fy = self::get( $year );
+        if ( ! $fy ) {
+            $result = $wpdb->insert(
+                $wpdb->prefix . 'emeacc_fiscal_years',
+                [
+                    'year'       => $year,
+                    'start_date' => $start_date,
+                    'end_date'   => $end_date,
+                    'status'     => 'open',
+                ]
+            );
+            if ( $result ) {
+                $fy = self::get( $year );
+            }
+        }
+
+        return $fy;
+    }
+
+    public static function close( int $year ): bool|\WP_Error {
+        global $wpdb;
+
+        $fy = self::get( $year );
+        if ( ! $fy ) {
+            return new \WP_Error( 'not_found', __( 'Boekjaar niet gevonden.', 'eme-accounting' ) );
+        }
+
+        if ( $fy->status === 'closed' ) {
             return new \WP_Error( 'already_closed', __( 'Boekjaar is al afgesloten.', 'eme-accounting' ) );
         }
 
@@ -57,9 +248,9 @@ class FiscalYear {
             return new \WP_Error( 'no_entries', __( 'Geen boekingen in dit boekjaar.', 'eme-accounting' ) );
         }
 
+        /*
         $result_acc = self::get_or_create_result_account();
 
-        // Close income: one 'out' entry per coa_id on the Resultaten account.
         foreach ( self::get_totals_by_coa( $year, 'in' ) as $group ) {
             if ( $group['total'] <= 0 ) continue;
             Journal::save( [
@@ -67,7 +258,7 @@ class FiscalYear {
                 'description'       => sprintf(
                     __( 'Afsluiten ontvangsten %d%s', 'eme-accounting' ),
                     $year,
-                    $group['coa_name'] !== '' ? ' \u2013 ' . $group['coa_name'] : ''
+                    $group['coa_name'] !== '' ? ' – ' . $group['coa_name'] : ''
                 ),
                 'amount'            => $group['total'],
                 'direction'         => 'out',
@@ -75,10 +266,10 @@ class FiscalYear {
                 'coa_id'            => $group['coa_id'],
                 'contra_account_id' => null,
                 'fiscal_year'       => $year,
+                'is_closing_entry'  => 1,
             ] );
         }
 
-        // Close expenses: one 'in' entry per coa_id on the Resultaten account.
         foreach ( self::get_totals_by_coa( $year, 'out' ) as $group ) {
             if ( $group['total'] <= 0 ) continue;
             Journal::save( [
@@ -86,7 +277,7 @@ class FiscalYear {
                 'description'       => sprintf(
                     __( 'Afsluiten uitgaven %d%s', 'eme-accounting' ),
                     $year,
-                    $group['coa_name'] !== '' ? ' \u2013 ' . $group['coa_name'] : ''
+                    $group['coa_name'] !== '' ? ' – ' . $group['coa_name'] : ''
                 ),
                 'amount'            => $group['total'],
                 'direction'         => 'in',
@@ -94,25 +285,65 @@ class FiscalYear {
                 'coa_id'            => $group['coa_id'],
                 'contra_account_id' => null,
                 'fiscal_year'       => $year,
+                'is_closing_entry'  => 1,
             ] );
         }
+         */
 
-        // Mark year as closed.
-        $closed   = self::get_closed_years();
-        $closed[] = $year;
-        update_option( self::OPTION_KEY, array_unique( $closed ) );
+        $wpdb->update(
+            $wpdb->prefix . 'emeacc_fiscal_years',
+            [
+                'status'     => 'closed',
+                'closed_at'  => current_time( 'mysql' ),
+                'closed_by'  => get_current_user_id(),
+            ],
+            [ 'year' => $year ]
+        );
 
         return true;
     }
 
-    /**
-     * Return per-coa_id totals for a given direction and fiscal year.
-     *
-     * Entries without a coa_id are grouped as a single catch-all row
-     * with coa_id = null and coa_name = ''.
-     *
-     * @return array<int, array{coa_id: int|null, coa_name: string, total: float}>
-     */
+    public static function reopen( int $year ): bool|\WP_Error {
+        global $wpdb;
+
+        $fy = self::get( $year );
+        if ( ! $fy ) {
+            return new \WP_Error( 'not_found', __( 'Boekjaar niet gevonden.', 'eme-accounting' ) );
+        }
+
+        if ( $fy->status !== 'closed' ) {
+            return new \WP_Error( 'not_closed', __( 'Boekjaar is niet afgesloten.', 'eme-accounting' ) );
+        }
+
+        self::delete_closing_entries( $year );
+
+        $wpdb->update(
+            $wpdb->prefix . 'emeacc_fiscal_years',
+            [
+                'status'      => 'open',
+                'reopened_at' => current_time( 'mysql' ),
+                'reopened_by' => get_current_user_id(),
+                'closed_at'   => null,
+                'closed_by'   => null,
+            ],
+            [ 'year' => $year ]
+        );
+
+        return true;
+    }
+
+    private static function delete_closing_entries( int $year ): void {
+        global $wpdb;
+        $wpdb->delete(
+            $wpdb->prefix . 'emeacc_journal',
+            [
+                'fiscal_year'       => $year,
+                'is_closing_entry'  => 1,
+            ],
+            [ '%d', '%d' ]
+        );
+    }
+
     private static function get_totals_by_coa( int $year, string $direction ): array {
         global $wpdb;
 
@@ -125,6 +356,7 @@ class FiscalYear {
                  LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
                  WHERE j.fiscal_year = %d
                    AND j.direction   = %s
+                   AND j.is_closing_entry = 0
                  GROUP BY j.coa_id
                  ORDER BY coa.code",
                 $year,
@@ -143,6 +375,7 @@ class FiscalYear {
         return $result;
     }
 
+    /*
     private static function get_or_create_result_account(): object {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_accounts';
@@ -163,19 +396,45 @@ class FiscalYear {
         ] );
 
         return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$table` WHERE id = %d", $wpdb->insert_id ) );
-    }
+    }*/
 
-    /**
-     * Get the result for a fiscal year (positive = surplus, negative = deficit).
-     */
     public static function get_year_result( int $year ): float {
         $totals = Journal::get_totals( [ 'fiscal_year' => $year ] );
         return $totals['income'] - $totals['expenses'];
     }
 
-    public static function ajax_close(): void {
-        $formatter = new \NumberFormatter( 'nl_BE', \NumberFormatter::CURRENCY );
+    public static function ajax_save(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
+        }
 
+        $id         = (int) ( $_POST['id'] ?? 0 );
+        $year       = (int) ( $_POST['year'] ?? 0 );
+        $start_date = sanitize_text_field( $_POST['start_date'] ?? '' );
+        $end_date   = sanitize_text_field( $_POST['end_date'] ?? '' );
+
+        if ( $id > 0 ) {
+            $result = self::update_by_id( $id, [
+                'start_date' => $start_date,
+                'end_date'   => $end_date,
+            ] );
+        } else {
+            $result = self::create( [
+                'year'       => $year,
+                'start_date' => $start_date,
+                'end_date'   => $end_date,
+            ] );
+        }
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Boekjaar opgeslagen.', 'eme-accounting' ) ] );
+    }
+
+    public static function ajax_close(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
@@ -186,11 +445,12 @@ class FiscalYear {
             wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
         }
 
-        $result = self::close_year( $year );
+        $result = self::close( $year );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
         }
 
+        $formatter = new \NumberFormatter( 'nl_BE', \NumberFormatter::CURRENCY );
         $year_result = self::get_year_result( $year );
         $label = $year_result >= 0
             ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency( $year_result, 'EUR' ) )
@@ -198,4 +458,121 @@ class FiscalYear {
 
         wp_send_json_success( [ 'message' => __( 'Boekjaar afgesloten.', 'eme-accounting' ), 'result' => $label ] );
     }
+
+    public static function ajax_reopen(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
+        }
+
+        $year = (int) ( $_POST['year'] ?? 0 );
+        if ( ! $year ) {
+            wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
+        }
+
+        $result = self::reopen( $year );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Boekjaar heropend.', 'eme-accounting' ) ] );
+    }
+
+    public static function ajax_delete(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
+        }
+
+        $year = (int) ( $_POST['year'] ?? 0 );
+        if ( ! $year ) {
+            wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
+        }
+
+        $result = self::delete( $year );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Boekjaar verwijderd.', 'eme-accounting' ) ] );
+    }
+
+    public static function ajax_check(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        $date = sanitize_text_field( $_POST['date'] ?? '' );
+        if ( empty( $date ) ) {
+            wp_send_json_error( __( 'Geen datum opgegeven.', 'eme-accounting' ) );
+        }
+
+        $fy = self::get_or_create_for_date( $date );
+        if ( ! $fy ) {
+            wp_send_json_error( __( 'Geen fiscaal jaar gevonden.', 'eme-accounting' ) );
+        }
+
+        wp_send_json_success( [
+            'year'       => (int) $fy->year,
+            'start_date' => $fy->start_date,
+            'end_date'   => $fy->end_date,
+            'status'     => $fy->status,
+        ] );
+    }
+
+    public static function get_closed_years(): array {
+        global $wpdb;
+        $rows = $wpdb->get_col(
+            "SELECT year FROM `{$wpdb->prefix}emeacc_fiscal_years` WHERE status = 'closed' ORDER BY year DESC"
+        );
+        return array_map( 'intval', $rows );
+    }
+
+    public static function get_available_years(): array {
+        global $wpdb;
+        $years = $wpdb->get_col(
+            "SELECT DISTINCT fiscal_year FROM `{$wpdb->prefix}emeacc_journal` ORDER BY fiscal_year DESC"
+        );
+        if ( empty( $years ) ) {
+            $years = [ (int) gmdate( 'Y' ) ];
+        }
+        return $years;
+    }
+
+    public static function get_current_year(): int {
+        return (int) gmdate( 'Y' );
+    }
+
+    public static function ensure_current_year_exists(): void {
+        global $wpdb;
+        $current = (int) gmdate( 'Y' );
+        $exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_fiscal_years` WHERE year = %d",
+                $current
+            )
+        );
+
+        if ( $exists == 0 ) {
+            $settings = get_option( 'eme_accounting_settings', [] );
+            $start_month = (int) ( $settings['fiscal_year_start_month'] ?? 1 );
+            $start_day   = (int) ( $settings['fiscal_year_start_day'] ?? 1 );
+            $end_month   = (int) ( $settings['fiscal_year_end_month'] ?? 12 );
+            $end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
+
+            $start_date = sprintf( '%04d-%02d-%02d', $current, $start_month, min( $start_day, days_in_month( $start_month, $current ) ) );
+            $end_date   = sprintf( '%04d-%02d-%02d', $current, $end_month, min( $end_day, days_in_month( $end_month, $current ) ) );
+
+            $wpdb->insert(
+                $wpdb->prefix . 'emeacc_fiscal_years',
+                [
+                    'year'       => $current,
+                    'start_date' => $start_date,
+                    'end_date'   => $end_date,
+                    'status'     => 'open',
+                ]
+            );
+        }
+    }
+}
+
+function days_in_month( int $month, int $year ): int {
+    return cal_days_in_month( CAL_GREGORIAN, $month, $year );
 }

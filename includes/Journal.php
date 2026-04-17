@@ -213,10 +213,25 @@ class Journal {
             return new \WP_Error( 'invalid_amount', __( 'Bedrag moet groter zijn dan 0.', 'eme-accounting' ) );
         }
 
-        $entry_date  = eme_sanitize_request( $data['entry_date'] ?? current_time( 'Y-m-d' ) );
-        $fiscal_year = isset( $data['fiscal_year'] )
-            ? (int) $data['fiscal_year']
-            : (int) gmdate( 'Y', strtotime( $entry_date ) );
+        $entry_date = eme_sanitize_request( $data['entry_date'] ?? current_time( 'Y-m-d' ) );
+
+        $fy = FiscalYear::get_or_create_for_date( $entry_date );
+        if ( ! $fy ) {
+            return new \WP_Error( 'no_fiscal_year', __( 'Geen fiscaal jaar gevonden voor deze datum.', 'eme-accounting' ) );
+        }
+
+        $fiscal_year = $fy->year;
+
+        if ( $fy->status === 'closed' ) {
+            return new \WP_Error(
+                'year_closed',
+                sprintf(
+                    __( 'Boekjaar %d is afgesloten op %s.', 'eme-accounting' ),
+                    $fiscal_year,
+                    date_i18n( 'd/m/Y', strtotime( $fy->closed_at ) )
+                )
+            );
+        }
 
         $allowed_directions = [ 'in', 'out', 'transfer' ];
         $direction          = in_array( $data['direction'] ?? 'out', $allowed_directions, true )
@@ -232,7 +247,6 @@ class Journal {
             'account_id'         => (int) $data['account_id'],
             'contra_account_id'  => ! empty( $data['contra_account_id'] ) ? (int) $data['contra_account_id'] : null,
             'coa_id'             => ! empty( $data['coa_id'] ) ? (int) $data['coa_id'] : null,
-            // bank_statement_ref: optioneel rekeningnummer / ref van bankafschrift
             'bank_statement_ref' => eme_sanitize_request( $data['bank_statement_ref'] ?? '' ),
             'bank_statement_seq' => eme_sanitize_request( $data['bank_statement_seq'] ?? '' ),
             'payment_method'     => eme_sanitize_request( $data['payment_method'] ?? '' ),
@@ -244,6 +258,7 @@ class Journal {
             'is_reconciled'      => (int) (bool) ( $data['is_reconciled'] ?? 0 ),
             'import_line_id'     => ! empty( $data['import_line_id'] ) ? (int) $data['import_line_id'] : null,
             'fiscal_year'        => $fiscal_year,
+            'is_closing_entry'   => (int) (bool) ( $data['is_closing_entry'] ?? 0 ),
             'notes'              => eme_sanitize_request( $data['notes'] ?? '' ),
             'created_by'         => get_current_user_id() ?: null,
         ];
@@ -307,11 +322,19 @@ class Journal {
         return $new_id;
     }
 
-    public static function delete( int $id ): bool {
+    public static function delete( int $id ): bool|\WP_Error {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_journal';
 
-        // If this is one leg of a transfer pair, delete the linked leg too.
+        $entry = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$table` WHERE id = %d", $id ) );
+        if ( ! $entry ) {
+            return true;
+        }
+
+        if ( FiscalYear::is_closed( (int) $entry->fiscal_year ) ) {
+            return new \WP_Error( 'year_closed', __( 'Kan boeking niet verwijderen: boekjaar is afgesloten.', 'eme-accounting' ) );
+        }
+
         $transfer_id = $wpdb->get_var( $wpdb->prepare( "SELECT transfer_id FROM `$table` WHERE id = %d AND direction='transfer'", $id ) );
         if ( $transfer_id ) {
             $wpdb->delete( $table, [ 'id' => (int) $transfer_id ], [ '%d' ] );
@@ -358,8 +381,11 @@ class Journal {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
         }
-        self::delete( (int) ( $_POST['id'] ?? 0 ) );
-        wp_send_json(['Result' => 'OK']); //ftable expects Result
+        $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+        wp_send_json( [ 'Result' => 'OK' ] );
     }
 
     public static function ajax_list(): void {

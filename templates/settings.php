@@ -6,11 +6,14 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
     $settings = [
         'default_income_account'  => (int)    ( $_POST['default_income_account']  ?? 0 ),
         'default_expense_account' => (int)    ( $_POST['default_expense_account'] ?? 0 ),
-        'default_fiscal_year'     => (int)    ( $_POST['default_fiscal_year']     ?? (int) gmdate( 'Y' ) ),
         'currency'                => strtoupper( sanitize_text_field( $_POST['currency'] ?? 'EUR' ) ),
         'delete_on_uninstall'     => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
         'eme_auto_booking'        => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
         'default_coa'             => (int)    ( $_POST['default_coa'] ?? 0 ),
+        'fiscal_year_start_month'  => (int)    ( $_POST['fiscal_year_start_month'] ?? 1 ),
+        'fiscal_year_start_day'    => (int)    ( $_POST['fiscal_year_start_day'] ?? 1 ),
+        'fiscal_year_end_month'    => (int)    ( $_POST['fiscal_year_end_month'] ?? 12 ),
+        'fiscal_year_end_day'      => (int)    ( $_POST['fiscal_year_end_day'] ?? 31 ),
     ];
     if ($settings['eme_auto_booking'] && !$settings['default_coa']) {
         echo '<div class="notice notice-error"><p>' . esc_html__( 'Kies een resultatenrekening aub.', 'eme-accounting' ) . '</p></div>';
@@ -24,11 +27,14 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'default_income_account'  => 0,
     'default_expense_account' => 0,
-    'default_fiscal_year'     => (int) gmdate( 'Y' ),
     'currency'                => 'EUR',
     'delete_on_uninstall'     => 'no',
     'default_coa'             => 0,
     'eme_auto_booking'        => 0,
+    'fiscal_year_start_month'  => 1,
+    'fiscal_year_start_day'    => 1,
+    'fiscal_year_end_month'    => 12,
+    'fiscal_year_end_day'      => 31,
 ] );
 $accounts = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
@@ -65,8 +71,36 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
     </td>
 </tr>
 <tr>
-    <th><?php esc_html_e( 'Standaard boekjaar', 'eme-accounting' ); ?></th>
-    <td><input type="number" name="default_fiscal_year" value="<?= (int) $settings['default_fiscal_year'] ?>" min="2000" max="2099"></td>
+    <th><?php esc_html_e( 'Boekjaar start', 'eme-accounting' ); ?></th>
+    <td>
+        <select name="fiscal_year_start_month">
+            <?php foreach ( range( 1, 12 ) as $m ): ?>
+            <option value="<?= $m ?>" <?= selected( $m, $settings['fiscal_year_start_month'], false ) ?>><?= date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <select name="fiscal_year_start_day">
+            <?php foreach ( range( 1, 31 ) as $d ): ?>
+            <option value="<?= $d ?>" <?= selected( $d, $settings['fiscal_year_start_day'], false ) ?>><?= $d ?></option>
+            <?php endforeach; ?>
+        </select>
+        <p class="description"><?php esc_html_e( 'Startdatum van het boekjaar (wordt gebruikt bij automatisch aanmaken van boekjaren).', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Boekjaar einde', 'eme-accounting' ); ?></th>
+    <td>
+        <select name="fiscal_year_end_month">
+            <?php foreach ( range( 1, 12 ) as $m ): ?>
+            <option value="<?= $m ?>" <?= selected( $m, $settings['fiscal_year_end_month'], false ) ?>><?= date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <select name="fiscal_year_end_day">
+            <?php foreach ( range( 1, 31 ) as $d ): ?>
+            <option value="<?= $d ?>" <?= selected( $d, $settings['fiscal_year_end_day'], false ) ?>><?= $d ?></option>
+            <?php endforeach; ?>
+        </select>
+        <p class="description"><?php esc_html_e( 'Einddatum van het boekjaar (wordt gebruikt bij automatisch aanmaken van boekjaren).', 'eme-accounting' ); ?></p>
+    </td>
 </tr>
 <tr>
     <th><?php esc_html_e( 'Valuta', 'eme-accounting' ); ?></th>
@@ -99,7 +133,7 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
             <?php foreach ( $coa_accounts as $id => $acc ):
                      if ( $acc && $acc->direction === 'in' ):
             ?>
-                         <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
+                         <option value="<?= (int) $id ?>" <?= selected( $settings['default_coa'] ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
                          <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
             </option>
             <?php endif; endforeach; ?>

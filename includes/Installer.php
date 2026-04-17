@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '12';
+    const DB_VERSION        = '13';
 
     public static function activate(): void {
         self::create_tables();
@@ -40,6 +40,10 @@ class Installer {
         if ( $current_version && $current_version < 12 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS transfer_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_transfer (transfer_id)" );
+        }
+        if ( $current_version && $current_version < 13 ) {
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS is_closing_entry TINYINT(1) NOT NULL DEFAULT 0 AFTER fiscal_year" );
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing (is_closing_entry)" );
         }
     }
 
@@ -87,6 +91,25 @@ class Installer {
             KEY idx_active (is_active)
         ) $charset;" );
 
+        // ── Fiscal years ─────────────────────────────────────────────────
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_fiscal_years (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            year            SMALLINT        NOT NULL UNIQUE,
+            start_date      DATE            NOT NULL,
+            end_date        DATE            NOT NULL,
+            status          ENUM('open','closed') DEFAULT 'open',
+            closed_at       DATETIME                     DEFAULT NULL,
+            closed_by       BIGINT UNSIGNED              DEFAULT NULL,
+            closed_reason   VARCHAR(255)                 DEFAULT NULL,
+            reopened_at     DATETIME                     DEFAULT NULL,
+            reopened_by     BIGINT UNSIGNED              DEFAULT NULL,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_status (status),
+            KEY idx_year (year)
+        ) $charset;" );
+
         // ── Chart of accounts (rekeningstelsel) ───────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_chart_of_accounts (
             id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -130,6 +153,7 @@ class Installer {
             reconciled_at       DATETIME                     DEFAULT NULL,
             import_line_id      BIGINT UNSIGNED              DEFAULT NULL,
             fiscal_year         SMALLINT        NOT NULL,
+            is_closing_entry    TINYINT(1)      NOT NULL DEFAULT 0,
             notes               TEXT,
             created_by          BIGINT UNSIGNED              DEFAULT NULL,
             created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -139,6 +163,7 @@ class Installer {
             KEY idx_account (account_id),
             KEY idx_coa (coa_id),
             KEY idx_fiscal_year (fiscal_year),
+            KEY idx_closing (is_closing_entry),
             KEY idx_category (category),
             KEY idx_reconciled (is_reconciled),
             KEY idx_eme_payment (eme_payment_id),
@@ -267,6 +292,7 @@ class Installer {
     private static function drop_tables(): void {
         global $wpdb;
         $tables = [
+            'emeacc_fiscal_years',
             'emeacc_import_lines',
             'emeacc_import_log',
             'emeacc_budget',

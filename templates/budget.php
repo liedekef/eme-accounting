@@ -1,20 +1,41 @@
 <?php
 defined( 'ABSPATH' ) || exit;
+
 $year        = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $coa        = EMEAccounting\ChartOfAccounts::get_all();
 $budget_map = EMEAccounting\Budget::get_year_map( $year );
-$prev_years = range( $year - 5, $year - 1 );
+$fy         = EMEAccounting\FiscalYear::get( $year );
+$is_closed  = $fy && $fy->status === 'closed';
+
+$fiscal_years = EMEAccounting\FiscalYear::get_all();
+$prev_years = [];
+foreach ( $fiscal_years as $f ) {
+    if ( $f->year < $year && $f->status === 'open' ) {
+        $prev_years[] = $f->year;
+    }
+}
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?= $year ?></h1>
 
+<?php if ( $is_closed ): ?>
+<div class="notice notice-warning">
+    <p><?php esc_html_e( 'Dit boekjaar is afgesloten. Begroting kan niet meer aangepast worden.', 'eme-accounting' ); ?></p>
+</div>
+<?php endif; ?>
+
 <p>
     <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></label>
     <select id="eme-acc-year-select" onchange="window.location='?page=eme-accounting-budget&year='+this.value">
-        <?php for ( $y = (int) gmdate( 'Y' ) - 2; $y <= (int) gmdate( 'Y' ) + 1; $y++ ): ?>
-        <option value="<?= $y ?>" <?= $y === $year ? 'selected' : '' ?>><?= $y ?></option>
-        <?php endfor; ?>
+        <?php foreach ( $fiscal_years as $f ): ?>
+        <option value="<?= (int) $f->year ?>" <?= $f->year === $year ? 'selected' : '' ?>>
+            <?= (int) $f->year ?>
+            <?php if ( $f->status === 'closed' ): ?>
+                (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
+            <?php endif; ?>
+        </option>
+        <?php endforeach; ?>
     </select>
 
     <label style="margin-left:20px"><?php esc_html_e( 'Kopieer resultaten van:', 'eme-accounting' ); ?></label>
@@ -76,7 +97,8 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
         <input type="number" name="lines[<?= $c->id ?>][budgeted_amount]" 
                value="<?= $budget > 0 ? $budget : '' ?>" 
                step="0.01" min="0" style="width:120px"
-               data-orig="<?= $budget > 0 ? $budget : '' ?>">
+               data-orig="<?= $budget > 0 ? $budget : '' ?>"
+               <?= $is_closed ? 'disabled' : '' ?>>
         <?php endif; ?>
     </td>
     <td><?php if ($c->parent_id) echo $formatter->formatCurrency($actual, 'EUR'); ?> </td>
@@ -95,6 +117,6 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 </div>
 <?php endforeach; ?>
 <input type="hidden" name="fiscal_year" value="<?= $year ?>">
-<p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
+<p><button type="submit" class="button button-primary submit-btn" <?= $is_closed ? 'disabled' : '' ?>><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
 </form>
 </div>

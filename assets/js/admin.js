@@ -325,6 +325,7 @@
      * ═══════════════════════════════════════════════════════════════════ */
     function handleJournalSave(form) {
         const btn = form.querySelector('.submit-btn');
+        const originalText = btn.textContent;
         btn.disabled = true;
         ajax('eme_accounting_save_entry', formToObj(form),
             (data) => {

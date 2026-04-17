@@ -27,7 +27,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Datum', 'eme-accounting' ); ?> *</label>
                     <input type="date" name="entry_date" id="entry_date" required
-                           value="<?= esc_attr( $edit_entry->entry_date ?? current_time( 'Y-m-d' ) ) ?>">
+                           value="<?= esc_attr( $edit_entry->entry_date ?? current_time( 'Y-m-d' )) ?>">
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Boekingsdatum bank', 'eme-accounting' ); ?></label>
@@ -35,10 +35,10 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                            value="<?= esc_attr( $edit_entry->booking_date ?? '' ) ?>">
                     <span class="description"><?php esc_html_e( 'Valutadatum (optioneel)', 'eme-accounting' ); ?></span>
                 </div>
-                <div class="eme-acc-field">
+                <div class="eme-acc-field" id="fiscal-year-info" style="display:none">
                     <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
-                    <input type="number" name="fiscal_year" id="fiscal_year" min="2000" max="2099"
-                           value="<?= esc_attr( $edit_entry->fiscal_year ?? $year ) ?>">
+                    <span id="fy-display" style="font-weight:bold;color:#2271b1">—</span>
+                    <input type="hidden" name="fiscal_year_info" id="fiscal_year_info" value="">
                 </div>
             </div>
 

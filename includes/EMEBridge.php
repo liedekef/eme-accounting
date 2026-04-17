@@ -45,7 +45,6 @@ class EMEBridge {
             'account_id'     => $default_account,
             'eme_payment_id' => $payment_id,
             'eme_event_id'   => (int) ( $payment['event_id'] ?? 0 ),
-            'fiscal_year'    => (int) gmdate( 'Y', strtotime( $payment['payment_date'] ?? 'now' ) ),
         ] );
     }
 }

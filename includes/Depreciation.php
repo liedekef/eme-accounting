@@ -61,7 +61,6 @@ class Depreciation {
                     'amount'      => $amount,
                     'direction'   => 'out',
                     'account_id'   => $asset->depreciation_account_id,
-                    'fiscal_year' => (int) gmdate( 'Y' ),
                 ] );
                 // Boeking voor activarekening (verminderen activa)
                 Journal::save( [
@@ -74,7 +73,6 @@ class Depreciation {
                     'amount'      => $amount,
                     'direction'   => 'in',
                     'account_id'   => $asset->account_id,
-                    'fiscal_year' => (int) gmdate( 'Y' ),
                 ] );
             }
 

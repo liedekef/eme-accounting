@@ -56,6 +56,10 @@ class Budget {
             return new \WP_Error( 'invalid_coa', __( 'Geen rekeningstelsel geselecteerd.', 'eme-accounting' ) );
         }
 
+        if ( FiscalYear::is_closed( $fiscal_year ) ) {
+            return new \WP_Error( 'year_closed', __( 'Boekjaar is afgesloten. Begroting kan niet meer aangepast worden.', 'eme-accounting' ) );
+        }
+
         $existing = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT id FROM `{$wpdb->prefix}emeacc_budget`
@@ -97,6 +101,11 @@ class Budget {
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
 
         $fiscal_year = (int) ( $_POST['fiscal_year'] ?? gmdate( 'Y' ) );
+
+        if ( FiscalYear::is_closed( $fiscal_year ) ) {
+            wp_send_json_error( __( 'Boekjaar is afgesloten. Begroting kan niet meer aangepast worden.', 'eme-accounting' ) );
+        }
+
         $lines     = $_POST['lines'] ?? [];
         $saved    = 0;
 
