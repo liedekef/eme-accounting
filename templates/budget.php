@@ -53,13 +53,12 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
     } else {
         $variance = $actual - $budget;
     }
+    $pct  = $budget > 0 ? min( 150, (int) ( $actual / $budget * 100 ) ) : 0;
     if ($variance<0) {
         $var_class="red";
-        $pct  = $actual > 0 ? min( 150, (int) ( $budget / $actual * 100 ) ) : 0;
         $over = $pct > 100;
     } else {
         $var_class="green";
-        $pct  = $budget > 0 ? min( 150, (int) ( $actual / $budget * 100 ) ) : 0;
         $over = false;
     }
 ?>
