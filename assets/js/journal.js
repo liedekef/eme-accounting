@@ -5,7 +5,6 @@
     var entryDateInput = document.getElementById('entry_date');
     var fyInfoDiv = document.getElementById('fiscal-year-info');
     var fyDisplay = document.getElementById('fy-display');
-    var fyHidden = document.getElementById('fiscal_year_info');
 
     function checkFiscalYear() {
         var date = entryDateInput.value;
@@ -26,7 +25,6 @@
                 if (r.success && r.data) {
                     var fy = r.data;
                     fyDisplay.textContent = fy.year + ' (' + fy.start_date + ' - ' + fy.end_date + ')';
-                    fyHidden.value = fy.year;
                     if (fy.status === 'closed') {
                         fyDisplay.style.color = '#d63638';
                         fyDisplay.textContent += ' [' + emeAccounting.i18n.fyClosed + ']';
@@ -36,12 +34,10 @@
                 } else {
                     fyDisplay.textContent = emeAccounting.i18n.noFyFound;
                     fyDisplay.style.color = '#d63638';
-                    fyHidden.value = '';
                 }
             })
             .catch(function() {
                 fyDisplay.textContent = '-';
-                fyHidden.value = '';
             });
     }
 

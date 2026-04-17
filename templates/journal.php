@@ -37,8 +37,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </div>
                 <div class="eme-acc-field" id="fiscal-year-info" style="display:none">
                     <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
-                    <span id="fy-display" style="font-weight:bold;color:#2271b1">—</span>
-                    <input type="hidden" name="fiscal_year_info" id="fiscal_year_info" value="">
+                    <br><br><span id="fy-display" style="font-weight:bold;color:#2271b1">—</span>
                 </div>
             </div>
 
