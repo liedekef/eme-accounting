@@ -465,6 +465,7 @@ class FiscalYear {
             wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
         }
 
+        $config = \EMEVzw\Config::get();
         $year = (int) ( $_POST['year'] ?? 0 );
         if ( ! $year ) {
             wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
@@ -478,8 +479,8 @@ class FiscalYear {
         $formatter = new \NumberFormatter( 'nl_BE', \NumberFormatter::CURRENCY );
         $year_result = self::get_year_result( $year );
         $label = $year_result >= 0
-            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency( $year_result, 'EUR' ) )
-            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency( abs( $year_result ), 'EUR' ) );
+            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency( $year_result, $config->currency ) )
+            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency( abs( $year_result ), $config->currency ) );
 
         wp_send_json_success( [ 'message' => __( 'Boekjaar afgesloten.', 'eme-accounting' ), 'result' => $label ] );
     }

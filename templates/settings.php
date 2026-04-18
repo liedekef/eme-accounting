@@ -7,7 +7,6 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
      && wp_verify_nonce( $_POST['eme_accounting_settings_nonce'], 'eme_accounting_settings' ) ) {
     $settings = [
         'default_income_account'  => (int)    ( $_POST['default_income_account']  ?? 0 ),
-        'default_expense_account' => (int)    ( $_POST['default_expense_account'] ?? 0 ),
         'delete_on_uninstall'     => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
         'eme_auto_booking'        => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
         'default_coa'             => (int)    ( $_POST['default_coa'] ?? 0 ),
@@ -23,7 +22,6 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
 
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'default_income_account'  => 0,
-    'default_expense_account' => 0,
     'delete_on_uninstall'     => 'no',
     'default_coa'             => 0,
     'eme_auto_booking'        => 0,
@@ -37,31 +35,8 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 <?php wp_nonce_field( 'eme_accounting_settings', 'eme_accounting_settings_nonce' ); ?>
 
 <div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Standaardinstellingen', 'eme-accounting' ); ?></h2>
+<h2><?php esc_html_e( 'Boekjaar info', 'eme-accounting' ); ?></h2>
 <table class="form-table">
-<tr>
-    <th><?php esc_html_e( 'Standaard ontvangstrekening', 'eme-accounting' ); ?></th>
-    <td>
-        <select name="default_income_account">
-            <option value="0"><?php esc_html_e( '— geen —', 'eme-accounting' ); ?></option>
-            <?php foreach ( $accounts as $id => $name ): ?>
-            <option value="<?= $id ?>" <?= selected( $id, $settings['default_income_account'], false ) ?>><?= esc_html( $name ) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <p class="description"><?php esc_html_e( 'Wordt gebruikt voor automatische boekingen van EME-betalingen.', 'eme-accounting' ); ?></p>
-    </td>
-</tr>
-<tr>
-    <th><?php esc_html_e( 'Standaard uitgavenrekening', 'eme-accounting' ); ?></th>
-    <td>
-        <select name="default_expense_account">
-            <option value="0"><?php esc_html_e( '— geen —', 'eme-accounting' ); ?></option>
-            <?php foreach ( $accounts as $id => $name ): ?>
-            <option value="<?= $id ?>" <?= selected( $id, $settings['default_expense_account'], false ) ?>><?= esc_html( $name ) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </td>
-</tr>
 <tr>
     <th><?php esc_html_e( 'Boekjaar start', 'eme-accounting' ); ?></th>
     <td><b><?= $config->fiscal_year_start_dd.' '.date_i18n( 'F', mktime( 0, 0, 0, $config->fiscal_year_start_mm, 1 ) ) ?></b>
@@ -87,13 +62,25 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
             <input type="checkbox" name="eme_auto_booking" value="1" <?= checked( 1, $settings['eme_auto_booking'] ) ?>>
             <?php esc_html_e( 'Maak automatisch een journaalboeking aan wanneer een EME-betaling als betaald wordt gemarkeerd.', 'eme-accounting' ); ?>
         </label>
-        <p class="description"><?php esc_html_e( 'Vereist een standaard ontvangstrekening (hierboven) en een standaard resultatenrekening (hieronder).', 'eme-accounting' ); ?></p>
+        <p class="description"><?php esc_html_e( 'Vereist een standaard ontvangstrekening en een standaard resultatenrekening (hieronder).', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Standaard ontvangstrekening', 'eme-accounting' ); ?></th>
+    <td>
+        <select name="default_income_account">
+            <option value="0"><?php esc_html_e( '— geen —', 'eme-accounting' ); ?></option>
+            <?php foreach ( $accounts as $id => $name ): ?>
+            <option value="<?= $id ?>" <?= selected( $id, $settings['default_income_account'], false ) ?>><?= esc_html( $name ) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <p class="description"><?php esc_html_e( 'Wordt gebruikt voor automatische boekingen van EME-betalingen.', 'eme-accounting' ); ?></p>
     </td>
 </tr>
 <tr>
     <th><?php esc_html_e( 'Standaard resultatenrekening', 'eme-accounting' ); ?></th>
     <td>
-        <select name="default_coa">
+        <select name="default_coa" class="eme_snapselect" data-live-search="true">
            <option value='0'><?php esc_html_e( '— Kies ontvangstenrekening —', 'eme-accounting' ); ?></option>
             <?php foreach ( $coa_accounts as $id => $acc ):
                      if ( $acc && $acc->direction === 'in' ):
