@@ -202,7 +202,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <option value="out" <?= selected( 'out', $direction, false ) ?>><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></option>
                 <option value="transfer" <?= selected( 'transfer', $direction, false ) ?>><?php esc_html_e( 'Transfers', 'eme-accounting' ); ?></option>
             </select>
-            <select name="coa_id" id="eme-acc-coa-filter">
+            <select name="coa_id" id="eme-acc-coa-filter" class="eme_snapselect" data-live-search="true">
                 <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                 <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                 <?php foreach ( $coa_accounts as $id => $acc ): 
