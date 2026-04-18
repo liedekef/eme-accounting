@@ -569,7 +569,7 @@
         };
     }
 
-    document.getElementById('report_type').addEventListener('change', function() {
+    document.getElementById('report_type')?.addEventListener('change', function() {
         document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display = this.value === 'patrimony' ? 'none' : '';
         document.getElementById('btn-export-pdf').style.display = this.value === 'income_expenditure' ? '' : 'none';
@@ -801,6 +801,7 @@
     function initJournalLinking() {
         const directionSelect = document.querySelector('#direction');
         const coaSelect = document.querySelector('#category_coa_id');
+        const contraAccount = document.getElementById('contra_account_id');
 
         if (!directionSelect || !coaSelect) return;
 
@@ -829,6 +830,7 @@
                 emptyOption.textContent = '— Geen rekening voor transfers —';
                 coaSelect.appendChild(emptyOption);
                 coaSelect.disabled = true;
+
                 return;
             }
 
@@ -883,12 +885,14 @@
         function handleDirectionChange() {
             const direction = directionSelect.value;
 
+            contraAccount.disabled = true;
             if (direction === 'in') {
                 filterCoaByDirection('in');
             } else if (direction === 'out') {
                 filterCoaByDirection('out');
             } else if (direction === 'transfer') {
                 filterCoaByDirection('transfer');
+                contraAccount.disabled = false;
             } else {
                 // Show all options if no valid direction
                 filterCoaByDirection(null);
@@ -900,6 +904,7 @@
 
         // Event listeners
         directionSelect.addEventListener('change', handleDirectionChange);
+        handleDirectionChange();
 
         // Initial setup based on current values
         const currentDirection = directionSelect.value;

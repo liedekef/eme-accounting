@@ -109,7 +109,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Tegenrekening', 'eme-accounting' ); ?></label>
-                    <select name="contra_account_id">
+                    <select name="contra_account_id" id="contra_account_id">
                         <option value=""><?php esc_html_e( '— (geen) —', 'eme-accounting' ); ?></option>
                         <?php foreach ( $accounts as $id => $name ): ?>
                         <option value="<?= (int) $id ?>" <?= selected( $edit_entry->contra_account_id ?? 0, $id, false ) ?>>
