@@ -1,6 +1,19 @@
 /* eme-accounting/assets/js/admin.js */
 /* global emeAccounting, Sortable, FTable */
 
+function esc(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('nl-BE', {
+        style: 'currency', currency: emeAccounting.i18n.currency, minimumFractionDigits: 2,
+    }).format(amount);
+}
+
 (function () {
     'use strict';
 
@@ -11,19 +24,6 @@
     /* ═══════════════════════════════════════════════════════════════════
      * UTILITIES
      * ═══════════════════════════════════════════════════════════════════ */
-
-    function esc(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function formatCurrency(amount) {
-        return new Intl.NumberFormat('nl-BE', {
-            style: 'currency', currency: i18n.currency, minimumFractionDigits: 2,
-        }).format(amount);
-    }
 
     function toFormData(obj, fd = new FormData(), prefix = '') {
         for (const key in obj) {
@@ -676,254 +676,6 @@
         const target = document.querySelector(`[data-edit-form="${btn.dataset.id}"]`);
         if (target) target.style.display = target.style.display === 'none' ? '' : 'none';
     }
-
-    /* ═══════════════════════════════════════════════════════════════════
-     * JOURNAL FTABLE
-     * ═══════════════════════════════════════════════════════════════════ */
-    const JournalTableContainer = document.querySelector('#JournalTableContainer');
-    if (JournalTableContainer) {
-        JournalTable = new FTable('#JournalTableContainer', {
-            title: '',
-            paging: true,
-            sorting: true,
-            sortingResetButton: true,
-            multiSorting: true,
-            defaultSorting: 'entry_date DESC, id DESC',
-            selecting: false,
-            multiselect: false,
-            actions: {
-                listAction: ajaxUrl + '?action=eme_accounting_journal_list&nonce=' + nonce,
-                deleteAction: ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + nonce
-            },
-            deleteConfirmation: function(data) {
-                if (data.record.direction=='transfer') {
-                    data.deleteConfirmMessage = "Weet u zeker dat u deze transfer van " + formatCurrency(data.record.amount) + " wil verwijderen? Dit zal beide entries van de transfer verwijderen."; 
-                } else {
-                    data.deleteConfirmMessage = "Weet u zeker dat u deze boeking van " + formatCurrency(data.record.amount) + " wil verwijderen?"; 
-                }
-            },
-            recordDeleted: function(eventArgs) {
-                // since sometimes 2 lines are deleted in one go (linked transfers), we do a reload
-                JournalTable.reload();
-            },
-            fields: {
-                id: {
-                    key: true,
-                    width: '1%',
-                    columnResizable: false,
-                    list: false
-                },
-                entry_date: {
-                    title: i18n.date || 'Datum',
-                    sortable: true
-                },
-                edit_url: {
-                    list: false
-                },
-                description: {
-                    title: i18n.description || 'Omschrijving',
-                    sortable: true,
-                    display: function(data) {
-                        return '<a href="' + esc(data.record.edit_url) + '">' + esc(data.value) + '</a>';
-                    }
-                },
-                coa_name: {
-                    title: i18n.category || 'Categorie',
-                    sortable: false,
-                    searchable: false,
-                    display: function(data) {
-                        return data.value ? '<span class="eme-acc-tag">' + esc(data.value) + '</span>' : '';
-                    }
-                },
-                bank_statement_ref: {
-                    title: i18n.bankref || 'Bankref.',
-                    sortable: false,
-                    searchable: false,
-                    display: function(data) {
-                        if (!data.value) return '';
-                        return '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
-                    }
-                },
-                account_name: {
-                    title: i18n.account || 'Rekening',
-                    sortable: false,
-                    searchable: false
-                },
-                amount: {
-                    title: i18n.amount || 'Bedrag',
-                    sortable: true,
-                    searchable: false,
-                    display: function(data) {
-                        const formatted_val = formatCurrency(data.value);
-                        if (data.value<0) {
-                            return '<span style="color: red; font-weight: bold;">' + formatted_val + '</span>';
-                        } else {
-                            return '<span style="color: green; font-weight: bold;">' + formatted_val + '</span>';
-                        }
-                    }
-                },
-                is_reconciled: {
-                    title: i18n.reconciled || 'Vereffend',
-                    width: '1%',
-                    sortable: false,
-                    searchable: false,
-                    display: function(data) {
-                        if (data.value) {
-                            const title = data.record.reconciled_at ? esc(data.record.reconciled_at) : '';
-                            return '<span class="eme-acc-tag eme-acc-reconciled" title="' + title + '">✓</span>';
-                        }
-                        return '<span class="eme-acc-tag eme-acc-pending">' + esc(i18n.pending || 'Openstaand') + '</span>';
-                    }
-                }
-            },
-            listQueryParams: () => ({
-                fiscal_year: document.querySelector('#eme-acc-year-filter')?.value || '',
-                account_id: document.querySelector('#eme-acc-account-filter')?.value || '',
-                direction: document.querySelector('#eme-acc-direction-filter')?.value || '',
-                coa_id: document.querySelector('#eme-acc-coa-filter')?.value || '',
-                search: document.querySelector('#eme-acc-search-filter')?.value || ''
-            })
-        });
-
-        JournalTable.load();
-
-        document.querySelectorAll('#eme-acc-filter-form select').forEach(function(sel) {
-            sel.addEventListener('change', function() {
-                JournalTable.reload();
-            });
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════════
-     * JOURNAL PAGE - COA & DIRECTION LINKING
-     * ═══════════════════════════════════════════════════════════════════ */
-
-    function initJournalLinking() {
-        const directionSelect = document.querySelector('#direction');
-        const coaSelect = document.querySelector('#category_coa_id');
-        const contraAccount = document.getElementById('contra_account_id');
-
-        if (!directionSelect || !coaSelect) return;
-
-        // Store original options for filtering
-        const originalOptions = Array.from(coaSelect.options);
-
-        // Get direction from optgroup label
-        function getDirectionFromOptgroup(option) {
-            const parentOptgroup = option.closest('optgroup');
-            if (!parentOptgroup) return null;
-            const label = parentOptgroup.getAttribute('label');
-            if (label === 'Ontvangsten') return 'in';
-            if (label === 'Uitgaven') return 'out';
-            return null;
-        }
-
-        // Filter COA options based on direction
-        function filterCoaByDirection(direction) {
-            // Clear current options
-            coaSelect.innerHTML = '';
-
-            if (direction === 'transfer') {
-                // Add empty option for transfer
-                const emptyOption = document.createElement('option');
-                emptyOption.value = '';
-                emptyOption.textContent = '— Geen rekening voor transfers —';
-                coaSelect.appendChild(emptyOption);
-                coaSelect.disabled = true;
-
-                return;
-            }
-
-            coaSelect.disabled = false;
-
-            // Loop through original options and rebuild with optgroups
-            let currentOptgroup = null;
-
-            // Filter and add matching options
-            originalOptions.forEach(option => {
-                const parentOptgroup = option.parentElement;
-                const optionDirection = getDirectionFromOptgroup(option);
-                if (optionDirection === direction || (direction === null && !optionDirection)) {
-                    // Check if we need to create a new optgroup
-                    if (parentOptgroup && parentOptgroup.tagName === 'OPTGROUP') {
-                        const groupLabel = parentOptgroup.getAttribute('label');
-                        if (!currentOptgroup || currentOptgroup.label !== groupLabel) {
-                            currentOptgroup = document.createElement('optgroup');
-                            currentOptgroup.label = groupLabel;
-                            coaSelect.appendChild(currentOptgroup);
-                        }
-                        currentOptgroup.appendChild(option.cloneNode(true));
-                    } else {
-                        coaSelect.appendChild(option.cloneNode(true));
-                    }
-                }
-            });
-
-            // Add empty option at the beginning
-            const emptyOption = document.createElement('option');
-            emptyOption.value = '';
-            emptyOption.textContent = '— Kies rekening —';
-            coaSelect.insertBefore(emptyOption, coaSelect.firstChild);
-
-            // Reset selected value
-            coaSelect.value = '';
-        }
-
-        // Set direction based on selected COA
-        function setDirectionFromCoa() {
-            const selectedOption = coaSelect.options[coaSelect.selectedIndex];
-            if (!selectedOption || !selectedOption.value) return;
-
-            const direction = getDirectionFromOptgroup(selectedOption);
-            if (direction) {
-                directionSelect.value = direction;
-                directionSelect.disabled = true;
-            }
-        }
-
-        // Handle manual direction change
-        function handleDirectionChange() {
-            const direction = directionSelect.value;
-
-            contraAccount.disabled = true;
-            if (direction === 'in') {
-                filterCoaByDirection('in');
-            } else if (direction === 'out') {
-                filterCoaByDirection('out');
-            } else if (direction === 'transfer') {
-                filterCoaByDirection('transfer');
-                contraAccount.disabled = false;
-            } else {
-                // Show all options if no valid direction
-                filterCoaByDirection(null);
-            }
-
-            // Clear COA value when direction changes
-            coaSelect.value = '';
-        }
-
-        // Event listeners
-        directionSelect.addEventListener('change', handleDirectionChange);
-        handleDirectionChange();
-
-        // Initial setup based on current values
-        const currentDirection = directionSelect.value;
-        if (currentDirection === 'in' || currentDirection === 'out') {
-            filterCoaByDirection(currentDirection);
-        } else if (currentDirection === 'transfer') {
-            filterCoaByDirection('transfer');
-        } else {
-            // not possible currently (currentDirection is in/out/transfer only
-            coaSelect.addEventListener('change', setDirectionFromCoa);
-            filterCoaByDirection(null);
-        }
-
-        // If there's a preselected COA (when editing), set direction accordingly
-        if (coaSelect.value) {
-            setDirectionFromCoa();
-        }
-    }
-    initJournalLinking();
 
     function initSnapSelect(selector, options = {}) {
         // Convert selector to elements array
