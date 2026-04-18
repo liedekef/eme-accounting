@@ -111,7 +111,6 @@ class Import {
                 'counterparty_name'=> substr( $line['counterparty_name'] ?? '', 0, 149 ),
                 'counterparty_iban'=> strtoupper( preg_replace( '/\s+/', '', $line['counterparty_iban'] ?? '' ) ),
                 'amount'           => $line['amount'],
-                'currency'         => $line['currency'] ?? 'EUR',
                 'bank_ref'         => substr( $line['bank_ref'] ?? '', 0, 99 ),
                 'structured_ref'   => substr( $line['structured_ref'] ?? '', 0, 21 ),
                 'raw_data'         => json_encode( $line ),

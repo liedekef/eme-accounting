@@ -21,7 +21,7 @@
 
     function formatCurrency(amount) {
         return new Intl.NumberFormat('nl-BE', {
-            style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
+            style: 'currency', currency: i18n.currency, minimumFractionDigits: 2,
         }).format(amount);
     }
 

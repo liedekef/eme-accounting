@@ -6,7 +6,6 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
     $settings = [
         'default_income_account'  => (int)    ( $_POST['default_income_account']  ?? 0 ),
         'default_expense_account' => (int)    ( $_POST['default_expense_account'] ?? 0 ),
-        'currency'                => strtoupper( sanitize_text_field( $_POST['currency'] ?? 'EUR' ) ),
         'delete_on_uninstall'     => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
         'eme_auto_booking'        => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
         'default_coa'             => (int)    ( $_POST['default_coa'] ?? 0 ),
@@ -27,7 +26,6 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'default_income_account'  => 0,
     'default_expense_account' => 0,
-    'currency'                => 'EUR',
     'delete_on_uninstall'     => 'no',
     'default_coa'             => 0,
     'eme_auto_booking'        => 0,
@@ -100,13 +98,6 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
             <?php endforeach; ?>
         </select>
         <p class="description"><?php esc_html_e( 'Einddatum van het boekjaar (wordt gebruikt bij automatisch aanmaken van boekjaren).', 'eme-accounting' ); ?></p>
-    </td>
-</tr>
-<tr>
-    <th><?php esc_html_e( 'Valuta', 'eme-accounting' ); ?></th>
-    <td>
-        <input type="text" name="currency" value="<?= esc_attr( $settings['currency'] ) ?>" maxlength="3" style="width:60px">
-        <p class="description"><?php esc_html_e( 'ISO-valutacode, bv. EUR', 'eme-accounting' ); ?></p>
     </td>
 </tr>
 </table>

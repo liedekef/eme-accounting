@@ -2,6 +2,8 @@
 defined( 'ABSPATH' ) || exit;
 $accounts = EMEAccounting\Accounts::get_all();
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+$config =  \EMEVzw\Config::get();
+$currency  = $config->currency;
 
 ?>
 <div class="wrap eme-acc-wrap">
@@ -47,7 +49,7 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 <tr data-account-row="<?= (int) $a->id ?>">
     <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
     <td><?= esc_html( $a->iban ) ?></td>
-    <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $balance, 'EUR') ?></td>
+    <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $balance, $currency) ?></td>
     <td>
         <button class="button button-small eme-acc-edit-account"
                 data-id="<?= (int) $a->id ?>"

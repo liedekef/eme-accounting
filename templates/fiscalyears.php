@@ -3,6 +3,9 @@ defined( 'ABSPATH' ) || exit;
 
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 $formatter = new NumberFormatter( 'nl_BE', NumberFormatter::CURRENCY );
+$config =  \EMEVzw\Config::get();
+$currency  = $config->currency;
+
 $current_year = (int) gmdate( 'Y' );
 
 if ( empty( $fiscal_years ) ) {
@@ -117,7 +120,7 @@ $default_end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
                     </td>
                     <td class="amount <?= $result >= 0 ? 'in' : 'out' ?>">
                         <?= $result >= 0 ? '+' : '–' ?>
-                        <?= $formatter->formatCurrency( abs( $result ), 'EUR' ) ?>
+                        <?= $formatter->formatCurrency( abs( $result ), $currency ) ?>
                     </td>
                     <td>
                         <?php if ( $fy->status === 'open' ): ?>

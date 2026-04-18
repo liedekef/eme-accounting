@@ -111,7 +111,6 @@ class Accounts {
             'name'            => eme_sanitize_request( $data['name'] ?? '' ),
             'iban'            => strtoupper( preg_replace( '/\s+/', '', $data['iban'] ?? '' ) ),
             'bic'             => strtoupper( eme_sanitize_request( $data['bic'] ?? '' ) ),
-            'currency'        => strtoupper( substr( eme_sanitize_request( $data['currency'] ?? 'EUR' ), 0, 3 ) ),
             'opening_balance' => (float) ( $data['opening_balance'] ?? 0 ),
             'is_active'       => (int) (bool) ( $data['is_active'] ?? 1 ),
             'sort_order'      => (int) ( $data['sort_order'] ?? 0 ),

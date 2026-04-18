@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name:       EME Accounting
- * Plugin URI:        https://github.com/your-repo/eme-accounting
+ * Plugin URI:        https://github.com/liedekef/eme-accounting
  * Description:       Enkelvoudige boekhouding als uitbreiding op Events Made Easy. Financiële rekeningen, dagboek, import/reconciliatie, stock, afschrijvingen, begroting en financiële rapporten.
  * Version:           1.0.0
  * Author:            Your Name
- * Author URI:        https://yoursite.be
+ * Author URI:        https://www.e-dynamics.be
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       eme-accounting

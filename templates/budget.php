@@ -1,6 +1,10 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+$config =  \EMEVzw\Config::get();
+$currency  = $config->currency;
+
 $year        = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $coa        = EMEAccounting\ChartOfAccounts::get_all();
 $budget_map = EMEAccounting\Budget::get_year_map( $year );
@@ -14,7 +18,6 @@ foreach ( $fiscal_years as $f ) {
         $prev_years[] = $f->year;
     }
 }
-$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?= $year ?></h1>
@@ -101,8 +104,8 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
                <?= $is_closed ? 'disabled' : '' ?>>
         <?php endif; ?>
     </td>
-    <td><?php if ($c->parent_id) echo $formatter->formatCurrency($actual, 'EUR'); ?> </td>
-    <td class="amount <?= $var_class ?>"><?php if ($c->parent_id) echo $formatter->formatCurrency($variance, 'EUR'); ?></td>
+    <td><?php if ($c->parent_id) echo $formatter->formatCurrency($actual, $currency); ?> </td>
+    <td class="amount <?= $var_class ?>"><?php if ($c->parent_id) echo $formatter->formatCurrency($variance, $currency); ?></td>
     <td><?php if ($c->parent_id): ?>
         <div class="budget-bar-wrap">
             <div class="budget-bar-fill <?= $over ? 'over' : '' ?>" style="width:<?= min( 100, $pct ) ?>%"></div>

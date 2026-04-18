@@ -2,6 +2,8 @@
 defined( 'ABSPATH' ) || exit;
 
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+$config =  \EMEVzw\Config::get();
+$currency  = $config->currency;
 
 $year       = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
@@ -37,19 +39,19 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
         <div class="eme-acc-card">
             <h3><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?> <?= $year ?></h3>
             <div class="card-value positive">
-                <?= $formatter->formatCurrency( $totals['income'], 'EUR' ); ?>
+                <?= $formatter->formatCurrency( $totals['income'], $currency ); ?>
             </div>
         </div>
         <div class="eme-acc-card">
             <h3><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?> <?= $year ?></h3>
             <div class="card-value negative">
-                <?= $formatter->formatCurrency( $totals['expenses'], 'EUR' ); ?>
+                <?= $formatter->formatCurrency( $totals['expenses'], $currency ); ?>
             </div>
         </div>
         <div class="eme-acc-card">
             <h3><?php esc_html_e( 'Resultaat', 'eme-accounting' ); ?> <?= $year ?></h3>
             <div class="card-value <?= $totals['net'] >= 0 ? 'positive' : 'negative' ?>">
-                <?= $formatter->formatCurrency( $totals['net'], 'EUR' ); ?>
+                <?= $formatter->formatCurrency( $totals['net'], $currency ); ?>
             </div>
         </div>
         <?php foreach ( array_slice( $accounts, 0, 3 ) as $acc ): ?>
@@ -57,7 +59,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             <h3><?= esc_html( $acc->name ); ?></h3>
             <?php $bal = EMEAccounting\Accounts::get_balance( (int) $acc->id ); ?>
             <div class="card-value <?= $bal >= 0 ? '' : 'negative' ?>">
-                <?= $formatter->formatCurrency( $bal, 'EUR' ); ?>
+                <?= $formatter->formatCurrency( $bal, $currency ); ?>
             </div>
             <div class="card-sub"><?= esc_html( $acc->iban ); ?></div>
         </div>
@@ -94,7 +96,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
                             $real_amount = -1 * $entry->amount;
                           else
                             $real_amount = $entry->amount;
-                          echo $formatter->formatCurrency($real_amount, 'EUR' );
+                          echo $formatter->formatCurrency($real_amount, $currency );
                     ?>
                 </td>
                 <td>

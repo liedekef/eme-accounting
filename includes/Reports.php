@@ -217,6 +217,7 @@ class Reports {
     }
 
     private static function generate_pdf_html( array $data, int $year ): string {
+        $settings = get_option( 'eme_accounting_settings', [] );
         $config =  \EMEVzw\Config::get();
         if ( ! $data || ! $config ) return '';
 

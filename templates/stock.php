@@ -1,6 +1,8 @@
 <?php // eme-accounting/templates/stock.php
 defined( 'ABSPATH' ) || exit;
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
+$config =  \EMEVzw\Config::get();
+$currency  = $config->currency;
 
 $items    = EMEAccounting\Stock::get_all();
 $accounts = EMEAccounting\Accounts::get_dropdown();
@@ -45,8 +47,8 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     </td>
     <td><?= esc_html( $item->sku ) ?></td>
     <td class="amount"><?= number_format( (float) $item->current_qty, 3, ',', '.' ) ?> <?= esc_html( $item->unit ) ?></td>
-    <td class="amount"><?= $formatter->formatCurrency($item->purchase_price, 'EUR') ?></td>
-    <td class="amount"><?= $formatter->formatCurrency( (float) $item->current_qty * (float) $item->purchase_price, 'EUR' ) ?></td>
+    <td class="amount"><?= $formatter->formatCurrency($item->purchase_price, $currency) ?></td>
+    <td class="amount"><?= $formatter->formatCurrency( (float) $item->current_qty * (float) $item->purchase_price, $currency ) ?></td>
     <td>
         <form id="eme-acc-stock-movement-form" style="display:flex;gap:4px;align-items:center">
             <input type="hidden" name="stock_id" value="<?= (int) $item->id ?>">

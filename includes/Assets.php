@@ -16,6 +16,9 @@ class Assets {
         if ( strpos( $plugin_page, 'eme-accounting' ) === false && strpos( $plugin_page, 'eme_accounting' ) === false ) {
             return;
         }
+
+        $config =  \EMEVzw\Config::get();
+
         wp_enqueue_style( 'eme-accounting', EME_ACCOUNTING_URL . 'assets/css/admin.css', [], EME_ACCOUNTING_VERSION );
         wp_enqueue_script( 'eme-accounting-sortable', EME_PLUGIN_URL . 'js/sortable/sortable.min.js', [ ], EME_VERSION, true );
         wp_enqueue_script( 'eme-accounting', EME_ACCOUNTING_URL . 'assets/js/admin.js', [ 'eme-accounting-sortable' ], EME_ACCOUNTING_VERSION, true );
@@ -31,8 +34,9 @@ class Assets {
                 'description'    => __( 'Omschrijving', 'eme-accounting' ),
                 'category'       => __( 'Categorie', 'eme-accounting' ),
                 'bankref'        => __( 'Bankref.', 'eme-accounting' ),
-                'account'         => __( 'Rekening', 'eme-accounting' ),
+                'account'        => __( 'Rekening', 'eme-accounting' ),
                 'amount'         => __( 'Bedrag', 'eme-accounting' ),
+                'currency'       => $config->currency,
                 'reconciled'     => __( 'Vereffend', 'eme-accounting' ),
                 'fyClosed'       => __( 'GESLOTEN', 'eme-accounting' ),
                 'noFyFound'      => __( 'Geen boekjaar gevonden', 'eme-accounting' ),
