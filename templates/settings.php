@@ -1,6 +1,8 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+$config =  \EMEVzw\Config::get();
+
 if ( isset( $_POST['eme_accounting_settings_nonce'] )
      && wp_verify_nonce( $_POST['eme_accounting_settings_nonce'], 'eme_accounting_settings' ) ) {
     $settings = [
@@ -9,10 +11,6 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
         'delete_on_uninstall'     => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
         'eme_auto_booking'        => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
         'default_coa'             => (int)    ( $_POST['default_coa'] ?? 0 ),
-        'fiscal_year_start_month'  => (int)    ( $_POST['fiscal_year_start_month'] ?? 1 ),
-        'fiscal_year_start_day'    => (int)    ( $_POST['fiscal_year_start_day'] ?? 1 ),
-        'fiscal_year_end_month'    => (int)    ( $_POST['fiscal_year_end_month'] ?? 12 ),
-        'fiscal_year_end_day'      => (int)    ( $_POST['fiscal_year_end_day'] ?? 31 ),
     ];
     if ($settings['eme_auto_booking'] && !$settings['default_coa']) {
         echo '<div class="notice notice-error"><p>' . esc_html__( 'Kies een resultatenrekening aub.', 'eme-accounting' ) . '</p></div>';
@@ -29,10 +27,6 @@ $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'delete_on_uninstall'     => 'no',
     'default_coa'             => 0,
     'eme_auto_booking'        => 0,
-    'fiscal_year_start_month'  => 1,
-    'fiscal_year_start_day'    => 1,
-    'fiscal_year_end_month'    => 12,
-    'fiscal_year_end_day'      => 31,
 ] );
 $accounts = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
@@ -70,34 +64,14 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 </tr>
 <tr>
     <th><?php esc_html_e( 'Boekjaar start', 'eme-accounting' ); ?></th>
-    <td>
-        <select name="fiscal_year_start_month">
-            <?php foreach ( range( 1, 12 ) as $m ): ?>
-            <option value="<?= $m ?>" <?= selected( $m, $settings['fiscal_year_start_month'], false ) ?>><?= date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select name="fiscal_year_start_day">
-            <?php foreach ( range( 1, 31 ) as $d ): ?>
-            <option value="<?= $d ?>" <?= selected( $d, $settings['fiscal_year_start_day'], false ) ?>><?= $d ?></option>
-            <?php endforeach; ?>
-        </select>
-        <p class="description"><?php esc_html_e( 'Startdatum van het boekjaar (wordt gebruikt bij automatisch aanmaken van boekjaren).', 'eme-accounting' ); ?></p>
+    <td><b><?= $config->fiscal_year_start_dd.' '.date_i18n( 'F', mktime( 0, 0, 0, $config->fiscal_year_start_mm, 1 ) ) ?></b>
+        <br><?php esc_html_e( '(aan te passen in de VZW instellingen)', 'eme-accounting' ); ?>
     </td>
 </tr>
 <tr>
     <th><?php esc_html_e( 'Boekjaar einde', 'eme-accounting' ); ?></th>
-    <td>
-        <select name="fiscal_year_end_month">
-            <?php foreach ( range( 1, 12 ) as $m ): ?>
-            <option value="<?= $m ?>" <?= selected( $m, $settings['fiscal_year_end_month'], false ) ?>><?= date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select name="fiscal_year_end_day">
-            <?php foreach ( range( 1, 31 ) as $d ): ?>
-            <option value="<?= $d ?>" <?= selected( $d, $settings['fiscal_year_end_day'], false ) ?>><?= $d ?></option>
-            <?php endforeach; ?>
-        </select>
-        <p class="description"><?php esc_html_e( 'Einddatum van het boekjaar (wordt gebruikt bij automatisch aanmaken van boekjaren).', 'eme-accounting' ); ?></p>
+    <td><b><?= $config->fiscal_year_end_dd.' '.date_i18n( 'F', mktime( 0, 0, 0, $config->fiscal_year_end_mm, 1 ) ) ?></b>
+        <br><?php esc_html_e( '(aan te passen in de VZW instellingen)', 'eme-accounting' ); ?>
     </td>
 </tr>
 </table>

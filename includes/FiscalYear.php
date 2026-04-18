@@ -17,6 +17,26 @@ class FiscalYear {
         return cal_days_in_month( CAL_GREGORIAN, $month, $year );
     }
 
+    public static function calculate_dates( int $year ): array {
+        $config = \EMEVzw\Config::get();
+        $start_month = (int) ( $config->fiscal_year_start_mm ?? 1 );
+        $start_day   = (int) ( $config->fiscal_year_start_dd ?? 1 );
+        $end_month   = (int) ( $config->fiscal_year_end_mm ?? 12 );
+        $end_day     = (int) ( $config->fiscal_year_end_dd ?? 31 );
+
+        $start_date = sprintf( '%04d-%02d-%02d', $year, $start_month, min( $start_day, self::days_in_month( $start_month, $year ) ) );
+        $end_date   = sprintf( '%04d-%02d-%02d', $year, $end_month, min( $end_day, self::days_in_month( $end_month, $year ) ) );
+
+        if ( $end_date < $start_date ) {
+            $end_date = sprintf( '%04d-%02d-%02d', $year + 1, $end_month, min( $end_day, self::days_in_month( $end_month, $year + 1 ) ) );
+        }
+
+        return [
+            'start_date' => $start_date,
+            'end_date'   => $end_date,
+        ];
+    }
+
     public static function get_all(): array {
         global $wpdb;
         return $wpdb->get_results(
@@ -415,19 +435,20 @@ class FiscalYear {
 
         $id         = (int) ( $_POST['id'] ?? 0 );
         $year       = (int) ( $_POST['year'] ?? 0 );
-        $start_date = sanitize_text_field( $_POST['start_date'] ?? '' );
-        $end_date   = sanitize_text_field( $_POST['end_date'] ?? '' );
+
+        if ( $year < 1900 || $year > 2100 ) {
+            wp_send_json_error( __( 'Ongeldig boekjaar.', 'eme-accounting' ) );
+        }
+
+        $dates = self::calculate_dates( $year );
 
         if ( $id > 0 ) {
-            $result = self::update_by_id( $id, [
-                'start_date' => $start_date,
-                'end_date'   => $end_date,
-            ] );
+            $result = self::update_by_id( $id, $dates );
         } else {
             $result = self::create( [
                 'year'       => $year,
-                'start_date' => $start_date,
-                'end_date'   => $end_date,
+                'start_date' => $dates['start_date'],
+                'end_date'   => $dates['end_date'],
             ] );
         }
 

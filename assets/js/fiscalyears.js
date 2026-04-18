@@ -5,10 +5,7 @@
     var form = document.getElementById('eme-acc-fiscal-year-form');
     var idHidden = document.getElementById('fy_id');
     var yearInput = document.getElementById('fy_year_input');
-    var startDate = document.getElementById('fy_start_date');
-    var endDate = document.getElementById('fy_end_date');
     var submitBtn = document.getElementById('fy_submit');
-    var cancelBtn = document.getElementById('fy_cancel');
     var messageDiv = document.getElementById('fy-message');
 
     function showMessage(msg, isError) {
@@ -19,44 +16,18 @@
         messageDiv.innerHTML = '';
     }
 
-    function setEditMode(id, year, start, end) {
-        idHidden.value = id;
-        yearInput.value = year;
-        yearInput.readOnly = true;
-        startDate.value = start;
-        endDate.value = end;
-        submitBtn.textContent = emeAccounting.i18n.update;
-        cancelBtn.style.display = 'inline-block';
-        clearMessage();
-    }
-
     function clearForm() {
         idHidden.value = '';
-        yearInput.value = emeAccountingFy.currentYear;
+        yearInput.value = '';
         yearInput.readOnly = false;
-        startDate.value = emeAccountingFy.defaultStartDate;
-        endDate.value = emeAccountingFy.defaultEndDate;
-        submitBtn.textContent = emeAccounting.i18n.save;
-        cancelBtn.style.display = 'none';
         clearMessage();
     }
-
-    cancelBtn.addEventListener('click', clearForm);
-
-    document.querySelectorAll('.btn-edit').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            setEditMode(
-                this.dataset.id,
-                this.dataset.year,
-                this.dataset.start,
-                this.dataset.end
-            );
-        });
-    });
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        if (!submitBtn) return;
         submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
         submitBtn.textContent = emeAccounting.i18n.saving;
         clearMessage();
 
@@ -65,14 +36,12 @@
         data.append('nonce', emeAccounting.nonce);
         data.append('id', idHidden.value);
         data.append('year', yearInput.value);
-        data.append('start_date', startDate.value);
-        data.append('end_date', endDate.value);
 
         fetch(emeAccounting.ajaxUrl, { method: 'POST', body: data })
             .then(function(r) { return r.json(); })
             .then(function(r) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = emeAccounting.i18n.save;
+                submitBtn.textContent = originalText;
                 if (r.success) {
                     showMessage(r.data.message, false);
                     clearForm();
@@ -83,7 +52,7 @@
             })
             .catch(function() {
                 submitBtn.disabled = false;
-                submitBtn.textContent = emeAccounting.i18n.save;
+                submitBtn.textContent = originalText;
                 showMessage(emeAccounting.i18n.error, true);
             });
     });

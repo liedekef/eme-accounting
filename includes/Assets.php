@@ -30,6 +30,8 @@ class Assets {
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'i18n'    => [
                 'confirm_delete' => __( 'Zeker verwijderen?', 'eme-accounting' ),
+                'save'           => __( 'Opslaan', 'eme-accounting' ),
+                'update'         => __( 'Bijwerken', 'eme-accounting' ),
                 'saving'         => __( 'Opslaan…', 'eme-accounting' ),
                 'loaded'         => __( 'Opgeladen', 'eme-accounting' ),
                 'saved'          => __( 'Opgeslagen', 'eme-accounting' ),
@@ -43,8 +45,6 @@ class Assets {
                 'reconciled'     => __( 'Vereffend', 'eme-accounting' ),
                 'fyClosed'       => __( 'GESLOTEN', 'eme-accounting' ),
                 'noFyFound'      => __( 'Geen boekjaar gevonden', 'eme-accounting' ),
-                'save'           => __( 'Opslaan', 'eme-accounting' ),
-                'update'         => __( 'Bijwerken', 'eme-accounting' ),
                 'processing'     => __( 'Bezig…', 'eme-accounting' ),
                 'error'          => __( 'Er is een fout opgetreden.', 'eme-accounting' ),
                 'confirmClose'   => __( 'Boekjaar %s afsluiten? Dit kan niet ongedaan gemaakt worden.', 'eme-accounting' ),
