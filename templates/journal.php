@@ -172,7 +172,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <?= $edit_entry ? esc_html__( 'Opslaan', 'eme-accounting' ) : esc_html__( 'Boeking toevoegen', 'eme-accounting' ) ?>
                 </button>
                 <?php if ( $edit_entry ): ?>
-                <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-journal' ) ) ?>" class="button">
+                <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ) ?>" class="button">
                     <?php esc_html_e( 'Annuleren', 'eme-accounting' ); ?>
                 </a>
                 <?php endif; ?>

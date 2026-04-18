@@ -435,7 +435,7 @@ class Journal {
             $result['Records'][] = [
                 'id'                 => (int) $entry->id,
                 'entry_date'         => eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
-                'edit_url'           => esc_url( admin_url( 'admin.php?page=eme-accounting-journal&edit=' . $entry->id ) ),
+                'edit_url'           => esc_url( admin_url( 'admin.php?page=emeaccounting-journal&edit=' . $entry->id ) ),
                 'description'        => $entry->description,
                 'coa_name'           => $entry->coa_name ?? '',
                 'bank_statement_ref' => $entry->bank_statement_ref ?? '',

@@ -60,7 +60,7 @@ $currency  = $config->currency;
                 data-sort-order="<?= (int) $a->sort_order ?>"
                 data-is-active="<?= (int) $a->is_active ?>"
                 data-description="<?= esc_attr( $a->description ?? '' ) ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-journal&account_id=' . $a->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Boekingen', 'eme-accounting' ); ?></a>
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal&account_id=' . $a->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Boekingen', 'eme-accounting' ); ?></a>
         <button class="button button-small eme-acc-delete-account" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
     </td>
 </tr>

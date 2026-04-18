@@ -26,7 +26,7 @@ $default_end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
     <div class="notice notice-warning">
         <p>
             <?php esc_html_e( 'Stel de start- en einddatum van het boekjaar in via', 'eme-accounting' ); ?>
-            <a href="<?php echo esc_url( admin_url( 'admin.php?page=eme-accounting-settings' ) ); ?>">
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-settings' ) ); ?>">
                 <?php esc_html_e( 'de instellingen', 'eme-accounting' ); ?>
             </a>
             <?php esc_html_e( 'voordat u boekjaren toevoegt.', 'eme-accounting' ); ?>

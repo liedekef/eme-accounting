@@ -30,7 +30,7 @@ foreach ( $fiscal_years as $f ) {
 
 <p>
     <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></label>
-    <select id="eme-acc-year-select" onchange="window.location='?page=eme-accounting-budget&year='+this.value">
+    <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting-budget&year='+this.value">
         <?php foreach ( $fiscal_years as $f ): ?>
         <option value="<?= (int) $f->year ?>" <?= $f->year === $year ? 'selected' : '' ?>>
             <?= (int) $f->year ?>
