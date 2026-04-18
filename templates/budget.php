@@ -14,8 +14,8 @@ $is_closed  = $fy && $fy->status === 'closed';
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 $prev_years = [];
 foreach ( $fiscal_years as $f ) {
-    if ( $f->year < $year && $f->status === 'open' ) {
-        $prev_years[] = $f->year;
+    if ( $f->year < $year ) {
+        $prev_years[] = $f;
     }
 }
 ?>
@@ -32,7 +32,7 @@ foreach ( $fiscal_years as $f ) {
     <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></label>
     <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting-budget&year='+this.value">
         <?php foreach ( $fiscal_years as $f ): ?>
-        <option value="<?= (int) $f->year ?>" <?= $f->year === $year ? 'selected' : '' ?>>
+        <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
             <?= (int) $f->year ?>
             <?php if ( $f->status === 'closed' ): ?>
                 (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
@@ -45,7 +45,11 @@ foreach ( $fiscal_years as $f ) {
     <select id="eme-acc-copy-year">
         <option value="">— <?php esc_html_e( 'Kies jaar', 'eme-accounting' ); ?> —</option>
         <?php foreach ( $prev_years as $y ): ?>
-        <option value="<?= $y ?>"><?= $y ?></option>
+        <option value="<?= $y->year ?>"><?= $y->year ?>
+            <?php if ( $y->status === 'closed' ): ?>
+                (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
+            <?php endif; ?>
+        </option>
         <?php endforeach; ?>
     </select>
     <span id="copy-status" style="margin-left:8px;color:#646970"></span>
