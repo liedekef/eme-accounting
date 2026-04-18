@@ -53,7 +53,7 @@
                     title: emeAccounting.i18n.description || 'Omschrijving',
                     sortable: true,
                     display: function(data) {
-                        return '<a href="' + esc(data.record.edit_url) + '">' + esc(data.value) + '</a>';
+                        return '<a href="' + data.record.edit_url + '">' + esc(data.value) + '</a>';
                     }
                 },
                 coa_name: {
@@ -155,7 +155,6 @@
                 emptyOption.textContent = '— Geen rekening voor transfers —';
                 coaSelect.appendChild(emptyOption);
                 coaSelect.disabled = true;
-
                 return;
             }
 
