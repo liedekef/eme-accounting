@@ -16,7 +16,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
 
     <div class="eme-acc-toolbar">
         <form method="get">
-            <input type="hidden" name="page" value="eme-accounting">
+            <input type="hidden" name="page" value="emeaccounting">
             <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?>
                 <select name="year" id="eme-acc-year-select" onchange="this.form.submit()">
                     <?php foreach ( $years as $y ): ?>
