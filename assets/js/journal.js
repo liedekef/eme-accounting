@@ -43,4 +43,5 @@
 
     entryDateInput.addEventListener('change', checkFiscalYear);
     checkFiscalYear();
+
 })();

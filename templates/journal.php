@@ -66,7 +66,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
-                    <select name="coa_id" id="category_coa_id" required>
+                    <select name="coa_id" id="category_coa_id" required class="eme_snapselect" data-live-search="true">
                         <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                         <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                         <?php foreach ( $coa_accounts as $id => $acc ): 

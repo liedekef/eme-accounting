@@ -89,7 +89,7 @@ $import_logs = $wpdb->get_results(
         <div style="display:flex;gap:4px;flex-wrap:wrap">
             <input type="number" class="journal-id-input" placeholder="Dagboek ID" style="width:80px;padding:2px 4px">
             <button class="button button-small btn-reconcile-manual" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Link', 'eme-accounting' ); ?></button>
-             <select name="coa_id" required>
+             <select name="coa_id" required class="eme_snapselect" data-live-search="true">
                  <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                  <?php if ($line->amount >= 0): ?>
                         <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
@@ -150,7 +150,7 @@ $import_logs = $wpdb->get_results(
     <td><span class="eme-acc-tag eme-acc-reconciled"><?= (int) $log->matched_lines ?></span></td>
     <td><?= $log->unmatched_lines > 0 ? '<span class="eme-acc-tag eme-acc-pending">' . (int) $log->unmatched_lines . '</span>' : '–' ?></td>
     <td>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
         <a href="#" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>
     </td>
 </tr>

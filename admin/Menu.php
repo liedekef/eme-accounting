@@ -17,27 +17,27 @@ class Menu {
             __( 'EME Boekhouding', 'eme-accounting' ),
             __( 'EME Boekhouding', 'eme-accounting' ),
             'manage_options',
-            'eme-accounting',
+            'emeaccounting',
             [ __CLASS__, 'page_dashboard' ],
             'dashicons-money-alt',
             56
         );
 
         $subpages = [
-            [ 'eme-accounting',             __( 'Dashboard', 'eme-accounting' ),              [ __CLASS__, 'page_dashboard' ] ],
-            [ 'eme-accounting-accounts',    __( 'Rekeningen', 'eme-accounting' ),             [ __CLASS__, 'page_accounts' ] ],
-            [ 'eme-accounting-journal',     __( 'Dagboek', 'eme-accounting' ),                [ __CLASS__, 'page_journal' ] ],
-            [ 'eme-accounting-import',      __( 'Import / Reconciliatie', 'eme-accounting' ), [ __CLASS__, 'page_import' ] ],
-            [ 'eme-accounting-stock',       __( 'Stock', 'eme-accounting' ),                  [ __CLASS__, 'page_stock' ] ],
-            [ 'eme-accounting-depreciation',__( 'Afschrijvingen', 'eme-accounting' ),         [ __CLASS__, 'page_depreciation' ] ],
-            [ 'eme-accounting-budget',      __( 'Begroting', 'eme-accounting' ),              [ __CLASS__, 'page_budget' ] ],
-            [ 'eme-accounting-reports',     __( 'Rapporten', 'eme-accounting' ),              [ __CLASS__, 'page_reports' ] ],
-            [ 'eme-accounting-settings',    __( 'Instellingen', 'eme-accounting' ),           [ __CLASS__, 'page_settings' ] ],
+            [ 'emeaccounting',             __( 'Dashboard', 'eme-accounting' ),              [ __CLASS__, 'page_dashboard' ] ],
+            [ 'emeaccounting-accounts',    __( 'Rekeningen', 'eme-accounting' ),             [ __CLASS__, 'page_accounts' ] ],
+            [ 'emeaccounting-journal',     __( 'Dagboek', 'eme-accounting' ),                [ __CLASS__, 'page_journal' ] ],
+            [ 'emeaccounting-import',      __( 'Import / Reconciliatie', 'eme-accounting' ), [ __CLASS__, 'page_import' ] ],
+            [ 'emeaccounting-stock',       __( 'Stock', 'eme-accounting' ),                  [ __CLASS__, 'page_stock' ] ],
+            [ 'emeaccounting-depreciation',__( 'Afschrijvingen', 'eme-accounting' ),         [ __CLASS__, 'page_depreciation' ] ],
+            [ 'emeaccounting-budget',      __( 'Begroting', 'eme-accounting' ),              [ __CLASS__, 'page_budget' ] ],
+            [ 'emeaccounting-reports',     __( 'Rapporten', 'eme-accounting' ),              [ __CLASS__, 'page_reports' ] ],
+            [ 'emeaccounting-settings',    __( 'Instellingen', 'eme-accounting' ),           [ __CLASS__, 'page_settings' ] ],
         ];
 
         foreach ( $subpages as [ $slug, $title, $callback ] ) {
             add_submenu_page(
-                'eme-accounting',
+                'emeaccounting',
                 $title,
                 $title,
                 'manage_options',

@@ -26,10 +26,10 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             </label>
         </form>
         <div class="spacer"></div>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-journal' ) ); ?>" class="button button-primary">
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>" class="button button-primary">
             + <?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?>
         </a>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-import' ) ); ?>" class="button">
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import' ) ); ?>" class="button">
             <?php esc_html_e( 'Bankimport', 'eme-accounting' ); ?>
         </a>
     </div>
@@ -113,11 +113,11 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
     </table>
 
     <p style="margin-top:12px">
-        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-journal&year=' . $year ) ); ?>">
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal&year=' . $year ) ); ?>">
             <?php esc_html_e( '→ Alle boekingen bekijken', 'eme-accounting' ); ?>
         </a>
         &nbsp;|&nbsp;
-        <a href="<?= esc_url( admin_url( 'admin.php?page=eme-accounting-reports' ) ); ?>">
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-reports' ) ); ?>">
             <?php esc_html_e( '→ Rapporten', 'eme-accounting' ); ?>
         </a>
     </p>

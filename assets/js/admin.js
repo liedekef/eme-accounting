@@ -925,4 +925,35 @@
     }
     initJournalLinking();
 
+    function initSnapSelect(selector, options = {}) {
+        // Convert selector to elements array
+        const elements = typeof selector === 'string'
+            ? Array.from(document.querySelectorAll(selector))
+            : [selector];
+
+        if (!elements.length) return [];
+
+        return Array.from(elements).map(el => {
+            // Guard: skip if already initialised
+            if (el.snapselectInstance) return el.snapselectInstance;
+
+            if (!el.id) {
+                el.id = 'snap-select-' + Math.random().toString(36).slice(2, 11);
+            }   
+
+            const config = {
+                placeholder:    options.placeholder    || undefined,
+                defaultText:    options.defaultText    || 'Select',
+                liveSearch:     options.liveSearch     !== undefined ? options.liveSearch     : el.multiple ? true : undefined,
+                closeOnSelect:  options.closeOnSelect  !== undefined ? options.closeOnSelect  : undefined,
+                showClearButton:     options.showClearButton     !== undefined ? options.showClearButton     : undefined,
+            };
+
+            const instance = new SnapSelectClass(el, config);
+            el.snapselectInstance = instance;
+            return instance;
+        });
+    }
+    initSnapSelect('select.eme_snapselect');
+
 })();

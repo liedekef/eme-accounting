@@ -245,7 +245,7 @@ class Journal {
             'amount'             => round( (float) $data['amount'], 2 ),
             'direction'          => $direction,
             'account_id'         => (int) $data['account_id'],
-            'contra_account_id'  => null,
+            'contra_account_id'  => ! empty( $data['contra_account_id'] ) ? (int) $data['contra_account_id'] : null,
             'coa_id'             => ! empty( $data['coa_id'] ) ? (int) $data['coa_id'] : null,
             'bank_statement_ref' => eme_sanitize_request( $data['bank_statement_ref'] ?? '' ),
             'bank_statement_seq' => eme_sanitize_request( $data['bank_statement_seq'] ?? '' ),
