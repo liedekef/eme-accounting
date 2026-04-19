@@ -421,11 +421,12 @@ class Journal {
         ];
 
         $args = [
-            'fiscal_year'    => isset( $_POST['fiscal_year'] ) ? (int) $_POST['fiscal_year'] : null,
-            'account_id'      => isset( $_POST['account_id'] ) && $_POST['account_id'] > 0 ? (int) $_POST['account_id'] : null,
-            'direction'       => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
-            'coa_id'          => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
-            'search'          => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
+            'fiscal_year'  => isset( $_POST['fiscal_year'] ) ? (int) $_POST['fiscal_year'] : null,
+            'account_id'   => isset( $_POST['account_id'] ) && $_POST['account_id'] > 0 ? (int) $_POST['account_id'] : null,
+            'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
+            'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
+            'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
+            'search'       => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
         ];
 
         $total = self::count_entries( $args );
@@ -440,12 +441,19 @@ class Journal {
                 ? (float) $entry->amount
                 : -1 * (float) $entry->amount;
 
+            $event_name = '';
+            if ($entry->eme_event_id) {
+                $event = eme_get_event($entry->eme_event_id);
+                if ($event)
+                    $event_name = trim( eme_translate( $event['event_name'] ) . ' (' . eme_localized_datetime( $event['event_start'] ) . ')' );
+            }
             $result['Records'][] = [
                 'id'                 => (int) $entry->id,
                 'entry_date'         => eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
                 'edit_url'           => esc_url( admin_url( 'admin.php?page=emeaccounting-journal&edit=' . $entry->id ) ),
                 'description'        => $entry->description,
                 'coa_name'           => $entry->coa_name ?? '',
+                'eme_event'          => $event_name,
                 'bank_statement_ref' => $entry->bank_statement_ref ?? '',
                 'account_name'       => $entry->account_name ?? '',
                 'amount'             => $signed_amount,
@@ -534,6 +542,10 @@ class Journal {
         if ( ! empty( $args['coa_id'] ) ) {
             $where[]   = "{$p}coa_id = %d";
             $prepare[] = (int) $args['coa_id'];
+        }
+        if ( ! empty( $args['eme_event_id'] ) ) {
+            $where[]   = "{$p}eme_event_id = %d";
+            $prepare[] = (int) $args['eme_event_id'];
         }
         if ( ! empty( $args['search'] ) ) {
             $like      = '%' . $wpdb->esc_like( $args['search'] ) . '%';

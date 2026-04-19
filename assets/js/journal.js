@@ -136,6 +136,11 @@
                         return '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
                     }
                 },
+                eme_event: {
+                    title: emeAccounting.i18n.event || 'Event',
+                    sortable: false,
+                    visibility: 'hidden'
+                },
                 account_name: {
                     title: emeAccounting.i18n.account || 'Rekening',
                     sortable: false,
@@ -173,7 +178,8 @@
                 account_id: document.querySelector('#eme-acc-account-filter')?.value || '',
                 direction: document.querySelector('#eme-acc-direction-filter')?.value || '',
                 coa_id: document.querySelector('#eme-acc-coa-filter')?.value || '',
-                search: document.querySelector('#eme-acc-search-filter')?.value || ''
+                search: document.querySelector('#eme-acc-search-filter')?.value || '',
+                eme_event_id: document.querySelector('#eme-acc-event-filter')?.value || ''
             })
         });
 

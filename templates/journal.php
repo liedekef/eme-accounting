@@ -214,7 +214,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <option value="<?= $aid ?>" <?= selected( $aid, $account_id, false ) ?>><?= esc_html( $aname ) ?></option>
                 <?php endforeach; ?>
             </select>
-                <select name="direction" id="eme-acc-direction-filter" >
+            <select name="direction" id="eme-acc-direction-filter" >
                 <option value=""><?php esc_html_e( 'Alle richtingen', 'eme-accounting' ); ?></option>
                 <option value="in"  <?= selected( 'in',  $direction, false ) ?>><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?></option>
                 <option value="out" <?= selected( 'out', $direction, false ) ?>><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></option>
@@ -241,6 +241,12 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <?php endif; endforeach; ?>
                 </optgroup>
             </select>
+            <?php
+                    echo eme_ui_select( 0, 'eme-acc-event-filter', [], '', 0, 'eme_snapselect_filterevents_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
+                    ?>
+                    <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just future ones.', 'events-made-easy' ); ?></span>
+            ?>
+
             <div class="spacer"></div>
             <strong id="eme-acc-totals">
                 <?php printf(

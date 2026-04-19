@@ -831,5 +831,16 @@ function ajax(action, data, onSuccess, onError) {
             };
         }
     });
+    initSnapSelectRemote('select.eme_snapselect_filterevents_class', {
+        placeholder: 'Filter op event',
+        showClearButton: true,
+        data: function(search, page) {
+            return {
+                action: 'eme_accounting_events_list',
+                search_all: document.getElementById('filter_eventsearch_all')?.checked ? 1 : 0,
+                nonce: nonce
+            };
+        }
+    });
 
 })();
