@@ -101,11 +101,13 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                     <?php
                     $event_id  = 0;
                     $myevents  = [];
-                    if ( ! empty( $conditions['event_id'] ) ) {
-                        $event_id = $conditions['event_id'];
-                        $events    = eme_get_events( extra_conditions: [ 'event_id' => array_map( 'intval', $event_ids ) ] );
-                        foreach ( $events as $event ) {
-                            $myevents[ $event['event_id'] ] = $event['event_name']. ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
+                    if ( ! empty( $edit_entry->eme_event_id ) ) {
+                        $event_id = $edit_entry->eme_event_id;
+                        $event = eme_get_event(  $event_id);
+                        if ( $event ) {
+                            $myevents[ $event_id ] = $event['event_name']. ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
+                        } else {
+                            $myevents[ $event_id ] = __('onbekend event','eme_accounting');
                         }
                     }
                     echo eme_ui_select( $event_id, 'eme_event_id', $myevents, '', 0, 'eme_snapselect_events_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
