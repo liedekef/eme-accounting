@@ -103,7 +103,7 @@ if ($edit_entry && $edit_entry->transfer_id) {
                            value="<?= esc_attr( $edit_entry->amount ?? '' ) ?>">
                 </div>
                 <div class="eme-acc-field">
-                    <label><?php esc_html_e( 'Event', 'eme-accounting' ); ?> *</label>
+                    <label><?php esc_html_e( 'Event', 'eme-accounting' ); ?></label>
                     <?php
                     $event_id  = 0;
                     $myevents  = [];
@@ -209,13 +209,13 @@ if ($edit_entry && $edit_entry->transfer_id) {
     <div class="eme-acc-toolbar">
         <form method="get" id="eme-acc-filter-form">
             <select name="year" id="eme-acc-year-filter">
-                <option value=""></option>
+                <option value=""><?php esc_html_e( 'Filter op boekjaar', 'eme-accounting' ); ?></option>
                 <?php foreach ( $years as $y ): ?>
                 <option value="<?= $y ?>" ><?= $y ?></option>
                 <?php endforeach; ?>
             </select>
             <input type="search" placeholder="Filter op omschrijving" name="eme-acc-search-filter" id="eme-acc-search-filter">
-            <input type="search" placeholder="Bedrag" name="eme-acc-amount-filter" id="eme-acc-amount-filter">
+            <input type="search" placeholder="Bedrag" name="eme-acc-amount-filter" id="eme-acc-amount-filter" size="8">
             <select name="account_id" id="eme-acc-account-filter">
                 <option value="0"><?php esc_html_e( 'Alle rekeningen', 'eme-accounting' ); ?></option>
                 <?php foreach ( $accounts as $aid => $aname ): ?>

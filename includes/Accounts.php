@@ -82,8 +82,6 @@ class Accounts {
                  FROM `{$wpdb->prefix}emeacc_journal`
                  WHERE account_id = %d
                    {$date_clause}",
-                $account_id,
-                $account_id,
                 $account_id
             )
         );

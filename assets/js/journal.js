@@ -281,6 +281,7 @@
             const direction = directionSelect.value;
 
             contraAccount.disabled = true;
+            contraAccount.required = false;
             if (direction === 'in') {
                 filterCoaByDirection('in');
             } else if (direction === 'out') {
@@ -288,6 +289,7 @@
             } else if (direction === 'transfer') {
                 filterCoaByDirection('transfer');
                 contraAccount.disabled = false;
+                contraAccount.required = true;
             } else {
                 // Show all options if no valid direction
                 filterCoaByDirection(null);

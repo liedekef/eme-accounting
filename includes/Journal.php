@@ -47,6 +47,7 @@ class Journal {
             'limit'          => 100,
             'offset'         => 0,
             'coa_id'         => 0,
+            'amount'         => 0,
             'econtra_account_idme_event_id'   => null,
         ];
 
@@ -325,7 +326,6 @@ class Journal {
                 return new \WP_Error( 'db_problem_transfer', __( 'Transfer boeking niet gelukt.', 'eme-accounting' ) );
             }
             $wpdb->query( 'COMMIT' );
-
 
             do_action( 'eme_accounting_journal_created', $out_id, $out_row );
             do_action( 'eme_accounting_journal_created', $in_id, $in_row );
