@@ -536,6 +536,7 @@ function ajax(action, data, onSuccess, onError) {
         document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display = this.value === 'patrimony' ? 'none' : '';
         document.getElementById('btn-export-pdf').style.display = this.value === 'income_expenditure' ? '' : 'none';
+        document.getElementById('btn-export-csv').style.display = this.value === 'events' ? 'none' : '';
     });
 
     function handleLoadReport() {
@@ -564,6 +565,7 @@ function ajax(action, data, onSuccess, onError) {
     function renderReport(type, data, container) {
         if (type === 'income_expenditure') renderIncomeExpenditure(data, container);
         else if (type === 'patrimony')      renderPatrimony(data, container);
+        else if (type === 'events')           renderEventsReport(data, container);
         else                                renderDiary(data, container);
     }
 
@@ -631,6 +633,91 @@ function ajax(action, data, onSuccess, onError) {
         }
         container.innerHTML = html + '</table>';
     }
+
+    function renderEventsReport(data, container) {
+        // Drilldown view (details)
+        if (data.details) {
+            // event info in data.info
+            const year = document.querySelector('#report_year')?.value || '';
+            let html = `<h2>Event boekingen voor ${esc(data.info.event_name)} met startdatum ${esc(data.info.event_start)}</h2>
+                <p><a href="#" onclick="loadEventsReport(${year});return false">← Terug naar overzicht</a></p>
+                <table class="eme-acc-table">
+                <tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th class="amount">Bedrag</th><th>Rekening</th></tr>`;
+            data.details.forEach(e => {
+                const sign = e.direction === 'in' ? '+' : '–';
+                html += `<tr>
+                    <td>${esc(e.entry_date)}</td>
+                    <td>${esc(e.description)}</td>
+                    <td>${esc(e.coa_name)}</td>
+                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${sign} ${formatCurrency(e.amount)}</td>
+                    <td>${esc(e.account_name)}</td>
+                </tr>`;
+            });
+            const totalIn = data.details.filter(e => e.direction === 'in').reduce((s, e) => s + parseFloat(e.amount), 0);
+            const totalOut = data.details.filter(e => e.direction === 'out').reduce((s, e) => s + parseFloat(e.amount), 0);
+            html += `<tr style="font-weight:600"><td colspan="3">Totaal ontvangen</td>
+                <td class="amount in">${formatCurrency(totalIn)}</td><td></td></tr>
+                <tr style="font-weight:600"><td colspan="3">Totaal uitgegeven</td>
+                <td class="amount out">${formatCurrency(totalOut)}</td><td></td></tr>
+                </table>`;
+            container.innerHTML = html;
+            return;
+        }
+
+        // Overview: summary list
+        let html = '<h2>Events Overzicht</h2><table class="eme-acc-table">'
+            + '<tr><th>Event</th><th>Event startdatum</th><th class="amount">Ontvangen</th><th class="amount">Uitgegeven</th><th>Saldo</th></tr>';
+        
+        const entries = Object.values(data.summary || {});
+        if (!entries.length) {
+            html += '<tr><td colspan="4">Geen boekingen voor dit jaar.</td></tr>';
+        } else {
+            entries.forEach(ev => {
+                const isPositive = ev.total_in >= ev.total_out;
+                html += `<tr style="cursor:pointer" onclick="loadEventDetails(${ev.event_id})">
+                    <td>${esc(ev.event_name)}</td>
+                    <td>${esc(ev.event_start)}</td>
+                    <td class="amount in">${formatCurrency(ev.total_in)}</td>
+                    <td class="amount out">${formatCurrency(ev.total_out)}</td>
+                    <td class="amount ${isPositive ? 'in' : 'out'}">${formatCurrency(Math.abs(ev.total_in - ev.total_out))}</td>
+                </tr>`;
+            });
+            const totalIn = entries.reduce((s, e) => s + e.total_in, 0);
+            const totalOut = entries.reduce((s, e) => s + e.total_out, 0);
+            html += `<tr style="font-weight:600"><td>Totaal</td>
+                <td class="amount in">${formatCurrency(totalIn)}</td>
+                <td class="amount out">${formatCurrency(totalOut)}</td>
+                <td class="amount ${totalIn >= totalOut ? 'in' : 'out'}">${formatCurrency(Math.abs(totalIn - totalOut))}</td></tr>`;
+        }
+        container.innerHTML = html + '</table>';
+    }
+
+    // Global helpers for event report drilldown (called from onclick)
+    window.loadEventsReport = function(year) {
+        const { type } = getReportParams();
+        const output = document.querySelector('#report-output');
+        if (output) output.innerHTML = '<p>Laden…</p>';
+        fetch(`${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=events&year=${year}&format=json`)
+            .then(r => r.json())
+            .then(r => {
+                if (!output) return;
+                r.success ? renderEventsReport(r.data, output)
+                          : (output.innerHTML = `<p class="error">${esc(r.data)}</p>`);
+            });
+    };
+
+    window.loadEventDetails = function(eventId) {
+        const year = document.querySelector('#report_year')?.value || '';
+        const output = document.querySelector('#report-output');
+        if (output) output.innerHTML = '<p>Laden…</p>';
+        fetch(`${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=events&year=${year}&event_id=${eventId}&format=json`)
+            .then(r => r.json())
+            .then(r => {
+                if (!output) return;
+                r.success ? renderEventsReport(r.data, output)
+                          : (output.innerHTML = `<p class="error">${esc(r.data)}</p>`);
+            });
+    };
 
     /* ═══════════════════════════════════════════════════════════════════
      * GENERIC

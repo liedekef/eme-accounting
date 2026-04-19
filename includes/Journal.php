@@ -47,7 +47,9 @@ class Journal {
             'limit'          => 100,
             'offset'         => 0,
             'coa_id'         => 0,
+            'eme_event_id'   => null,
         ];
+
         $args = wp_parse_args( $args, $defaults );
 
         $where   = [];
@@ -87,6 +89,10 @@ class Journal {
             $where[]   = '(description LIKE %s OR bank_statement_ref LIKE %s)';
             $prepare[] = $like;
             $prepare[] = $like;
+        }
+        if ( ! empty( $args['eme_event_id'] ) ) {
+            $where[]   = 'j.eme_event_id = %d';
+            $prepare[] = (int) $args['eme_event_id'];
         }
 
         $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';

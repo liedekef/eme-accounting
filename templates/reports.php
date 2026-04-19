@@ -13,6 +13,7 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
             <option value="income_expenditure"><?php esc_html_e( 'Staat van Ontvangsten en Uitgaven', 'eme-accounting' ); ?></option>
             <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen (intern)', 'eme-accounting' ); ?></option>
             <option value="diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
+            <option value="events"><?php esc_html_e( 'Events Overzicht', 'eme-accounting' ); ?></option>
         </select>
     </div>
     <div class="eme-acc-field" id="report_year_div">

@@ -169,17 +169,76 @@ class Reports {
         return $grouped;
     }
 
+    /**
+     * Events report: all journal entries linked to EME events.
+     *
+     * @param  int      $year        Fiscal year
+     * @param  int|null $event_id    Optional event ID for drilldown
+     * @return array{summary: array<int,array{event_id:int,event_name:string,event_start:?string,event_end:?string,total_in:float,total_out:float}}, details: array<int,object>}
+     */
+    public static function events_report( int $year, ?int $event_id = null ): array {
+        global $wpdb;
+
+        // Drilldown: get all entries for a specific event
+        if ( $event_id ) {
+            $entries = Journal::get_entries( [
+                'fiscal_year'  => $year,
+                'eme_event_id' => $event_id,
+                'limit'       => 9999,
+                'orderby'     => 'entry_date',
+                'order'      => 'ASC',
+            ] );
+            $event = eme_get_event($event_id);
+            $event['event_start'] = eme_localized_datetime($event['event_start']);
+            $event['event_end'] = eme_localized_datetime($event['event_end']);
+            return [ 'info' => $event, 'details' => $entries ];
+        }
+
+        // Overview: group by event_id
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.eme_event_id,
+                        SUM(CASE WHEN j.direction = 'in'  THEN j.amount ELSE 0 END) AS total_in,
+                        SUM(CASE WHEN j.direction = 'out' THEN j.amount ELSE 0 END) AS total_out
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 WHERE j.fiscal_year = %d
+                   AND j.eme_event_id IS NOT NULL
+                   AND j.is_closing_entry = 0
+                 GROUP BY j.eme_event_id
+                 ORDER BY j.eme_event_id",
+                $year
+            )
+        );
+
+        $summary = [];
+        foreach ( $rows as $row ) {
+            $event = eme_get_event( (int) $row->eme_event_id );
+            $summary[ (int) $row->eme_event_id ] = [
+                'event_id'    => (int) $row->eme_event_id,
+                'event_name'  => $event ? $event['event_name'] : __( '(onbekend event)', 'eme-accounting' ),
+                'event_start' => $event ? eme_localized_datetime($event['event_start']) : null,
+                'event_end'   => $event ? eme_localized_datetime($event['event_end']) : null,
+                'total_in'    => (float) $row->total_in,
+                'total_out'   => (float) $row->total_out,
+            ];
+        }
+
+        return [ 'summary' => $summary ];
+    }
+
     public static function ajax_export(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_die();
 
         $type   = eme_sanitize_request( $_GET['type'] ?? 'diary' );
         $year   = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
+        $event_id = (!empty($_GET['event_id'])) ? (int) ($_GET['event_id']) : null;
         $format = eme_sanitize_request( $_GET['format'] ?? 'csv' );
 
         $data = match ( $type ) {
             'income_expenditure' => self::income_expenditure( $year ),
             'patrimony'          => self::patrimony( $_GET['date'] ?? '' ),
+            'events'             => self::events_report( $year, $event_id ),
             default              => self::diary( [ 'fiscal_year' => $year ] ),
         };
 
