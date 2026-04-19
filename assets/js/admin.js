@@ -671,4 +671,77 @@ function ajax(action, data, onSuccess, onError) {
     }
     initSnapSelect('select.eme_snapselect');
 
+    function initSnapSelectRemote(selector, options = {}) {
+        // Convert selector to elements array
+        const elements = typeof selector === 'string'
+            ? Array.from(document.querySelectorAll(selector))
+            : [selector];
+
+        if (!elements.length) return [];
+
+        return Array.from(elements).map(el => {
+            // Guard: skip if already initialised
+            if (el.snapselectInstance) return el.snapselectInstance;
+
+            if (!el.id) {
+                el.id = 'snap-select-' + Math.random().toString(36).slice(2, 11);
+            }
+
+            const pagesize = options.pagesize || 30;
+            // Build the ajax.url function, incorporating any extra data
+            const config = {
+                placeholder:    options.placeholder    || undefined,
+                defaultText:    options.defaultText    || 'Select',
+                closeOnSelect:  !el.multiple,
+                showClearButton:     options.showClearButton !== undefined ? options.showClearButton : undefined,
+                onItemAdd:      typeof options.onItemAdd    === 'function' ? options.onItemAdd    : undefined,
+                onItemDelete:   typeof options.onItemDelete === 'function' ? options.onItemDelete : undefined,
+                ajax: {
+                    // Allow caller to pass a custom url function (e.g. for state→country cascade)
+                    url: options.url || ajaxUrl,
+                    cache: options.cache !== undefined ? options.cache : undefined,
+                    pagesize: pagesize,
+                    data: options.data || {},
+                    processResults: function(data, search, page) {
+                        // EME backend returns { TotalRecordCount, Records:[{id,text},...] }
+                        // or a plain array
+                        const records = Array.isArray(data)
+                            ? data
+                            : (data.Records || []);
+                        let hasMore;
+                        if (data.hasMore !== undefined) {
+                            hasMore = data.hasMore;
+                        } else {
+                            const total   = data.TotalRecordCount !== undefined
+                                ? data.TotalRecordCount
+                                : records.length;
+                            hasMore = total > page * pagesize;
+                            // the next if covers the case where all rows are returned in 1 go, not respecting paging
+                            if (data.TotalRecordCount !== undefined && records.length >= data.TotalRecordCount)
+                                hasMore = false;
+                        }
+                        return { results: records, hasMore };
+                    },
+                }
+            };
+            const instance = new SnapSelectClass(el, config);
+
+            // Expose a .snapselect property on the element
+            el.snapselectInstance = instance;
+
+            return instance;
+        });
+    }
+    initSnapSelectRemote('select.eme_snapselect_events_class', {
+        placeholder: 'Selecteer event',
+        showClearButton: true,
+        data: function(search, page) {
+            return {
+                action: 'eme_accounting_events_list',
+                entry_date: document.getElementById('entry_date').value,
+                nonce: nonce
+            };
+        }
+    });
+
 })();

@@ -188,8 +188,9 @@
 
     function initJournalLinking() {
         const directionSelect = document.querySelector('#direction');
-        const coaSelect = document.querySelector('#category_coa_id');
-        const contraAccount = document.getElementById('contra_account_id');
+        const coaSelect       = document.querySelector('#category_coa_id');
+        const contraAccount   = document.getElementById('contra_account_id');
+        const originalValue   = coaSelect.value;
 
         if (!directionSelect || !coaSelect) return;
 
@@ -306,8 +307,10 @@
         }
 
         // If there's a preselected COA (when editing), set direction accordingly
-        if (coaSelect.value) {
+        if (originalValue) {
             setDirectionFromCoa();
+            // since we would lose the selected value, set it again
+            coaSelect.value = originalValue;
         }
     }
     initJournalLinking();

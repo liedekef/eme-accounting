@@ -72,19 +72,14 @@ class Assets {
         }
 
         if ( $plugin_page === 'emeaccounting-fiscal-years' ) {
-            $fy_settings = get_option( 'eme_accounting_settings', [] );
             $current_year = (int) gmdate( 'Y' );
-            $start_month = (int) ( $fy_settings['fiscal_year_start_month'] ?? 1 );
-            $start_day   = (int) ( $fy_settings['fiscal_year_start_day'] ?? 1 );
-            $end_month   = (int) ( $fy_settings['fiscal_year_end_month'] ?? 12 );
-            $end_day     = (int) ( $fy_settings['fiscal_year_end_day'] ?? 31 );
-
+            $dates = \FiscalYear::calculate_dates($current_year);
             wp_enqueue_script( 'emeaccounting-fiscalyears', EME_ACCOUNTING_URL . 'assets/js/fiscalyears.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
-            wp_localize_script( 'emeaccounting-fiscalyears', 'emeAccountingFy', [
+            /*wp_localize_script( 'emeaccounting-fiscalyears', 'emeAccountingFy', [
                 'currentYear'       => $current_year,
-                'defaultStartDate'  => sprintf( '%04d-%02d-%02d', $current_year, $start_month, min( $start_day, cal_days_in_month( CAL_GREGORIAN, $start_month, $current_year ) ) ),
-                'defaultEndDate'    => sprintf( '%04d-%02d-%02d', $current_year, $end_month, min( $end_day, cal_days_in_month( CAL_GREGORIAN, $end_month, $current_year ) ) ),
-            ] );
+                'defaultStartDate'  => $dates['start_date'],
+                'defaultEndDate'    => $dates['end_date']
+            ] );*/
         }
     }
 }

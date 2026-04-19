@@ -225,16 +225,8 @@ class FiscalYear {
             return $fy;
         }
 
-        $settings = get_option( 'eme_accounting_settings', [] );
-        $year     = (int) date( 'Y', strtotime( $date ) );
-
-        $start_month = (int) ( $settings['fiscal_year_start_month'] ?? 1 );
-        $start_day   = (int) ( $settings['fiscal_year_start_day'] ?? 1 );
-        $end_month   = (int) ( $settings['fiscal_year_end_month'] ?? 12 );
-        $end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
-
-        $start_date = sprintf( '%04d-%02d-%02d', $year, $start_month, min( $start_day, self::days_in_month( $start_month, $year ) ) );
-        $end_date   = sprintf( '%04d-%02d-%02d', $year, $end_month, min( $end_day, self::days_in_month( $end_month, $year ) ) );
+        $year  = (int) date( 'Y', strtotime( $date ) );
+        $dates = self::calculate_dates( $year );
 
         $fy = self::get( $year );
         if ( ! $fy ) {
@@ -242,8 +234,8 @@ class FiscalYear {
                 $wpdb->prefix . 'emeacc_fiscal_years',
                 [
                     'year'       => $year,
-                    'start_date' => $start_date,
-                    'end_date'   => $end_date,
+                    'start_date' => $dates['start_date'],
+                    'end_date'   => $dates['end_date'],
                     'status'     => 'open',
                 ]
             );
@@ -577,21 +569,13 @@ class FiscalYear {
         );
 
         if ( $exists == 0 ) {
-            $settings = get_option( 'eme_accounting_settings', [] );
-            $start_month = (int) ( $settings['fiscal_year_start_month'] ?? 1 );
-            $start_day   = (int) ( $settings['fiscal_year_start_day'] ?? 1 );
-            $end_month   = (int) ( $settings['fiscal_year_end_month'] ?? 12 );
-            $end_day     = (int) ( $settings['fiscal_year_end_day'] ?? 31 );
-
-            $start_date = sprintf( '%04d-%02d-%02d', $current, $start_month, min( $start_day, self::days_in_month( $start_month, $current ) ) );
-            $end_date   = sprintf( '%04d-%02d-%02d', $current, $end_month, min( $end_day, self::days_in_month( $end_month, $current ) ) );
-
+            $dates = self::calculate_dates( $current );
             $wpdb->insert(
                 $wpdb->prefix . 'emeacc_fiscal_years',
                 [
                     'year'       => $current,
-                    'start_date' => $start_date,
-                    'end_date'   => $end_date,
+                    'start_date' => $dates['start_date'],
+                    'end_date'   => $dates['end_date'],
                     'status'     => 'open',
                 ]
             );
