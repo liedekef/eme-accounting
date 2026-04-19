@@ -14,6 +14,11 @@ $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $edit_entry  = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
 $years       = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
 $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
+
+$form_disabled = "";
+if ($edit_entry && $edit_entry->transfer_id) {
+    $form_disabled = 'disabled="disabled"';
+}
 ?>
 <div class="wrap eme-acc-wrap">
     <h1><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></h1>
@@ -22,6 +27,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
     <div class="eme-acc-form-box">
         <h2><?= $edit_entry ? esc_html__( 'Boeking bewerken', 'eme-accounting' ) : esc_html__( 'Nieuwe boeking', 'eme-accounting' ) ?></h2>
         <form id="eme-acc-journal-form">
+        <fieldset <?= $form_disabled ?>>
             <?php if ( $edit_entry ): ?>
             <input type="hidden" name="id" value="<?= (int) $edit_entry->id ?>">
             <?php endif; ?>
@@ -195,6 +201,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 </a>
                 <?php endif; ?>
             </p>
+        </fieldset>
         </form>
     </div>
 
@@ -208,6 +215,7 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <?php endforeach; ?>
             </select>
             <input type="search" placeholder="Filter op omschrijving" name="eme-acc-search-filter" id="eme-acc-search-filter">
+            <input type="search" placeholder="Bedrag" name="eme-acc-amount-filter" id="eme-acc-amount-filter">
             <select name="account_id" id="eme-acc-account-filter">
                 <option value="0"><?php esc_html_e( 'Alle rekeningen', 'eme-accounting' ); ?></option>
                 <?php foreach ( $accounts as $aid => $aname ): ?>
@@ -241,11 +249,12 @@ $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
                 <?php endif; endforeach; ?>
                 </optgroup>
             </select>
+            <br>
             <?php
-                    echo eme_ui_select( 0, 'eme-acc-event-filter', [], '', 0, 'eme_snapselect_filterevents_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
-                    ?>
-                    <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just future ones.', 'events-made-easy' ); ?></span>
+                 echo eme_ui_select( 0, 'eme-acc-event-filter', [], '', 0, 'eme_snapselect_filterevents_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
             ?>
+            <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just future ones.', 'events-made-easy' ); ?></span>
+            <button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
 
             <div class="spacer"></div>
             <strong id="eme-acc-totals">

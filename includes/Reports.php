@@ -56,7 +56,7 @@ class Reports {
                  LEFT JOIN `{$coa_table}` coa    ON coa.id    = j.coa_id
                  LEFT JOIN `{$coa_table}` parent ON parent.id = coa.parent_id
                  WHERE j.fiscal_year = %d
-                   AND j.direction  != 'transfer'
+                   AND transfer_id IS NULL
                    AND j.is_closing_entry = 0
                  GROUP BY j.direction, main_id
                  ORDER BY j.direction DESC, main_code",

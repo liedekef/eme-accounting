@@ -47,7 +47,7 @@ class Journal {
             'limit'          => 100,
             'offset'         => 0,
             'coa_id'         => 0,
-            'eme_event_id'   => null,
+            'econtra_account_idme_event_id'   => null,
         ];
 
         $args = wp_parse_args( $args, $defaults );
@@ -65,8 +65,16 @@ class Journal {
             $prepare[] = (int) $args['account_id'];
         }
         if ( $args['direction'] !== null ) {
-            $where[]   = 'direction = %s';
-            $prepare[] = $args['direction'];
+            if ($args['direction'] == 'transfer') {
+                $where[]   = 'transfer_id IS NOT NULL';
+            } else {
+                $where[]   = 'direction = %s AND transfer_id IS NULL';
+                $prepare[] = $args['direction'];
+            }
+        }
+        if ( $args['amount'] > 0 ) {
+            $where[]   = 'amount = %d';
+            $prepare[] = (int) $args['amount'];
         }
         if ( $args['coa_id'] > 0 ) {
             $where[]   = 'coa_id = %d';
@@ -176,7 +184,7 @@ class Journal {
             $prepare[] = $args['coa_id'];
         }
 
-        $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) . " AND direction != 'transfer'" : "WHERE direction != 'transfer'";
+        $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) . " AND transfer_id IS NULL" : "WHERE transfer_id IS NULL";
 
         $row = $wpdb->get_row(
             $wpdb->prepare(
@@ -291,7 +299,7 @@ class Journal {
             // Insert out-leg first (without transfer_id), then link both legs.
             $wpdb->query( 'START TRANSACTION' );
             $out_row = $row;
-            $out_row['direction']         = 'transfer';
+            $out_row['direction']         = 'out';
             $out_row['account_id']        = (int) $data['account_id'];
             $out_row['contra_account_id'] = (int) $data['contra_account_id'];
             $out_row['description']       = $row['description'] . " (transfer naar {$contra_account->name})";
@@ -300,10 +308,10 @@ class Journal {
 
             // now the in-leg
             $in_row = $row;
-            $in_row['direction']          = 'transfer';
+            $in_row['direction']          = 'in';
             $in_row['account_id']         = (int) $data['contra_account_id'];
             $in_row['contra_account_id']  = (int) $data['account_id'];
-            $in_row['amount']             = -1*$row['amount'];
+            $in_row['amount']             = $row['amount'];
             $in_row['transfer_id']        = $out_id; // link to out-leg
             $in_row['description']        = $row['description'] . " (transfer van {$account->name})";
             $wpdb->insert( $table, $in_row );
@@ -426,6 +434,7 @@ class Journal {
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
             'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
             'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
+            'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? (int) $_POST['amount'] : null,
             'search'       => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
         ];
 
@@ -536,12 +545,20 @@ class Journal {
             $prepare[] = (int) $args['account_id'];
         }
         if ( ! empty( $args['direction'] ) ) {
-            $where[]   = "{$p}direction = %s";
-            $prepare[] = $args['direction'];
+            if ($args['direction'] == 'transfer') {
+                $where[]   = "{$p}transfer_id IS NOT NULL";
+            } else {
+                $where[]   = "{$p}direction = %s AND transfer_id IS NULL";
+                $prepare[] = $args['direction'];
+            }
         }
         if ( ! empty( $args['coa_id'] ) ) {
             $where[]   = "{$p}coa_id = %d";
             $prepare[] = (int) $args['coa_id'];
+        }
+        if ( ! empty( $args['amount'] ) ) {
+            $where[]   = "{$p}amount = %d";
+            $prepare[] = (int) $args['amount'];
         }
         if ( ! empty( $args['eme_event_id'] ) ) {
             $where[]   = "{$p}eme_event_id = %d";

@@ -38,7 +38,7 @@ class Budget {
             $wpdb->prepare(
                 "SELECT COALESCE(SUM(amount), 0) as total
                  FROM `{$wpdb->prefix}emeacc_journal`
-                 WHERE fiscal_year = %d AND coa_id = %d AND direction != 'transfer'",
+                 WHERE fiscal_year = %d AND coa_id = %d AND transfer_id IS NULL",
                 $year,
                 $coa_id
             )

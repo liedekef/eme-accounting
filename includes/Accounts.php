@@ -76,8 +76,6 @@ class Accounts {
                         CASE
                         WHEN direction = 'in' THEN amount
                         WHEN direction = 'out' THEN -amount
-                        WHEN direction = 'transfer' AND account_id = %d THEN -amount
-                        WHEN direction = 'transfer' AND contra_account_id = %d THEN amount
                         ELSE 0
                         END
                     ), 0)
