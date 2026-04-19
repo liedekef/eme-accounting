@@ -6,6 +6,69 @@
     var fyInfoDiv = document.getElementById('fiscal-year-info');
     var fyDisplay = document.getElementById('fy-display');
 
+    let JournalTable;
+
+    function handleJournalSave(form) {
+        const btn = form.querySelector('.submit-btn');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        ajax('eme_accounting_save_entry', formToObj(form),
+            (data) => {
+                flashButton(btn, emeAccounting.i18n.saving);
+                JournalTable.reload();
+                form.reset();
+            },
+            (errorMsg) => {  // Error callback met message
+                alert(errorMsg);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        );
+    }
+
+    function handleJournalSearch(form) {
+        JournalTable.reload();
+    }
+
+    function handleJournalDelete(btn) {
+        if (!confirm(emeAccounting.i18n.confirm_delete)) return;
+        ajax('eme_accounting_delete_entry', { id: btn.dataset.id }, () =>
+            fadeRemove(document.querySelector(`[data-journal-row="${btn.dataset.id}"]`))
+        );
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * SINGLE SUBMIT DISPATCHER
+     * ═══════════════════════════════════════════════════════════════════ */
+    const submitHandlers = {
+        'eme-acc-journal-form':        handleJournalSave,
+        'eme-acc-filter-form':         handleJournalSearch
+    };
+
+    document.addEventListener('submit', function (e) {
+        // If e.target is an input, e.target.form gives the parent form
+        const form = e.target.form || e.target.closest('form');
+        if (!form) return;
+        const formId = form.getAttribute('id');
+        const handler = submitHandlers[formId];
+        if (!handler) return;
+        e.preventDefault();
+        handler(e.target);
+    });
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * SINGLE CLICK DISPATCHER
+     * ═══════════════════════════════════════════════════════════════════ */
+    const clickHandlers = {
+        'eme-acc-delete-entry':   handleJournalDelete
+    };
+    document.addEventListener('click', function (e) {
+        for (const [cls, handler] of Object.entries(clickHandlers)) {
+            const btn = e.target.closest(`#${cls}, .${cls}`);
+            if (btn) { handler(btn, e); return; }
+        }
+    });
+
     /* ═══════════════════════════════════════════════════════════════════
      * JOURNAL FTABLE
      * ═══════════════════════════════════════════════════════════════════ */

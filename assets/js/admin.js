@@ -1,6 +1,9 @@
 /* eme-accounting/assets/js/admin.js */
 /* global emeAccounting, Sortable, FTable */
 
+/* ═══════════════════════════════════════════════════════════════════
+ * UTILITIES
+ * ═══════════════════════════════════════════════════════════════════ */
 function esc(str) {
     if (str == null) return '';
     return String(str)
@@ -14,57 +17,52 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
+function flashButton(btn, text) {
+    const orig = btn.textContent;
+    btn.textContent = text;
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 500);
+}
+
+function formToObj(form) {
+    const obj = {};
+    new FormData(form).forEach((v, k) => { obj[k] = v; });
+    return obj;
+}
+
+function fadeRemove(el) {
+    if (!el) return;
+    el.style.transition = 'opacity .3s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 320);
+}
+
+function toFormData(obj, fd = new FormData(), prefix = '') {
+    for (const key in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+        const val     = obj[key];
+        const formKey = prefix ? `${prefix}[${key}]` : key;
+        if (val !== null && typeof val === 'object' && !(val instanceof File)) {
+            toFormData(val, fd, formKey);
+        } else {
+            fd.append(formKey, val ?? '');
+        }
+    }
+    return fd;
+}
+
+function ajax(action, data, onSuccess, onError) {
+    const nonce = emeAccounting.nonce;
+    fetch(emeAccounting.ajaxUrl, { method: 'POST', body: toFormData({ action, nonce, ...data }) })
+        .then(r => r.json())
+        .then(r => r.success ? onSuccess?.(r.data) : (onError || alert)(r.data || 'Er is een fout opgetreden.'))
+        .catch(() => (onError || alert)('Verbindingsfout met server.'));
+}
+
 (function () {
     'use strict';
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
-
-    let JournalTable;
-
-    /* ═══════════════════════════════════════════════════════════════════
-     * UTILITIES
-     * ═══════════════════════════════════════════════════════════════════ */
-
-    function toFormData(obj, fd = new FormData(), prefix = '') {
-        for (const key in obj) {
-            if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
-            const val     = obj[key];
-            const formKey = prefix ? `${prefix}[${key}]` : key;
-            if (val !== null && typeof val === 'object' && !(val instanceof File)) {
-                toFormData(val, fd, formKey);
-            } else {
-                fd.append(formKey, val ?? '');
-            }
-        }
-        return fd;
-    }
-
-    function ajax(action, data, onSuccess, onError) {
-        fetch(ajaxUrl, { method: 'POST', body: toFormData({ action, nonce, ...data }) })
-            .then(r => r.json())
-            .then(r => r.success ? onSuccess?.(r.data) : (onError || alert)(r.data || 'Er is een fout opgetreden.'))
-            .catch(() => (onError || alert)('Verbindingsfout met server.'));
-    }
-
-    function flashButton(btn, text) {
-        const orig = btn.textContent;
-        btn.textContent = text;
-        btn.disabled = true;
-        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 500);
-    }
-
-    function formToObj(form) {
-        const obj = {};
-        new FormData(form).forEach((v, k) => { obj[k] = v; });
-        return obj;
-    }
-
-    function fadeRemove(el) {
-        if (!el) return;
-        el.style.transition = 'opacity .3s';
-        el.style.opacity = '0';
-        setTimeout(() => el.remove(), 320);
-    }
 
     /* ═══════════════════════════════════════════════════════════════════
      * SINGLE SUBMIT DISPATCHER
@@ -72,8 +70,6 @@ function formatCurrency(amount) {
     const submitHandlers = {
         'eme-acc-account-form':        handleAccountSave,
         'eme-acc-coa-form':            handleCoaSave,
-        'eme-acc-journal-form':        handleJournalSave,
-        'eme-acc-filter-form':         handleJournalSearch,
         'eme-acc-import-form':         handleImportUpload,
         'eme-acc-stock-form':          handleStockSave,
         'eme-acc-stock-movement-form': handleStockMovement,
@@ -102,7 +98,6 @@ function formatCurrency(amount) {
         'eme-acc-edit-coa':       handleCoaEdit,
         'eme-acc-delete-coa':     handleCoaDelete,
         'eme-acc-coa-cancel':     handleCoaCancel,
-        'eme-acc-delete-entry':   handleJournalDelete,
         'btn-auto-reconcile':     handleAutoReconcile,
         'btn-reconcile-manual':   handleManualReconcile,
         'btn-ignore-line':        handleIgnoreLine,
@@ -314,38 +309,6 @@ function formatCurrency(amount) {
             },
         });
     });
-
-    /* ═══════════════════════════════════════════════════════════════════
-     * JOURNAL PAGE
-     * ═══════════════════════════════════════════════════════════════════ */
-    function handleJournalSave(form) {
-        const btn = form.querySelector('.submit-btn');
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        ajax('eme_accounting_save_entry', formToObj(form),
-            (data) => {
-                flashButton(btn, i18n.saving);
-                JournalTable.reload();
-                form.reset();
-            },
-            (errorMsg) => {  // Error callback met message
-                alert(errorMsg);
-                btn.disabled = false;
-                btn.textContent = originalText;
-            }
-        );
-    }
-
-    function handleJournalSearch(form) {
-        JournalTable.reload();
-    }
-
-    function handleJournalDelete(btn) {
-        if (!confirm(i18n.confirm_delete)) return;
-        ajax('eme_accounting_delete_entry', { id: btn.dataset.id }, () =>
-            fadeRemove(document.querySelector(`[data-journal-row="${btn.dataset.id}"]`))
-        );
-    }
 
     /* ═══════════════════════════════════════════════════════════════════
      * IMPORT / RECONCILIATION PAGE
