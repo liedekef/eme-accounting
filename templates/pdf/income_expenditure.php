@@ -16,6 +16,7 @@ if (!empty($config->bus)) {
 $postal     = esc_html( trim( ( $config->postal_code ?? '' ) . ' ' . ( $config->city ?? '' ) ) );
 $website    = esc_html( $config->website  ?? '' );
 $email      = esc_html( $config->email ?? '' );
+$court      = esc_html( $config->court ?? '' );
 $currency   = $config->currency;
 ?>
 <style>
@@ -70,7 +71,8 @@ $currency   = $config->currency;
         Ondernemingsnr. <?= $vzw_number ?>
     </p>
     <p class="vzw-subtitle">
-        <?= $website ?> | <?= $email ?>
+        <?= $website ?> | <?= $email ?><br>
+        <?= $court ?>
     </p>
 
     <div class="doc-title">Boekjaar <?= $year ?> Staat van Ontvangsten en Uitgaven
