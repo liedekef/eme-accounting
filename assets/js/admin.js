@@ -738,7 +738,8 @@ function ajax(action, data, onSuccess, onError) {
         data: function(search, page) {
             return {
                 action: 'eme_accounting_events_list',
-                entry_date: document.getElementById('entry_date').value,
+                entry_date: document.getElementById('entry_date')?.value || 0,
+                search_all: document.getElementById('eventsearch_all')?.checked ? 1 : 0,
                 nonce: nonce
             };
         }

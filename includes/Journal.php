@@ -466,14 +466,19 @@ class Journal {
         // snapselect gives us paging, but currently we ignore it here and return everything we can
         $q         = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
         $year      = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
-        $dates     = FiscalYear::calculate_dates( $year );
-        $scope     = $dates['start_date'].'--'.$dates['end_date'];
+        $search_all= isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
+        $scope="future";
+        if ($search_all) {
+            $scope="all";
+        //} else {
+        //    $dates = FiscalYear::calculate_dates( $year );
+        //    $scope = $dates['start_date'].'--'.$dates['end_date'];
+        }
         $pagesize  = isset( $_REQUEST['pagesize'] ) ? intval( $_REQUEST['pagesize'] ) : 20;
         $mysql_pagesize = $pagesize+1;
         $start     = ( isset( $_REQUEST['page'] ) && intval( $_REQUEST['page'] ) > 0 ) ? ( intval( $_REQUEST['page'] ) - 1 ) * $pagesize : 0;
-
         $prepared_sql = $wpdb->prepare( "event_name LIKE %s", '%'.$wpdb->esc_like($q).'%' );
-        $events       = eme_get_events(limit: $pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
+        $events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
         // eme_search_events understands past/future/all scopes only
         //$events     = eme_search_events( $q, $scope, 1, 0, 0, "LIMIT $start,$mysql_pagesize" );
         $records     = [];
