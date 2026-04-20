@@ -362,4 +362,13 @@
     entryDateInput.addEventListener('change', checkFiscalYear);
     checkFiscalYear();
 
+    // when editing, we will clear the edit param from the url
+    const form = document.getElementById('eme-acc-journal-form');
+    if (form) {
+        // Remove only the 'edit' parameter from the URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('edit');
+        window.history.replaceState({}, document.title, url.toString());
+    }
+
 })();
