@@ -500,10 +500,10 @@ class Journal {
         $pagesize  = isset( $_REQUEST['pagesize'] ) ? intval( $_REQUEST['pagesize'] ) : 20;
         $mysql_pagesize = $pagesize+1;
         $start     = ( isset( $_REQUEST['page'] ) && intval( $_REQUEST['page'] ) > 0 ) ? ( intval( $_REQUEST['page'] ) - 1 ) * $pagesize : 0;
-        $prepared_sql = $wpdb->prepare( "event_name LIKE %s", '%'.$wpdb->esc_like($q).'%' );
-        $events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
+        //$prepared_sql = $wpdb->prepare( "event_name LIKE %s", '%'.$wpdb->esc_like($q).'%' );
+        //$events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
         // eme_search_events understands past/future/all scopes only
-        //$events     = eme_search_events( $q, $scope, 1, 0, 0, "LIMIT $start,$mysql_pagesize" );
+        $events     = eme_search_events( $q, $scope, 1, 0, 0, $start, $mysql_pagesize );
         $records     = [];
         foreach ( $events as $event ) {
             $records[] = [
