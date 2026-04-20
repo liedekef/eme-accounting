@@ -73,7 +73,7 @@ class Assets {
 
         if ( $plugin_page === 'emeaccounting-fiscal-years' ) {
             $current_year = (int) gmdate( 'Y' );
-            $dates = \FiscalYear::calculate_dates($current_year);
+            $dates = FiscalYear::calculate_dates($current_year);
             wp_enqueue_script( 'emeaccounting-fiscalyears', EME_ACCOUNTING_URL . 'assets/js/fiscalyears.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
             /*wp_localize_script( 'emeaccounting-fiscalyears', 'emeAccountingFy', [
                 'currentYear'       => $current_year,

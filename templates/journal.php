@@ -16,9 +16,28 @@ $years       = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
 $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 
 $form_disabled = "";
-if ($edit_entry && $edit_entry->transfer_id) {
-    $form_disabled = 'disabled="disabled"';
+$inactive_account      = null;
+$inactive_contra_account = null;
+if ( $edit_entry ) {
+    if ( $edit_entry->transfer_id ) {
+        $form_disabled = 'disabled="disabled"';
+    }
+    $account        = EMEAccounting\Accounts::get( $edit_entry->account_id );
+    $contra_account = $edit_entry->contra_account_id ? EMEAccounting\Accounts::get( $edit_entry->contra_account_id ) : null;
+    if ( $account && ! $account->is_active ) {
+        $form_disabled        = 'disabled="disabled"';
+        $inactive_account     = $account;
+    }
+    if ( $contra_account && ! $contra_account->is_active ) {
+        $form_disabled           = 'disabled="disabled"';
+        $inactive_contra_account = $contra_account;
+    }
 }
+
+$active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
+    $account = EMEAccounting\Accounts::get( $id );
+    return $account && $account->is_active;
+}, ARRAY_FILTER_USE_KEY );
 ?>
 <div class="wrap eme-acc-wrap">
     <h1><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></h1>
@@ -122,25 +141,35 @@ if ($edit_entry && $edit_entry->transfer_id) {
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
+                    <?php if ( $form_disabled && $inactive_account ): ?>
+                    <input type="hidden" name="account_id" value="<?= (int) $edit_entry->account_id ?>">
+                    <span style="color:#d63638"><?= __( 'Inactief: ', 'eme-accounting' ) . esc_html( $inactive_account->name ) . ( $inactive_account->iban ? ' (' . $inactive_account->iban . ')' : '' ) ?></span>
+                    <?php else: ?>
                     <select name="account_id" required>
                         <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
-                        <?php foreach ( $accounts as $id => $name ): ?>
+                        <?php foreach ( $active_accounts as $id => $name ): ?>
                         <option value="<?= (int) $id ?>" <?= selected( $edit_entry->account_id ?? 0, $id, false ) ?>>
                             <?= esc_html( $name ) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
+                    <?php endif; ?>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Tegenrekening', 'eme-accounting' ); ?></label>
+                    <?php if ( $form_disabled && $inactive_contra_account ): ?>
+                    <input type="hidden" name="contra_account_id" value="<?= (int) $edit_entry->contra_account_id ?>">
+                    <span style="color:#d63638"><?= __( 'Inactief: ', 'eme-accounting' ) . esc_html( $inactive_contra_account->name ) . ( $inactive_contra_account->iban ? ' (' . $inactive_contra_account->iban . ')' : '' ) ?></span>
+                    <?php else: ?>
                     <select name="contra_account_id" id="contra_account_id">
                         <option value=""><?php esc_html_e( '— (geen) —', 'eme-accounting' ); ?></option>
-                        <?php foreach ( $accounts as $id => $name ): ?>
+                        <?php foreach ( $active_accounts as $id => $name ): ?>
                         <option value="<?= (int) $id ?>" <?= selected( $edit_entry->contra_account_id ?? 0, $id, false ) ?>>
                             <?= esc_html( $name ) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
+                    <?php endif; ?>
                 </div>
             </div>
 
