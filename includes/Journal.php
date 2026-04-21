@@ -50,7 +50,7 @@ class Journal {
             'offset'         => 0,
             'coa_id'         => 0,
             'amount'         => 0,
-            'econtra_account_idme_event_id'   => null,
+            'eme_event_id'   => null,
         ];
 
         $args = wp_parse_args( $args, $defaults );
