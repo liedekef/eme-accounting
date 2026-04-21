@@ -516,9 +516,10 @@ class FiscalYear {
             wp_send_json_error( __( 'Geen datum opgegeven.', 'eme-accounting' ) );
         }
 
-        $fy = self::get_or_create_for_date( $date );
+        //$fy = self::get_or_create_for_date( $date );
+        $fy = self::get_for_date( $date );
         if ( ! $fy ) {
-            wp_send_json_error( __( 'Geen fiscaal jaar gevonden.', 'eme-accounting' ) );
+            wp_send_json_error( __( 'Geen boekjaar gevonden.', 'eme-accounting' ) );
         }
 
         wp_send_json_success( [

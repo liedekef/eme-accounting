@@ -233,9 +233,10 @@ class Journal {
 
         $entry_date = eme_sanitize_request( $data['entry_date'] ?? current_time( 'Y-m-d' ) );
 
-        $fy = FiscalYear::get_or_create_for_date( $entry_date );
+        //$fy = FiscalYear::get_or_create_for_date( $entry_date );
+        $fy = FiscalYear::get_for_date( $entry_date );
         if ( ! $fy ) {
-            return new \WP_Error( 'no_fiscal_year', __( 'Geen fiscaal jaar gevonden voor deze datum.', 'eme-accounting' ) );
+            return new \WP_Error( 'no_fiscal_year', __( 'Geen boekjaar gevonden voor deze datum.', 'eme-accounting' ) );
         }
 
         $fiscal_year = $fy->year;

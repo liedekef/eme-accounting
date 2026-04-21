@@ -350,7 +350,7 @@
                         fyDisplay.style.color = '#2271b1';
                     }
                 } else {
-                    fyDisplay.textContent = emeAccounting.i18n.noFyFound;
+                    fyDisplay.textContent = r.data || emeAccounting.i18n.noFyFound;
                     fyDisplay.style.color = '#d63638';
                 }
             })

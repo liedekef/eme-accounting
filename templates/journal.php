@@ -36,6 +36,11 @@ if ( $edit_entry ) {
     }
 }
 
+if (empty($accounts)) {
+    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst financiële rekeningen aan.', 'eme-accounting' ) . '</p></div>';
+    return;
+}
+
 $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
     $account = EMEAccounting\Accounts::get( $id );
     return $account && $account->is_active;
