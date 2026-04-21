@@ -15,6 +15,7 @@ $import_logs = $wpdb->get_results(
 );
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Import & Reconciliatie', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
@@ -158,4 +159,5 @@ $import_logs = $wpdb->get_results(
 </tbody>
 </table>
 <?php endif; ?>
+</fieldset>
 </div>

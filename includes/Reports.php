@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 class Reports {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_export_report', [ __CLASS__, 'ajax_export' ] );
@@ -228,7 +230,7 @@ class Reports {
 
     public static function ajax_export(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die();
+        Capabilities::require_view_ajax( 'reports' );
 
         $type   = eme_sanitize_request( $_GET['type'] ?? 'diary' );
         $year   = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );

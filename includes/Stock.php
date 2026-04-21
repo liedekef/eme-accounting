@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 class Stock {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_stock',     [ __CLASS__, 'ajax_save' ] );
@@ -70,14 +72,14 @@ class Stock {
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'stock' );
         $r = self::save( $_POST );
         is_wp_error( $r ) ? wp_send_json_error( $r->get_error_message() ) : wp_send_json_success( [ 'id' => $r ] );
     }
 
     public static function ajax_movement(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'stock' );
         $r = self::add_movement(
             (int) ( $_POST['stock_id'] ?? 0 ),
             eme_sanitize_request( $_POST['type'] ?? 'in' ),
@@ -90,7 +92,7 @@ class Stock {
 
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'stock' );
         global $wpdb;
         $id = (int) ( $_POST['id'] ?? 0 );
         if ( $id > 0 ) {

@@ -7,6 +7,7 @@ $currency  = $config->currency;
 
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Financiële Rekeningen', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
 <h2 id="eme-acc-account-form-title"><?php esc_html_e( 'Rekening toevoegen', 'eme-accounting' ); ?></h2>
@@ -67,4 +68,5 @@ $currency  = $config->currency;
 <?php endforeach; ?>
 </tbody>
 </table>
+</fieldset>
 </div>

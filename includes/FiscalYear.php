@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 class FiscalYear {
 
     public static function init(): void {
@@ -421,9 +423,7 @@ class FiscalYear {
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'fiscalyears' );
 
         $id         = (int) ( $_POST['id'] ?? 0 );
         $year       = (int) ( $_POST['year'] ?? 0 );
@@ -453,9 +453,7 @@ class FiscalYear {
 
     public static function ajax_close(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'fiscalyears' );
 
         $config = \EMEVzw\Config::get();
         $year = (int) ( $_POST['year'] ?? 0 );
@@ -479,9 +477,7 @@ class FiscalYear {
 
     public static function ajax_reopen(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'fiscalyears' );
 
         $year = (int) ( $_POST['year'] ?? 0 );
         if ( ! $year ) {
@@ -498,9 +494,7 @@ class FiscalYear {
 
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'fiscalyears' );
 
         $year = (int) ( $_POST['year'] ?? 0 );
         if ( ! $year ) {

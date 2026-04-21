@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 /**
  * Journal entries: create, read, update, delete + query helpers.
  *
@@ -390,9 +392,7 @@ class Journal {
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'journal' );
         $result = self::save( $_POST );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
@@ -402,9 +402,7 @@ class Journal {
 
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'journal' );
         $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
@@ -414,9 +412,7 @@ class Journal {
 
     public static function ajax_list(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_view_ajax( 'journal' );
 
         $formatter = new \NumberFormatter('nl_BE', \NumberFormatter::CURRENCY);
 
@@ -480,9 +476,7 @@ class Journal {
 
     public static function ajax_events_snapselect() {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_view_ajax( 'journal' );
 
         global $wpdb;
         header( 'Content-type: application/json; charset=utf-8' );

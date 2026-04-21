@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 class Budget {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_budget_line', [ __CLASS__, 'ajax_save' ] );
@@ -98,7 +100,7 @@ class Budget {
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'budget' );
 
         $fiscal_year = (int) ( $_POST['fiscal_year'] ?? gmdate( 'Y' ) );
 
@@ -139,7 +141,7 @@ class Budget {
      */
     public static function ajax_get_year(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_view_ajax( 'budget' );
 
         $year = (int) ( $_POST['year'] ?? gmdate( 'Y' ) );
         $actuals = [];

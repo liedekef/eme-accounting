@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 /**
  * Financial Accounts CRUD & helpers.
  */
@@ -152,9 +154,7 @@ class Accounts {
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'accounts' );
         $result = self::save( $_POST );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
@@ -164,9 +164,7 @@ class Accounts {
 
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'accounts' );
         $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );

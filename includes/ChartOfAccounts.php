@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 class ChartOfAccounts {
 
     public static function init(): void {
@@ -362,9 +364,7 @@ $accounts = [
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'coa' );
         $result = self::save( $_POST );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
@@ -374,9 +374,7 @@ $accounts = [
 
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'coa' );
         $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
@@ -386,9 +384,7 @@ $accounts = [
 
     public static function ajax_reorder(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'coa' );
         $items = json_decode( eme_sanitize_request($_POST['items'] ?? '[]'), true );
         self::reorder( $items );
         wp_send_json_success();
@@ -396,9 +392,7 @@ $accounts = [
 
     public static function ajax_next_seq(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'coa' );
         $parent_id = (int) ( $_POST['parent_id'] ?? 0 );
         if ( $parent_id <= 0 ) {
             wp_send_json_error( __( 'Ongeldige hoofdrekening.', 'eme-accounting' ) );

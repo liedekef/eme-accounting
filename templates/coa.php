@@ -5,6 +5,7 @@ $accounts     = EMEAccounting\ChartOfAccounts::get_tree();
 $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
@@ -117,4 +118,5 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
 </ul>
 </div>
 </div>
+</fieldset>
 </div>

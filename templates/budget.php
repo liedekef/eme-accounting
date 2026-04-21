@@ -20,6 +20,7 @@ foreach ( $fiscal_years as $f ) {
 }
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?= $year ?></h1>
 
 <?php if ( $is_closed ): ?>
@@ -126,4 +127,5 @@ foreach ( $fiscal_years as $f ) {
 <input type="hidden" name="fiscal_year" value="<?= $year ?>">
 <p><button type="submit" class="button button-primary submit-btn" <?= $is_closed ? 'disabled' : '' ?>><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
 </form>
+</fieldset>
 </div>

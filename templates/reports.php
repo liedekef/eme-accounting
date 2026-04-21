@@ -4,6 +4,7 @@ $year  = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset>
 <h1><?php esc_html_e( 'Financiële Rapporten', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
 <div class="eme-acc-row" style="align-items:flex-end">
@@ -37,4 +38,5 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
 </div>
 <div id="report-output" style="margin-top:20px"></div>
 
+</fieldset>
 </div>

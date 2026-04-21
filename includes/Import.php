@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 /**
  * Bank statement import (CSV / CODA) and reconciliation.
  *
@@ -36,7 +38,7 @@ class Import {
 
     public static function ajax_delete_log(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'import' );
         $id = (int) ( $_POST['id'] ?? 0 );
         if ( $id > 0 ) {
             self::delete_log( $id );
@@ -467,9 +469,7 @@ class Import {
 
     public static function ajax_upload(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'import' );
         $account_id = (int) ( $_POST['account_id'] ?? 0 );
         $format     = eme_sanitize_request( $_POST['format'] ?? 'auto' );
         $result     = self::process_upload( $account_id, $_FILES['import_file'], $format );
@@ -481,9 +481,7 @@ class Import {
 
     public static function ajax_reconcile_line(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
         $line_id    = (int) ( $_POST['line_id'] ?? 0 );
         $journal_id = (int) ( $_POST['journal_id'] ?? 0 );
@@ -500,9 +498,7 @@ class Import {
 
     public static function ajax_ignore_line(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
         $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
@@ -516,9 +512,7 @@ class Import {
 
     public static function ajax_auto_reconcile(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'import' );
         $log_id     = (int) ( $_POST['log_id'] ?? 0 );
         $account_id = (int) ( $_POST['account_id'] ?? 0 );
         $matched    = self::auto_match( $log_id, $account_id );
@@ -527,9 +521,7 @@ class Import {
 
     public static function ajax_create_from_line(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( __( 'Geen rechten.', 'eme-accounting' ) );
-        }
+        Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
 
         $line_id = (int) ( $_POST['line_id'] ?? 0 );

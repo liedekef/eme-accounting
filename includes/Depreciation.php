@@ -3,6 +3,8 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EMEAccounting\Capabilities;
+
 class Depreciation {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_asset',      [ __CLASS__, 'ajax_save' ] );
@@ -230,14 +232,14 @@ class Depreciation {
 
     public static function ajax_save(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'depreciation' );
         $r = self::save( $_POST );
         is_wp_error( $r ) ? wp_send_json_error( $r->get_error_message() ) : wp_send_json_success( [ 'id' => $r ] );
     }
 
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error();
+        Capabilities::require_manage_ajax( 'depreciation' );
         global $wpdb;
         $id = (int) ( $_POST['id'] ?? 0 );
         if ( $id > 0 ) {

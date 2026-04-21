@@ -8,6 +8,7 @@ $assets   = EMEAccounting\Depreciation::get_all();
 $accounts = EMEAccounting\Accounts::get_dropdown();
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Vaste Activa & Afschrijvingen', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
@@ -131,4 +132,5 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 <?php else: ?>
 <p><?php esc_html_e( 'Nog geen vaste activa geregistreerd.', 'eme-accounting' ); ?></p>
 <?php endif; ?>
+</fieldset>
 </div>

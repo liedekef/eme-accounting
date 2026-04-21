@@ -12,6 +12,7 @@ $recent     = EMEAccounting\Journal::get_entries( [ 'fiscal_year' => $year, 'lim
 $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
     <h1><?php esc_html_e( 'EME Boekhouding – Dashboard', 'eme-accounting' ); ?></h1>
 
     <div class="eme-acc-toolbar">
@@ -121,4 +122,5 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
             <?php esc_html_e( '→ Rapporten', 'eme-accounting' ); ?>
         </a>
     </p>
+</fieldset>
 </div>

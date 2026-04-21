@@ -15,8 +15,10 @@ $edit_entry  = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
 $years       = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
 $totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 
-$form_disabled = "";
-$inactive_account      = null;
+// $form_disabled may already be set by Menu.php (read-only access profile).
+// Journal can only further restrict it (e.g. closed fiscal year, transfer entry, inactive account).
+$form_disabled           = $form_disabled ?? '';
+$inactive_account        = null;
 $inactive_contra_account = null;
 if ( $edit_entry ) {
     if ( $edit_entry->transfer_id ) {

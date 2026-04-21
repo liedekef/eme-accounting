@@ -15,6 +15,7 @@ if ( empty( $fiscal_years ) ) {
 
 ?>
 <div class="wrap eme-acc-wrap">
+<fieldset <?= $form_disabled ?>>
     <h1><?php esc_html_e( 'Boekjaren', 'eme-accounting' ); ?></h1>
 
     <?php if ( empty( $config->fiscal_year_start_mm) || empty( $config->fiscal_year_end_mm ) ): ?>
@@ -129,4 +130,5 @@ if ( empty( $fiscal_years ) ) {
         </table>
         <?php endif; ?>
     </div>
+</fieldset>
 </div>
