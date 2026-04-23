@@ -5,6 +5,7 @@
     var entryDateInput = document.getElementById('entry_date');
     var fyInfoDiv = document.getElementById('fiscal-year-info');
     var fyDisplay = document.getElementById('fy-display');
+    const directionSelect = document.getElementById('direction');
 
     let JournalTable;
 
@@ -17,6 +18,7 @@
                 flashButton(btn, emeAccounting.i18n.saving);
                 JournalTable.reload();
                 form.reset();
+                handleDirectionChange();
             },
             (errorMsg) => {  // Error callback met message
                 alert(errorMsg);
@@ -194,8 +196,7 @@
     }
 
     function initJournalLinking() {
-        const directionSelect = document.querySelector('#direction');
-        const coaSelect       = document.querySelector('#category_coa_id');
+        const coaSelect       = document.getElementById('category_coa_id');
         const contraAccount   = document.getElementById('contra_account_id');
         const originalValue   = coaSelect.value;
 

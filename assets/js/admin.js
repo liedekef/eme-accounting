@@ -611,9 +611,9 @@ function ajax(action, data, onSuccess, onError) {
 
     function renderReport(type, data, container) {
         if (type === 'income_expenditure') renderIncomeExpenditure(data, container);
-        else if (type === 'patrimony')      renderPatrimony(data, container);
-        else if (type === 'events')           renderEventsReport(data, container);
-        else                                renderDiary(data, container);
+        else if (type === 'patrimony')     renderPatrimony(data, container);
+        else if (type === 'events')        renderEventsReport(data, container);
+        else                               renderDiary(data, container);
     }
 
     function renderIncomeExpenditure(data, container) {
@@ -773,22 +773,18 @@ function ajax(action, data, onSuccess, onError) {
     if (patrimonyForm) {
         patrimonyForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const $btn = this.querySelector('.submit-btn');
-            $btn.disabled = true;
-            $btn.textContent = i18n.saving;
+            const btn = this.querySelector('.submit-btn');
+            btn.disabled = true;
+            btn.textContent = i18n.saving;
             const formData = new FormData(this);
             const data = {};
             formData.forEach((value, key) => { data[key] = value; });
             ajax('eme_accounting_save_patrimony', data, function() {
-                $btn.textContent = i18n.saved;
-                $btn.disabled = false;
-                setTimeout(() => {
-                    $btn.textContent = i18n.save;
-                    $btn.disabled = false;
-                }, 1800);
+                flashButton(btn, i18n.saved);
+                location.reload();
             }, function(msg) {
-                $btn.textContent = i18n.save;
-                $btn.disabled = false;
+                btn.textContent = i18n.save;
+                btn.disabled = false;
                 alert(msg);
             });
         });

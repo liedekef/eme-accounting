@@ -18,6 +18,22 @@ $website    = esc_html( $config->website  ?? '' );
 $email      = esc_html( $config->email ?? '' );
 $court      = esc_html( $config->court ?? '' );
 $currency   = $config->currency;
+
+// Vertegenwoordigers: zoek op function_title (voorzitter + secretaris)
+$active_board       = EMEVzw\Config::get_active_board_members();
+$vertegenwoordigers = [];
+foreach ( $active_board as $m ) {
+    $func_lower = strtolower( $m->function_title ?? '' );
+    if ( preg_match( '/(voorzitter|president|chair)/i', $func_lower ) ) {
+        $vertegenwoordigers[] = $m;
+    } elseif ( preg_match( '/(secretaris|secretary)/i', $func_lower ) ) {
+        $vertegenwoordigers[] = $m;
+    }
+}
+
+// Uniek array (vermijd dubbelingen als iemand beide functies heeft)
+$vertegenwoordigers = array_unique( $vertegenwoordigers, SORT_REGULAR );
+
 ?>
 <style>
   * { box-sizing: border-box; }
@@ -58,8 +74,14 @@ $currency   = $config->currency;
              margin-top: 8pt; font-size: 10pt; font-weight: bold; }
   .net-box.negative { background: #fff0f0; border-color: #d63638; color: #d63638; }
 
-  .footer { margin-top: 16pt; font-size: 8pt; color: #666;
-            border-top: 1px solid #ccc; padding-top: 6pt; text-align: center; }
+  .signature-block { margin-top: 20pt; }
+  .signature-table { width: 100%; border-collapse: collapse; }
+  .signature-table td { vertical-align: bottom; padding: 0 12pt 0 0; width: 50%; }
+  .signature-table td:last-child { padding-right: 0; }
+  .sig-label { font-size: 8.5pt; color: #555; margin-bottom: 3pt; }
+  .sig-line { border-bottom: 1px solid #000; height: 30pt; margin-bottom: 3pt; }
+  .sig-identity { font-size: 8pt; color: #666; font-style: italic; }
+
 </style>
 
 <div class="page">
@@ -142,3 +164,38 @@ $currency   = $config->currency;
             </tr>
         </tbody>
     </table>
+
+    <!-- HANDTEKENINGEN -->
+    <div class="signature-block">
+        <table class="signature-table">
+            <?php if ( ! empty( $vertegenwoordigers ) ): ?>
+                <?php foreach ( array_chunk( $vertegenwoordigers, 2 ) as $vertegenwoordigers_per2 ): ?>
+                <tr>
+                    <?php foreach ( $vertegenwoordigers_per2 as $v ): ?>
+                    <td>
+                        <div class="sig-identity">
+                            <?= esc_html( $v->first_name . ' ' . $v->last_name ) ?><br>
+                            <em><?= esc_html( EMEVzw\Config::legal_capacity_label( $v->legal_capacity ?? 'bestuurder' ) ) ?><?= ! empty( $v->function_title ) ? ' · ' . esc_html( EMEVzw\Config::function_title_label( $v->function_title ) ) : '' ?></em>
+                        </div>
+                        <div class="sig-label">Handtekening</div>
+                        <div class="sig-line"></div>
+                    </td>
+                    <?php endforeach; ?>
+                    <?php if ( count( $vertegenwoordigers_per2 ) === 1 ): ?>
+                    <td></td>
+                    <?php endif; ?>
+                </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr>
+                    <td>
+                        <div class="sig-label">Handtekening (identiteit/hoedanigheid vertegenwoordiger)</div>
+                        <div class="sig-line"></div>
+                    </td>
+                    <td></td>
+                </tr>
+            <?php endif; ?>
+        </table>
+    </div>
+
+</div>
