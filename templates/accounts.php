@@ -7,11 +7,11 @@ $currency  = $config->currency;
 
 ?>
 <div class="wrap eme-acc-wrap">
+<form id="eme-acc-account-form">
 <fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Financiële Rekeningen', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
 <h2 id="eme-acc-account-form-title"><?php esc_html_e( 'Rekening toevoegen', 'eme-accounting' ); ?></h2>
-<form id="eme-acc-account-form">
 <input type="hidden" name="id" value="0">
 <input type="hidden" name="type" value="asset">
 <div class="eme-acc-row">
@@ -24,15 +24,18 @@ $currency  = $config->currency;
 <div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'IBAN', 'eme-accounting' ); ?></label><input type="text" name="iban" maxlength="34" placeholder="BE68 5390 0754 7034"></div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'BIC', 'eme-accounting' ); ?></label><input type="text" name="bic" maxlength="11"></div>
-    <div class="eme-acc-field"><label><?php esc_html_e( 'Beginsaldo (€)', 'eme-accounting' ); ?></label><input type="number" name="opening_balance" step="0.01" value="0.00"></div>
+    <div class="eme-acc-field"><label><?php esc_html_e( 'Begindatum', 'eme-accounting' ); ?></label><input type="date" name="opening_date"></div>
 </div>
 <div class="eme-acc-row">
+    <div class="eme-acc-field"><label><?php esc_html_e( 'Beginsaldo (€)', 'eme-accounting' ); ?></label><input type="number" name="opening_balance" step="0.01" value="0.00"></div>
+</div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?></label><textarea name="description"></textarea></div>
 </div>
 <p>
     <button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button>
     <button type="button" id="eme-acc-account-cancel" class="button" style="display:none"><?php esc_html_e( 'Annuleren', 'eme-accounting' ); ?></button>
 </p>
+</fieldset>
 </form>
 </div>
 
@@ -40,6 +43,8 @@ $currency  = $config->currency;
 <thead><tr>
     <th><?php esc_html_e( 'Naam', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'IBAN', 'eme-accounting' ); ?></th>
+    <th class="amount"><?php esc_html_e( 'Beginsaldo', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Begindatum', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Huidig saldo', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Acties', 'eme-accounting' ); ?></th>
 </tr></thead>
@@ -50,6 +55,8 @@ $currency  = $config->currency;
 <tr data-account-row="<?= (int) $a->id ?>">
     <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
     <td><?= esc_html( $a->iban ) ?></td>
+    <td class="amount <?= $a->opening_balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $a->opening_balance, $currency) ?></td>
+    <td><?= esc_html( $a->opening_date ?? '' ) ?></td>
     <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $balance, $currency) ?></td>
     <td>
         <button class="button button-small eme-acc-edit-account"
@@ -58,6 +65,7 @@ $currency  = $config->currency;
                 data-iban="<?= esc_attr( $a->iban ) ?>"
                 data-bic="<?= esc_attr( $a->bic ) ?>"
                 data-opening-balance="<?= esc_attr( $a->opening_balance ) ?>"
+                data-opening-date="<?= esc_attr( $a->opening_date ?? '' ) ?>"
                 data-sort-order="<?= (int) $a->sort_order ?>"
                 data-is-active="<?= (int) $a->is_active ?>"
                 data-description="<?= esc_attr( $a->description ?? '' ) ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
@@ -68,5 +76,4 @@ $currency  = $config->currency;
 <?php endforeach; ?>
 </tbody>
 </table>
-</fieldset>
 </div>

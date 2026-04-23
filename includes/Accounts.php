@@ -91,6 +91,14 @@ class Accounts {
         return (float) $account->opening_balance + (float) $sum;
     }
 
+    public static function can_book_on_date( int $account_id, string $entry_date ): bool {
+        $account = self::get( $account_id );
+        if ( ! $account || empty( $account->opening_date ) ) {
+            return true;
+        }
+        return $entry_date >= $account->opening_date;
+    }
+
     /* ------------------------------------------------------------------
      * WRITE
      * ------------------------------------------------------------------ */
@@ -110,6 +118,7 @@ class Accounts {
             'iban'            => strtoupper( preg_replace( '/\s+/', '', $data['iban'] ?? '' ) ),
             'bic'             => strtoupper( eme_sanitize_request( $data['bic'] ?? '' ) ),
             'opening_balance' => (float) ( $data['opening_balance'] ?? 0 ),
+            'opening_date'   => ! empty( $data['opening_date'] ) ? eme_sanitize_request( $data['opening_date'] ) : null,
             'is_active'       => (int) (bool) ( $data['is_active'] ?? 1 ),
             'sort_order'      => (int) ( $data['sort_order'] ?? 0 ),
             'description'     => eme_sanitize_request( $data['description'] ?? '' ),

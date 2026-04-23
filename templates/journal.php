@@ -13,7 +13,6 @@ $accounts    = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $edit_entry  = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
 $years       = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
-$totals      = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 
 // $form_disabled may already be set by Menu.php (read-only access profile).
 // Journal can only further restrict it (e.g. closed fiscal year, transfer entry, inactive account).
@@ -292,15 +291,6 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just future ones.', 'events-made-easy' ); ?></span>
             <button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
 
-            <div class="spacer"></div>
-            <strong id="eme-acc-totals">
-                <?php printf(
-                    esc_html__( 'Ontvangen: %s  |  Uitgaven: %s  |  Resultaat: %s', 'eme-accounting' ),
-                    $formatter->formatCurrency( $totals['income'], $currency),
-                    $formatter->formatCurrency( $totals['expenses'], $currency ),
-                    $formatter->formatCurrency( $totals['net'], $currency )
-                ); ?>
-            </strong>
         </form>
     </div>
 

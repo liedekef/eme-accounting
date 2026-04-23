@@ -55,7 +55,7 @@ $years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
                 <?= $formatter->formatCurrency( $totals['net'], $currency ); ?>
             </div>
         </div>
-        <?php foreach ( array_slice( $accounts, 0, 3 ) as $acc ): ?>
+        <?php foreach ( $accounts as $acc ): ?>
         <div class="eme-acc-card">
             <h3><?= esc_html( $acc->name ); ?></h3>
             <?php $bal = EMEAccounting\Accounts::get_balance( (int) $acc->id ); ?>

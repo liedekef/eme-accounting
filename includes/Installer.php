@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '15';
+    const DB_VERSION        = '16';
 
     public static function activate(): void {
         self::create_tables();
@@ -52,6 +52,9 @@ class Installer {
         }
         if ( (int) $current_version < 15 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_depreciation ADD COLUMN asset_type VARCHAR(150) NOT NULL DEFAULT 'machines'" );
+        }
+        if ( (int) $current_version < 16 ) {
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_accounts ADD COLUMN opening_date DATE DEFAULT NULL" );
         }
     }
 
@@ -92,6 +95,7 @@ class Installer {
             iban            VARCHAR(34)     NOT NULL DEFAULT '',
             bic             VARCHAR(11)     NOT NULL DEFAULT '',
             opening_balance DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            opening_date    DATE            DEFAULT NULL,
             is_active       TINYINT(1)      NOT NULL DEFAULT 1,
             sort_order      SMALLINT        NOT NULL DEFAULT 0,
             description     TEXT,

@@ -178,6 +178,7 @@ function ajax(action, data, onSuccess, onError) {
         form.querySelector('[name="iban"]').value            = d.iban;
         form.querySelector('[name="bic"]').value             = d.bic;
         form.querySelector('[name="opening_balance"]').value = d.openingBalance;
+        form.querySelector('[name="opening_date"]').value    = d.openingDate || '';
         form.querySelector('[name="sort_order"]').value      = d.sortOrder;
         form.querySelector('[name="is_active"]').value       = d.isActive;
         form.querySelector('[name="description"]').value     = d.description;
@@ -197,6 +198,7 @@ function ajax(action, data, onSuccess, onError) {
         const form = document.getElementById('eme-acc-account-form');
         form.reset();
         form.querySelector('[name="id"]').value = '0';
+        form.querySelector('[name="opening_date"]').value = '';
         document.getElementById('eme-acc-account-form-title').textContent = 'Rekening toevoegen';
         document.getElementById('eme-acc-account-cancel').style.display = 'none';
     }

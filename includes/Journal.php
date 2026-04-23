@@ -252,6 +252,20 @@ class Journal {
             );
         }
 
+        $account = Accounts::get( (int) $data['account_id'] );
+        if ( empty( $account ) ) {
+            return new \WP_Error( 'invalid_account', __( 'Ongeldige rekening geselecteerd.', 'eme-accounting' ) );
+        }
+        if ( ! Accounts::can_book_on_date( (int) $data['account_id'], $entry_date ) ) {
+            return new \WP_Error(
+                'before_opening_date',
+                sprintf(
+                    __( 'Boeking valt voor de begindatum van rekening "%s".', 'eme-accounting' ),
+                    $account->name
+                )
+            );
+        }
+
         $allowed_directions = [ 'in', 'out', 'transfer' ];
         $direction          = in_array( $data['direction'] ?? 'out', $allowed_directions, true )
             ? $data['direction']
@@ -297,8 +311,19 @@ class Journal {
             if ( empty( $data['contra_account_id'] ) ) {
                 return new \WP_Error( 'missing_contra_account', __( 'Transfer vereist tegenrekening.', 'eme-accounting' ) );
             }
-            $account = Accounts::get( (int) $data['account_id'] );
             $contra_account = Accounts::get( (int) $data['contra_account_id'] );
+            if ( empty( $contra_account ) ) {
+                return new \WP_Error( 'invalid_account', __( 'Ongeldige rekening geselecteerd.', 'eme-accounting' ) );
+            }
+            if ( ! Accounts::can_book_on_date( (int) $data['contra_account_id'], $entry_date ) ) {
+                return new \WP_Error(
+                    'before_opening_date',
+                    sprintf(
+                        __( 'Boeking valt voor de begindatum van rekening "%s".', 'eme-accounting' ),
+                        $contra_account->name
+                    )
+                );
+            }
             // Create dual booking: out from account_id, in to contra_account_id
             // Insert out-leg first (without transfer_id), then link both legs.
             $wpdb->query( 'START TRANSACTION' );
