@@ -568,7 +568,7 @@ class Journal {
             if ($args['direction'] == 'transfer') {
                 $where[]   = "{$p}transfer_id IS NOT NULL";
             } else {
-                $where[]   = "{$p}direction = %s AND transfer_id IS NULL";
+                $where[]   = "{$p}direction = %s AND {$p}transfer_id IS NULL";
                 $prepare[] = $args['direction'];
             }
         }
@@ -602,7 +602,7 @@ class Journal {
         [ $where_sql, $prepare ] = self::build_filter_where( $args );
 
         if ( empty( $prepare ) ) {
-            return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+            return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} $where_sql" );
         }
 
         return (int) $wpdb->get_var(
