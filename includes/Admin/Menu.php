@@ -37,6 +37,7 @@ class Menu {
             [ 'emeaccounting-stock',        __( 'Stock', 'eme-accounting' ),                  'stock',        [ __CLASS__, 'page_stock' ] ],
             [ 'emeaccounting-depreciation', __( 'Afschrijvingen', 'eme-accounting' ),         'depreciation', [ __CLASS__, 'page_depreciation' ] ],
             [ 'emeaccounting-budget',       __( 'Begroting', 'eme-accounting' ),              'budget',       [ __CLASS__, 'page_budget' ] ],
+            [ 'emeaccounting-patrimony',    __( 'Staat van het Vermogen', 'eme-accounting' ), 'patrimony',    [ __CLASS__, 'page_patrimony' ] ],
             [ 'emeaccounting-reports',      __( 'Rapporten', 'eme-accounting' ),              'reports',      [ __CLASS__, 'page_reports' ] ],
             [ 'emeaccounting-fiscal-years', __( 'Boekjaren', 'eme-accounting' ),              'fiscalyears',  [ __CLASS__, 'page_fiscal_years' ] ],
             [ 'emeaccounting-coa',          __( 'Rekeningstelsel', 'eme-accounting' ),        'coa',          [ __CLASS__, 'page_coa' ] ],
@@ -79,6 +80,7 @@ class Menu {
     public static function page_import():       void { self::load_template( 'import',       'import' ); }
     public static function page_stock():        void { self::load_template( 'stock',        'stock' ); }
     public static function page_depreciation(): void { self::load_template( 'depreciation', 'depreciation' ); }
+    public static function page_patrimony():    void { self::load_template( 'patrimony',    'patrimony' ); }
     public static function page_budget():       void { self::load_template( 'budget',       'budget' ); }
     public static function page_reports():      void { self::load_template( 'reports',      'reports' ); }
     public static function page_fiscal_years(): void { self::load_template( 'fiscalyears',  'fiscalyears' ); }

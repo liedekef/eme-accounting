@@ -100,10 +100,6 @@ class Depreciation {
 
     public static function save( array $data ): int|\WP_Error {
         global $wpdb;
-        $allowed_methods = [ 'linear', 'declining' ];
-        if ( ! in_array( $data['method'] ?? 'linear', $allowed_methods, true ) ) {
-            return new \WP_Error( 'invalid_method', __( 'Onbekende afschrijvingsmethode.', 'eme-accounting' ) );
-        }
 
         // Check: both account_id and depreciation_account_id must be filled together
         $has_account_id              = ! empty( $data['account_id'] );
@@ -153,7 +149,7 @@ class Depreciation {
         $last_depreciation = null;
         if ( $years_elapsed >= 1 ) {
             $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' );
-            $last_depreciation = sprintf( '%d-01-02', $purchase_year + 1 );
+            $last_depreciation = sprintf( '%d-01-02', $purchase_year + $years_elapsed );
         }
 
         $row = [
@@ -164,6 +160,7 @@ class Depreciation {
             'residual_value'          => $residual,
             'useful_life_years'       => $useful_life,
             'method'                  => $method,
+            'asset_type'              => $data['asset_type'] ?? 'machines',
             'account_id'              => ! empty( $data['account_id'] ) ? (int) $data['account_id'] : null,
             'depreciation_account_id' => ! empty( $data['depreciation_account_id'] ) ? (int) $data['depreciation_account_id'] : null,
             'current_book_value'      => $current_book_value,
@@ -228,6 +225,82 @@ class Depreciation {
         }
         // Linear
         return round( $depreciable / $asset->useful_life_years, 2 );
+    }
+
+    /**
+     * Get total current book value by asset type as of a specific date.
+     *
+     * @param string $asset_type Asset type (onroerende_goederen, machines, roerende_goederen)
+     * @param string|null $up_to_date Date string (Y-m-d), defaults to current date
+     * @return float
+     */
+    public static function get_total_by_type( string $asset_type, ?string $up_to_date = null ): float {
+        global $wpdb;
+
+        if ( ! $up_to_date ) {
+            $up_to_date = current_time( 'Y-m-d' );
+        }
+
+        $assets = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_depreciation`
+                 WHERE is_active = 1 AND asset_type = %s",
+                $asset_type
+            )
+        );
+
+        $total = 0;
+        foreach ( $assets as $asset ) {
+            $total += self::get_book_value_at_date( $asset, $up_to_date );
+        }
+
+        return round( $total, 2 );
+    }
+
+    /**
+     * Calculate book value of a single asset at a specific date.
+     *
+     * @param object $asset Asset row from emeacc_depreciation
+     * @param string $at_date Date string (Y-m-d)
+     * @return float
+     */
+    public static function get_book_value_at_date( object $asset, string $at_date ): float {
+        if ( empty( $asset->purchase_date ) ) {
+            return (float) $asset->current_book_value;
+        }
+
+        $purchase_ts = strtotime( $asset->purchase_date );
+        $at_ts     = strtotime( $at_date );
+
+        if ( $at_ts <= $purchase_ts ) {
+            return (float) $asset->purchase_price;
+        }
+
+        $years_elapsed = floor( ( $at_ts - $purchase_ts ) / ( 365.25 * 24 * 3600 ) );
+
+        if ( $years_elapsed <= 0 ) {
+            return (float) $asset->purchase_price;
+        }
+
+        $temp_asset = (object) [
+            'purchase_price'    => $asset->purchase_price,
+            'residual_value'  => $asset->residual_value,
+            'useful_life_years' => $asset->useful_life_years,
+            'method'            => $asset->method,
+            'current_book_value' => $asset->purchase_price,
+        ];
+
+        $total_depreciation = 0;
+        for ( $i = 0; $i < $years_elapsed; $i++ ) {
+            $annual = self::calculate_annual_amount( $temp_asset );
+            $total_depreciation += $annual;
+            $temp_asset->current_book_value = max(
+                $asset->residual_value,
+                $temp_asset->current_book_value - $annual
+            );
+        }
+
+        return max( $asset->residual_value, round( $asset->purchase_price - $total_depreciation, 2 ) );
     }
 
     public static function ajax_save(): void {

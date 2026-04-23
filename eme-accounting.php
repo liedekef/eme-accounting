@@ -62,6 +62,7 @@ function eme_accounting_init(): void {
     EMEAccounting\Stock::init();
     EMEAccounting\Depreciation::init();
     EMEAccounting\Budget::init();
+    EMEAccounting\Patrimony::init();
     EMEAccounting\Reports::init();
     EMEAccounting\Assets::init();
     EMEAccounting\EMEBridge::init();

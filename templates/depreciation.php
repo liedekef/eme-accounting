@@ -31,6 +31,14 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 </div>
 <div class="eme-acc-row">
     <div class="eme-acc-field">
+        <label><?php esc_html_e( 'Type afschrijving', 'eme-accounting' ); ?></label>
+        <select name="asset_type" id="asset_type">
+            <option value="machines"><?php esc_html_e( 'Machines', 'eme-accounting' ); ?></option>
+            <option value="onroerende_goederen"><?php esc_html_e( 'Onroerende goederen', 'eme-accounting' ); ?></option>
+            <option value="roerende_goederen"><?php esc_html_e( 'Roerende goederen & rollend materieel', 'eme-accounting' ); ?></option>
+        </select>
+    </div>
+    <div class="eme-acc-field">
         <label><?php esc_html_e( 'Restwaarde na volledige afschrijving (€)', 'eme-accounting' ); ?></label>
         <input type="number" name="residual_value" id="residual_value" step="0.01" min="0" value="0">
     </div>
@@ -83,13 +91,14 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 <table class="eme-acc-table">
 <thead><tr>
     <th><?php esc_html_e( 'Naam', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Type', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Aankoopdatum', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Aankoopprijs', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Boekwaarde', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Methode', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Duur', 'eme-accounting' ); ?></th>
     <th class="amount"><?php esc_html_e( 'Jaarl. afschr.', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Volgende auto', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Laatste afschrijving', 'eme-accounting' ); ?></th>
 </tr></thead>
 <tbody>
 <?php foreach ( $assets as $asset ):
@@ -105,10 +114,11 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
         <br><span style="font-size:11px;color:#646970"><?= esc_html( mb_substr( $asset->description, 0, 60 ) ) ?></span>
         <?php endif; ?>
         <div class="row-actions">
-            <a href="#" class="eme-acc-edit-asset" data-id="<?= (int) $asset->id ?>" data-name="<?= esc_attr( $asset->name ) ?>" data-purchase-date="<?= esc_attr( $asset->purchase_date ) ?>" data-purchase-price="<?= (float) $asset->purchase_price ?>" data-residual-value="<?= (float) $asset->residual_value ?>" data-current-book-value="<?= (float) $asset->current_book_value ?>" data-useful-life-years="<?= (int) $asset->useful_life_years ?>" data-method="<?= esc_attr( $asset->method ) ?>" data-account-id="<?= (int) $asset->account_id ?>" data-depreciation-account-id="<?= (int) $asset->depreciation_account_id ?>" data-description="<?= esc_attr( $asset->description ) ?>"><?php esc_html_e( 'Bewerken', 'eme-accounting' ); ?></a> |
+            <a href="#" class="eme-acc-edit-asset" data-id="<?= (int) $asset->id ?>" data-name="<?= esc_attr( $asset->name ) ?>" data-purchase-date="<?= esc_attr( $asset->purchase_date ) ?>" data-purchase-price="<?= (float) $asset->purchase_price ?>" data-residual-value="<?= (float) $asset->residual_value ?>" data-current-book-value="<?= (float) $asset->current_book_value ?>" data-useful-life-years="<?= (int) $asset->useful_life_years ?>" data-method="<?= esc_attr( $asset->method ) ?>" data-asset-type="<?= esc_attr( $asset->asset_type ) ?>" data-account-id="<?= (int) $asset->account_id ?>" data-depreciation-account-id="<?= (int) $asset->depreciation_account_id ?>" data-description="<?= esc_attr( $asset->description ) ?>"><?php esc_html_e( 'Bewerken', 'eme-accounting' ); ?></a> |
             <a href="#" class="eme-acc-delete-asset" data-id="<?= (int) $asset->id ?>"><?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?></a>
         </div>
     </td>
+    <td><span class="eme-acc-tag"><?= isset( $asset->asset_type ) ? esc_html__( ucfirst( str_replace( '_', ' ', $asset->asset_type ) ), 'eme-accounting' ) : '—' ?></span></td>
     <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $asset->purchase_date ) ) ) ?></td>
     <td class="amount"><?= $formatter->formatCurrency( $asset->purchase_price, $currency ) ?></td>
     <td class="amount">

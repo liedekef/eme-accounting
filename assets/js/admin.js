@@ -64,6 +64,9 @@ function ajax(action, data, onSuccess, onError) {
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
 
+    function parseBE(val) {
+        return parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0;
+    }
     /* ═══════════════════════════════════════════════════════════════════
      * SINGLE SUBMIT DISPATCHER
      * ═══════════════════════════════════════════════════════════════════ */
@@ -113,6 +116,8 @@ function ajax(action, data, onSuccess, onError) {
         // Depreciation / Assets
         'eme-acc-edit-asset':   handleAssetEdit,
         'eme-acc-delete-asset': handleAssetDelete,
+        // Patrimony
+        'eme-acc-delete-patrimony': handleDeletePatrimony,
     };
 
     document.addEventListener('click', function (e) {
@@ -472,6 +477,7 @@ function ajax(action, data, onSuccess, onError) {
         form.querySelector('#current_book_value').value = d.currentBookValue;
         form.querySelector('[name="useful_life_years"]').value = d.usefulLifeYears;
         form.querySelector('[name="method"]').value           = d.method;
+        form.querySelector('[name="asset_type"]').value        = d.assetType || 'machines';
         form.querySelector('[name="account_id"]').value     = d.accountId;
         form.querySelector('[name="depreciation_account_id"]').value = d.depreciationAccountId;
         form.querySelector('[name="description"]').value = d.description || '';
@@ -485,6 +491,15 @@ function ajax(action, data, onSuccess, onError) {
             fadeRemove(document.querySelector(`[data-asset-row="${btn.dataset.id}"]`))
         );
     }
+
+    // Delete patrimony
+    function handleDeletePatrimony(btn) {
+        if (!confirm(i18n.confirm_delete_patrimony)) return;
+        ajax('eme_accounting_delete_patrimony', { id: btn.dataset.id, nonce: nonce }, function() {
+            setTimeout(() => location.reload(), 350);
+        });
+    }
+
 
     /* ═══════════════════════════════════════════════════════════════════
      * BUDGET PAGE
@@ -750,6 +765,66 @@ function ajax(action, data, onSuccess, onError) {
                           : (output.innerHTML = `<p class="error">${esc(r.data)}</p>`);
             });
     };
+
+    /* ════════════════════════════════════════════════════════════════
+     * PATRIMONY
+     * ════════════════════════════════════════════════════════════════ */
+    const patrimonyForm = document.getElementById('eme-acc-patrimony-form');
+    if (patrimonyForm) {
+        patrimonyForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const $btn = this.querySelector('.submit-btn');
+            $btn.disabled = true;
+            $btn.textContent = i18n.saving;
+            const formData = new FormData(this);
+            const data = {};
+            formData.forEach((value, key) => { data[key] = value; });
+            ajax('eme_accounting_save_patrimony', data, function() {
+                $btn.textContent = i18n.saved;
+                $btn.disabled = false;
+                setTimeout(() => {
+                    $btn.textContent = i18n.save;
+                    $btn.disabled = false;
+                }, 1800);
+            }, function(msg) {
+                $btn.textContent = i18n.save;
+                $btn.disabled = false;
+                alert(msg);
+            });
+        });
+    }
+
+    function recalcPatrimony() {
+        let assets = 0, liab = 0, rights = 0, oblig = 0;
+        document.querySelectorAll('.eme-acc-amount').forEach(function(el) {
+            const v = parseBE(el.value); // needed to get the real international number
+            const s = el.dataset.section;
+            if (s === 'assets') assets += v;
+            if (s === 'liab')   liab   += v;
+            if (s === 'rights') rights += v;
+            if (s === 'oblig')  oblig  += v;
+        });
+        document.getElementById('total-assets').textContent = formatCurrency(assets);
+        document.getElementById('total-liab').textContent   = formatCurrency(liab);
+        document.getElementById('total-rights').textContent = formatCurrency(rights);
+        document.getElementById('total-oblig').textContent  = formatCurrency(oblig);
+        const net = assets - liab;
+        const netEl = document.getElementById('total-net');
+        netEl.textContent = formatCurrency(net);
+        netEl.style.color = net < 0 ? '#d63638' : '#00a32a';
+    }
+
+    const PatrimonyYearSelect = document.getElementById('eme-acc-patrimony-year');
+    if (PatrimonyYearSelect) {
+        PatrimonyYearSelect.addEventListener('change', function() {
+            window.location = `${window.location.pathname}?page=emeaccounting-patrimony&year=${this.value}`;
+        });
+
+        document.querySelectorAll('.eme-acc-amount').forEach(function(el) {
+            el.addEventListener('input', recalcPatrimony);
+        });
+        recalcPatrimony();
+    }
 
     /* ═══════════════════════════════════════════════════════════════════
      * GENERIC

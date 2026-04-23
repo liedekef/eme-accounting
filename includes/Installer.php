@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '14';
+    const DB_VERSION        = '15';
 
     public static function activate(): void {
         self::create_tables();
@@ -49,6 +49,9 @@ class Installer {
         }
         if ( (int) $current_version < 14 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS updated_by BIGINT UNSIGNED DEFAULT NULL" );
+        }
+        if ( (int) $current_version < 15 ) {
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_depreciation ADD COLUMN asset_type VARCHAR(150) NOT NULL DEFAULT 'machines'" );
         }
     }
 
@@ -226,7 +229,8 @@ class Installer {
             purchase_price      DECIMAL(14,2)   NOT NULL,
             residual_value      DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
             useful_life_years   SMALLINT        NOT NULL DEFAULT 5,
-            method              ENUM('linear','declining') NOT NULL DEFAULT 'linear',
+            method              VARCHAR(150)    NOT NULL DEFAULT 'linear',
+            asset_type          VARCHAR(150)    NOT NULL DEFAULT 'machines',
             account_id          BIGINT UNSIGNED              DEFAULT NULL,
             depreciation_account_id BIGINT UNSIGNED          DEFAULT NULL,
             current_book_value  DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
@@ -252,6 +256,66 @@ class Installer {
             KEY idx_year (fiscal_year)
         ) $charset;" );
 
+        // ── Staat van het Vermogen (Bijlage C – per boekjaar) ───────────
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_patrimony (
+            id                          INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+            fiscal_year                 SMALLINT        NOT NULL,
+
+            -- Sectie 1: Waarderingsregels (art. 6)
+            depr_machines_new_years     TINYINT         NOT NULL DEFAULT 5,
+            depr_machines_used_years    TINYINT         NOT NULL DEFAULT 2,
+            depr_computers_new_years    TINYINT         NOT NULL DEFAULT 5,
+            depr_computers_used_years   TINYINT         NOT NULL DEFAULT 2,
+            depr_furniture_new_years    TINYINT         NOT NULL DEFAULT 5,
+            depr_furniture_used_years   TINYINT         NOT NULL DEFAULT 2,
+            depr_other_new_years        TINYINT         NOT NULL DEFAULT 5,
+            depr_other_used_years       TINYINT         NOT NULL DEFAULT 2,
+            depr_method                 VARCHAR(12)     NOT NULL DEFAULT 'linear',
+            cash_valuation_note         TEXT,
+
+            -- Sectie 2: Aanpassing waarderingsregels (art. 7)
+            valuation_changes           TEXT,
+
+            -- Sectie 3: Bijkomende inlichtingen (art. 14)
+            additional_info             TEXT,
+
+            -- Sectie 4: Bezittingen
+            asset_real_estate           DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_machines              DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_movables              DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_stocks                DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_receivables           DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_investments           DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_cash                  DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            asset_other                 DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+
+            -- Sectie 4: Schulden
+            liab_financial              DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            liab_suppliers              DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            liab_members                DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            liab_fiscal_social          DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            liab_other                  DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+
+            -- Sectie 4: Rechten
+            right_subsidies             DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            right_donations             DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            right_other                 DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+
+            -- Sectie 4: Verplichtingen
+            oblig_mortgages             DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            oblig_guarantees            DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+            oblig_other                 DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
+
+            -- Sectie 5
+            non_numeric_obligations     TEXT,
+
+            status                      ENUM('draft','final') NOT NULL DEFAULT 'draft',
+            notes                       TEXT,
+            created_at                  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at                  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_year (fiscal_year)
+        ) $charset;" );
         // ── Bank import batches ─────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_log (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
