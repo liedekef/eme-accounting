@@ -37,7 +37,6 @@ $currency  = $config->currency;
 </p>
 </fieldset>
 </form>
-</div>
 
 <table class="eme-acc-table">
 <thead><tr>
