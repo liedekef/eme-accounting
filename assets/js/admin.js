@@ -715,7 +715,7 @@ function ajax(action, data, onSuccess, onError) {
 
         // Overview: summary list
         let html = '<h2>Events Overzicht</h2><table class="eme-acc-table">'
-            + '<tr><th>Event</th><th>Event startdatum</th><th class="amount">Ontvangen</th><th class="amount">Uitgegeven</th><th>Saldo</th></tr>';
+            + '<tr><th>Event</th><th>Event startdatum</th><th class="amount">Ontvangen</th><th class="amount">Uitgegeven</th><th class="amount">Saldo</th></tr>';
         
         const entries = Object.values(data.summary || {});
         if (!entries.length) {
@@ -733,7 +733,9 @@ function ajax(action, data, onSuccess, onError) {
             });
             const totalIn = entries.reduce((s, e) => s + e.total_in, 0);
             const totalOut = entries.reduce((s, e) => s + e.total_out, 0);
-            html += `<tr style="font-weight:600"><td>Totaal</td>
+            html += `<tr style="font-weight:600">
+                <td>Totaal</td>
+                <td></td>
                 <td class="amount in">${formatCurrency(totalIn)}</td>
                 <td class="amount out">${formatCurrency(totalOut)}</td>
                 <td class="amount ${totalIn >= totalOut ? 'in' : 'out'}">${formatCurrency(Math.abs(totalIn - totalOut))}</td></tr>`;
