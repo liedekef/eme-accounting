@@ -18,7 +18,7 @@
                 flashButton(btn, emeAccounting.i18n.saving);
                 JournalTable.reload();
                 form.reset();
-                handleDirectionChange();
+                directionSelect.dispatchEvent(new Event('change'));
             },
             (errorMsg) => {  // Error callback met message
                 alert(errorMsg);
