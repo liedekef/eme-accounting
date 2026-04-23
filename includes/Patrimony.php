@@ -191,7 +191,7 @@ class Patrimony {
         $totals = self::totals( $p );
 
         ob_start();
-        include EME_VZW_DIR . 'templates/pdf/patrimony.php';
+        include EME_ACCOUNTING_DIR . 'templates/pdf/patrimony.php';
         return ob_get_clean();
     }
 

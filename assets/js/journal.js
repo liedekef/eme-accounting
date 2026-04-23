@@ -12,13 +12,19 @@
     function handleJournalSave(form) {
         const btn = form.querySelector('.submit-btn');
         const originalText = btn.textContent;
+        const isNewEntry = !form.querySelector('input[name="id"]') ||
+            !form.querySelector('input[name="id"]').value;
         btn.disabled = true;
         ajax('eme_accounting_save_entry', formToObj(form),
             (data) => {
-                flashButton(btn, emeAccounting.i18n.saving);
-                JournalTable.reload();
-                form.reset();
-                directionSelect.dispatchEvent(new Event('change'));
+                if (isNewEntry) {
+                    flashButton(btn, emeAccounting.i18n.saving);
+                    JournalTable.reload();
+                    form.reset();
+                    directionSelect.dispatchEvent(new Event('change'));
+                } else {
+                    location.reload();
+                }
             },
             (errorMsg) => {  // Error callback met message
                 alert(errorMsg);
