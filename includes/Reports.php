@@ -234,6 +234,93 @@ class Reports {
         return [ 'summary' => $summary ];
     }
 
+    /**
+     * Financial year report: breakdown per COA account (including child accounts).
+     *
+     * @param int  $year        Fiscal year
+     * @return array{fiscal_year: int, accounts: array}
+     */
+    public static function financial_year_report( int $year ): array {
+        global $wpdb;
+        $coa_table = $wpdb->prefix . 'emeacc_chart_of_accounts';
+
+        // Get all active COA accounts (main + children)
+        $accounts = $wpdb->get_results(
+            "SELECT id, code, name, parent_id, direction
+             FROM `{$coa_table}`
+             WHERE is_active = 1
+             ORDER BY direction DESC, code"
+        );
+
+        $totals_by_coa = [];
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.coa_id, COALESCE(SUM(j.amount), 0) AS total
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 WHERE j.fiscal_year = %d
+                   AND j.is_closing_entry = 0
+                 GROUP BY j.coa_id",
+                $year
+            )
+        );
+        foreach ( $rows as $r ) {
+            $totals_by_coa[ (int) $r->coa_id ] = (float) $r->total;
+        }
+
+        $result = [];
+        $parents = [];
+        $children = [];
+
+        foreach ( $accounts as $acc ) {
+            $total = $totals_by_coa[ (int) $acc->id ] ?? 0.0;
+            if ( $acc->parent_id ) {
+                $children[] = [
+                    'id'         => (int) $acc->id,
+                    'code'       => $acc->code,
+                    'name'       => $acc->name,
+                    'parent_id' => (int) $acc->parent_id,
+                    'direction' => $acc->direction,
+                    'total'     => $total,
+                ];
+                if ( isset( $parents[ (int) $acc->parent_id ] ) ) {
+                    $parents[ (int) $acc->parent_id ] += $total;
+                } else {
+                    $parents[ (int) $acc->parent_id ] = $total;
+                }
+            } else {
+                $parents[ (int) $acc->id ] = 0.0;
+                $result[] = [
+                    'id'         => (int) $acc->id,
+                    'code'       => $acc->code,
+                    'name'       => $acc->name,
+                    'parent_id' => null,
+                    'direction' => $acc->direction,
+                    'total'     => 0.0,
+                    'children'  => [],
+                ];
+            }
+        }
+
+        foreach ( $children as $child ) {
+            foreach ( $result as &$parent ) {
+                if ( $parent['id'] === $child['parent_id'] ) {
+                    $parent['children'][] = $child;
+                    $parent['total'] += $child['total'];
+                    break;
+                }
+            }
+        }
+
+        usort( $result, function( $a, $b ) {
+            return strcmp( $a['direction'], $b['direction'] );
+        } );
+
+        return [
+            'fiscal_year'        => $year,
+            'accounts'         => $result,
+        ];
+    }
+
     public static function ajax_export(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
@@ -247,6 +334,7 @@ class Reports {
             'income_expenditure' => self::income_expenditure( $year ),
             'patrimony'          => self::patrimony( $_GET['date'] ?? '' ),
             'events'             => self::events_report( $year, $event_id ),
+            'financial_year'    => self::financial_year_report( $year ),
             default              => self::diary( [ 'fiscal_year' => $year ] ),
         };
 
@@ -254,6 +342,8 @@ class Reports {
             self::output_csv( $data, $type . '_' . $year );
         } elseif ( $format === 'pdf' && $type=='income_expenditure' ) {
             self::ajax_download_income_expenditure_pdf( $data, $year );
+        } elseif ( $format === 'pdf' && $type=='financial_year' ) {
+            self::ajax_download_financial_year_pdf( $data, $year );
         } else {
             wp_send_json_success( $data );
         }
@@ -318,6 +408,42 @@ class Reports {
         $dompdf->render();
         $dompdf->stream( 'StaatVanOntvangstenUitgaven' . $year . '.pdf', [ 'Attachment' => false ] );
         exit;
+    }
+
+    public static function ajax_download_financial_year_pdf( array $data, int $year ): void {
+        $html = self::generate_financial_year_pdf_html( $data, $year );
+
+        if ( empty( $html ) ) {
+            wp_send_json_error();
+        }
+
+        $dompdf_autoload = WP_PLUGIN_DIR . '/events-made-easy/includes/dompdf/vendor/autoload.php';
+        if ( ! file_exists( $dompdf_autoload ) ) {
+            wp_send_json_error();
+        }
+        require_once $dompdf_autoload;
+
+        $options = new \Dompdf\Options();
+        $options->set( 'isHtml5ParserEnabled', true );
+        $options->set( 'isRemoteEnabled', false );
+        $options->set( 'defaultFont', 'helvetica' );
+
+        $dompdf = new \Dompdf\Dompdf( $options );
+        $dompdf->loadHtml( '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head><body>'
+            . $html . '</body></html>' );
+        $dompdf->setPaper( 'A4', 'portrait' );
+        $dompdf->render();
+        $dompdf->stream( 'FinancieelJaarverslag' . $year . '.pdf', [ 'Attachment' => false ] );
+        exit;
+    }
+
+    private static function generate_financial_year_pdf_html( array $data, int $year ): string {
+        $config = \EMEVzw\Config::get();
+        if ( ! $config ) return '';
+
+        ob_start();
+        include EME_ACCOUNTING_DIR . 'templates/pdf/financial_year.php';
+        return ob_get_clean();
     }
 
 }

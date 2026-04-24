@@ -480,7 +480,7 @@ function ajax(action, data, onSuccess, onError) {
         form.querySelector('[name="purchase_date"]').value    = d.purchaseDate;
         form.querySelector('[name="purchase_price"]').value   = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(d.purchasePrice) || 0);
         form.querySelector('[name="residual_value"]').value = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(d.residualValue) || 0);
-        form.querySelector('#current_book_value').value = d.currentBookValue;
+        form.querySelector('#current_book_value').value = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(d.currentBookValue) || 0);
         form.querySelector('[name="useful_life_years"]').value = d.usefulLifeYears;
         form.querySelector('[name="method"]').value           = d.method;
         form.querySelector('[name="asset_type"]').value        = d.assetType || 'machines';
@@ -549,41 +549,42 @@ function ajax(action, data, onSuccess, onError) {
         return {
             type: document.querySelector('#report_type')?.value ?? '',
             year: document.querySelector('#report_year')?.value ?? '',
-            date: document.querySelector('#report_date')?.value ?? '',
+            date: document.querySelector('#report_date')?.value ?? ''
         };
     }
 
     document.getElementById('report_type')?.addEventListener('change', function() {
         document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display = this.value === 'patrimony' ? 'none' : '';
-        document.getElementById('btn-export-pdf').style.display = this.value === 'income_expenditure' ? '' : 'none';
+        document.getElementById('btn-export-pdf').style.display = (this.value === 'income_expenditure' || this.value === 'financial_year') ? '' : 'none';
         document.getElementById('btn-export-csv').style.display = this.value === 'events' ? 'none' : '';
     });
 
     function handleLoadReport() {
-        const { type, year, date } = getReportParams();
+        const params = getReportParams();
         const output = document.querySelector('#report-output');
         if (output) output.innerHTML = '<p>Laden…</p>';
-        fetch(`${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=json`)
+        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&format=json`;
+        fetch(`${ajaxUrl}?${query}`)
             .then(r => r.json())
             .then(r => {
                 if (!output) return;
-                r.success ? renderReport(type, r.data, output)
+                r.success ? renderReport(params.type, r.data, output)
                           : (output.innerHTML = `<p class="error">${esc(r.data)}</p>`);
             });
     }
 
     function handleExportCsv() {
-        const { type, year, date } = getReportParams();
-        //window.location = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=csv`;
-        const url = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=csv`;
+        const params = getReportParams();
+        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&format=csv`;
+        const url = `${ajaxUrl}?${query}`;
         fetch(url)
         .then(response => response.blob())
         .then(blob => {
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = `Reports-${year}.csv`;
+            link.download = `Reports-${params.type}-${params.year}.csv`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -595,16 +596,15 @@ function ajax(action, data, onSuccess, onError) {
     }
 
     function handleExportPDF() {
-        const { type, year, date } = getReportParams();
-        //window.location = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=pdf`;
-        const url = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${type}&year=${year}&date=${date}&format=pdf`;
+        const params = getReportParams();
+        const url = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&format=pdf`;
         fetch(url)
         .then(response => response.blob())
         .then(blob => {
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = `Reports-${year}.pdf`;
+            link.download = `Reports-${params.type}-${params.year}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -619,6 +619,7 @@ function ajax(action, data, onSuccess, onError) {
         if (type === 'income_expenditure') renderIncomeExpenditure(data, container);
         else if (type === 'patrimony')     renderPatrimony(data, container);
         else if (type === 'events')        renderEventsReport(data, container);
+        else if (type === 'financial_year') renderFinancialYearReport(data, container);
         else                               renderDiary(data, container);
     }
 
@@ -745,6 +746,55 @@ function ajax(action, data, onSuccess, onError) {
                 <td class="amount ${totalIn >= totalOut ? 'in' : 'out'}">${formatCurrency(Math.abs(totalIn - totalOut))}</td></tr>`;
         }
         container.innerHTML = html + '</table>';
+    }
+
+    function renderFinancialYearReport(data, container) {
+        let html = `<h2>Financieel Jaarverslag per rekening – ${esc(data.fiscal_year)}</h2>`;
+
+        const inAccounts = data.accounts.filter(a => a.direction === 'in');
+        const outAccounts = data.accounts.filter(a => a.direction === 'out');
+
+        html += `<div style="display:grid;grid-template-columns:1fr;gap:20px">
+            <div><h3>Ontvangsten</h3>
+            <table class="eme-acc-table">
+            <thead><tr><th>Rekening</th><th class="amount">Totaal</th></tr></thead>
+            <tbody>`;
+        let totalIn = 0;
+        for (const acc of inAccounts) {
+            html += `<tr style="font-weight:600"><td>${esc(acc.code)} - ${esc(acc.name)}</td><td class="amount in">${formatCurrency(acc.total)}</td></tr>`;
+            totalIn += acc.total;
+            if (acc.children) {
+                for (const child of acc.children) {
+                    if (child.total)
+                        html += `<tr><td style="padding-left:20px">${esc(child.code)} - ${esc(child.name)}</td><td class="amount in">${formatCurrency(child.total)}</td></tr>`;
+                }
+            }
+        }
+        html += `<tr style="font-weight:600"><td>Totaal ontvangsten</td><td class="amount in">${formatCurrency(totalIn)}</td></tr>`;
+        html += `</tbody></table></div>`;
+
+        html += `<div><h3>Uitgaven</h3>
+            <table class="eme-acc-table">
+            <thead><tr><th>Rekening</th><th class="amount">Totaal</th></tr></thead>
+            <tbody>`;
+        let totalOut = 0;
+        for (const acc of outAccounts) {
+            html += `<tr style="font-weight:600"><td>${esc(acc.code)} - ${esc(acc.name)}</td><td class="amount out">${formatCurrency(acc.total)}</td></tr>`;
+            totalOut += acc.total;
+            if (acc.children) {
+                for (const child of acc.children) {
+                    if (child.total)
+                        html += `<tr><td style="padding-left:20px">${esc(child.code)} - ${esc(child.name)}</td><td class="amount out">${formatCurrency(child.total)}</td></tr>`;
+                }
+            }
+        }
+        html += `<tr style="font-weight:600"><td>Totaal uitgaven</td><td class="amount out">${formatCurrency(totalOut)}</td></tr>`;
+        html += `</tbody></table></div></div>`;
+
+        const saldo = totalIn - totalOut;
+        html += `<p style="font-size:16px;font-weight:600;margin-top:16px">
+            Saldo: <span class="amount ${saldo >= 0 ? 'in' : 'out'}">${formatCurrency(saldo)}</span></p>`;
+        container.innerHTML = html;
     }
 
     // Global helpers for event report drilldown (called from onclick)

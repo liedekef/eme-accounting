@@ -50,7 +50,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Huidge waarde (€)', 'eme-accounting' ); ?></label>
-        <input type="text" disabled id="current_book_value" value="0">
+        <input type="text" disabled id="current_book_value" value="0,00">
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Gebruiksduur (jaar)', 'eme-accounting' ); ?></label>
