@@ -29,8 +29,9 @@ foreach ( $fiscal_years as $f ) {
 </div>
 <?php endif; ?>
 
-<p>
-    <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></label>
+<!-- Boekjaar selector en acties -->
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+    <label><strong><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></strong>
     <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting-budget&year='+this.value">
         <?php foreach ( $fiscal_years as $f ): ?>
         <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
@@ -41,8 +42,9 @@ foreach ( $fiscal_years as $f ) {
         </option>
         <?php endforeach; ?>
     </select>
+    </label>
 
-    <label style="margin-left:20px"><?php esc_html_e( 'Kopieer resultaten van:', 'eme-accounting' ); ?></label>
+    <label style="margin-left:12px"><strong><?php esc_html_e( 'Kopieer resultaten van:', 'eme-accounting' ); ?></strong>
     <select id="eme-acc-copy-year">
         <option value="">— <?php esc_html_e( 'Kies jaar', 'eme-accounting' ); ?> —</option>
         <?php foreach ( $prev_years as $y ): ?>
@@ -54,7 +56,13 @@ foreach ( $fiscal_years as $f ) {
         <?php endforeach; ?>
     </select>
     <span id="copy-status" style="margin-left:8px;color:#646970"></span>
-</p>
+    </label>
+
+    <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_budget&year=' . $year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
+       class="button button-primary" target="_blank">
+        📄 <?php esc_html_e( 'Download PDF', 'eme-accounting' ); ?>
+    </a>
+</div>
 
 <?php // Group by direction: IN first, then OUT ?>
 <form id="eme-acc-budget-form">

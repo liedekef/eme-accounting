@@ -9,6 +9,7 @@ class Budget {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_budget_line', [ __CLASS__, 'ajax_save' ] );
         add_action( 'wp_ajax_eme_accounting_get_budget_year', [ __CLASS__, 'ajax_get_year' ] );
+        add_action( 'wp_ajax_eme_accounting_download_budget', [ __CLASS__, 'ajax_download_pdf' ] );
     }
 
     /**
@@ -154,5 +155,82 @@ class Budget {
         }
 
         wp_send_json_success( $actuals );
+    }
+
+    /* ------------------------------------------------------------------
+     * PDF GENERATIE
+     * ------------------------------------------------------------------ */
+
+    public static function generate_pdf_html( int $year ): string {
+        $coa = ChartOfAccounts::get_all();
+        $budget_map = self::get_year_map( $year );
+        $config = \EMEVzw\Config::get();
+        $currency = $config->currency;
+
+        $income_rows = [];
+        $expense_rows = [];
+
+        foreach ( $coa as $c ) {
+            if ( $c->direction !== 'in' && $c->direction !== 'out' ) continue;
+            if ( empty( $c->is_active ) ) continue;
+            if ( ! $c->parent_id ) continue;
+
+            $budget = $budget_map[ $c->id ] ?? 0;
+            $actual = self::get_actual_for_coa( $year, $c->id );
+            $variance = $c->direction === 'out' ? $budget - $actual : $actual - $budget;
+
+            $row = [
+                'code'    => $c->code,
+                'name'   => $c->name,
+                'budget' => $budget,
+                'actual' => $actual,
+                'variance' => $variance,
+            ];
+
+            if ( $c->direction === 'in' ) {
+                $income_rows[] = $row;
+            } else {
+                $expense_rows[] = $row;
+            }
+        }
+
+        $data = [
+            'income'   => $income_rows,
+            'expenses' => $expense_rows,
+        ];
+
+        ob_start();
+        include EME_ACCOUNTING_DIR . 'templates/pdf/budget.php';
+        return ob_get_clean();
+    }
+
+    public static function ajax_download_pdf(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_view_ajax( 'budget' );
+
+        $year = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
+        $html = self::generate_pdf_html( $year );
+
+        if ( empty( $html ) ) {
+            wp_send_json_error();
+        }
+
+        $dompdf_autoload = WP_PLUGIN_DIR . '/events-made-easy/includes/dompdf/vendor/autoload.php';
+        if ( ! file_exists( $dompdf_autoload ) ) {
+            wp_send_json_error();
+        }
+        require_once $dompdf_autoload;
+
+        $options = new \Dompdf\Options();
+        $options->set( 'isHtml5ParserEnabled', true );
+        $options->set( 'isRemoteEnabled', false );
+        $options->set( 'defaultFont', 'helvetica' );
+
+        $dompdf = new \Dompdf\Dompdf( $options );
+        $dompdf->load_html( $html );
+        $dompdf->render();
+
+        $dompdf->stream( 'Begroting_' . $year . '.pdf', [ 'Attachment' => false ] );
+        exit;
     }
 }
