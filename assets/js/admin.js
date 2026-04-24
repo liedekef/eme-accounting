@@ -119,6 +119,8 @@ function ajax(action, data, onSuccess, onError) {
         'eme-acc-delete-asset': handleAssetDelete,
         // Patrimony
         'eme-acc-delete-patrimony': handleDeletePatrimony,
+        // Budget
+        'eme-acc-delete-budget': handleDeleteBudget,
     };
 
     document.addEventListener('click', function (e) {
@@ -502,6 +504,14 @@ function ajax(action, data, onSuccess, onError) {
     function handleDeletePatrimony(btn) {
         if (!confirm(i18n.confirm_delete_patrimony)) return;
         ajax('eme_accounting_delete_patrimony', { id: btn.dataset.id, nonce: nonce }, function() {
+            setTimeout(() => location.reload(), 350);
+        });
+    }
+
+    // Delete budget (all lines for a fiscal year)
+    function handleDeleteBudget(btn) {
+        if (!confirm(i18n.confirm_delete_budget)) return;
+        ajax('eme_accounting_delete_budget', { year: btn.dataset.year, nonce: nonce }, function() {
             setTimeout(() => location.reload(), 350);
         });
     }

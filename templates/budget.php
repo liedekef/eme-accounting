@@ -135,7 +135,13 @@ foreach ( $fiscal_years as $f ) {
 </div>
 <?php endforeach; ?>
 <input type="hidden" name="fiscal_year" value="<?= $year ?>">
-<p><button type="submit" class="button button-primary submit-btn" <?= $is_closed ? 'disabled' : '' ?>><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
+<p>
+    <button type="submit" class="button button-primary submit-btn" <?= $is_closed ? 'disabled' : '' ?>><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button>
+    <button type="button" class="button eme-acc-delete-budget" data-year="<?= $year ?>"
+            style="margin-left:8px;color:#d63638;border-color:#d63638">
+        <?php esc_html_e( 'Verwijder deze begroting', 'eme-accounting' ); ?>
+    </button>
+</p>
 </form>
 </fieldset>
 
@@ -170,6 +176,7 @@ if ( $all_budget_years ):
                class="button button-small"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></a>
             <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_budget&year=' . (int) $row->fiscal_year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
                class="button button-small" target="_blank">PDF</a>
+            <button type="button" class="button button-small eme-acc-delete-budget" data-year="<?= (int) $row->fiscal_year ?>">✕</button>
         </td>
     </tr>
     <?php endforeach; ?>

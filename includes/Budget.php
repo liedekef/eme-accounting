@@ -9,6 +9,7 @@ class Budget {
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_budget_line', [ __CLASS__, 'ajax_save' ] );
         add_action( 'wp_ajax_eme_accounting_get_budget_year', [ __CLASS__, 'ajax_get_year' ] );
+        add_action( 'wp_ajax_eme_accounting_delete_budget',   [ __CLASS__, 'ajax_delete' ] );
         add_action( 'wp_ajax_eme_accounting_download_budget', [ __CLASS__, 'ajax_download_pdf' ] );
     }
 
@@ -131,6 +132,25 @@ class Budget {
             'budgeted_amount' => $amount,
         ] );
         return (int) $wpdb->insert_id;
+    }
+
+    /**
+     * Delete all budget lines for a given fiscal year.
+     */
+    public static function ajax_delete(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'budget' );
+        global $wpdb;
+        $year = (int) ( $_POST['year'] ?? 0 );
+        if ( $year <= 0 ) {
+            wp_send_json_error( __( 'Ongeldig boekjaar.', 'eme-accounting' ) );
+        }
+        $wpdb->delete(
+            $wpdb->prefix . 'emeacc_budget',
+            [ 'fiscal_year' => $year ],
+            [ '%d' ]
+        );
+        wp_send_json_success();
     }
 
     public static function ajax_save(): void {

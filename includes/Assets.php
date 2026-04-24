@@ -53,6 +53,7 @@ class Assets {
             'i18n'    => [
                 'confirm_delete' => __( 'Zeker verwijderen?', 'eme-accounting' ),
                 'confirm_delete_patrimony' => __( 'Staat van Vermogen verwijderen?', 'eme-vzw-helper' ),
+                'confirm_delete_budget'    => __( 'Begroting van dit boekjaar verwijderen?', 'eme-accounting' ),
                 'save'           => __( 'Opslaan', 'eme-accounting' ),
                 'update'         => __( 'Bijwerken', 'eme-accounting' ),
                 'saving'         => __( 'Opslaan…', 'eme-accounting' ),
