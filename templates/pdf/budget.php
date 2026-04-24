@@ -16,6 +16,9 @@ $currency   = $config->currency;
 
 $year = $year ?? date( 'Y' );
 $fmt = new NumberFormatter( 'nl_BE', NumberFormatter::CURRENCY );
+
+$vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
+
 ?>
 <style>
   * { box-sizing: border-box; }
@@ -183,21 +186,37 @@ $fmt = new NumberFormatter( 'nl_BE', NumberFormatter::CURRENCY );
         </tbody>
     </table>
 
+    <!-- HANDTEKENINGEN -->
     <div class="signature-block">
-    <table class="signature-table">
-        <tr>
-            <td>
-                <p class="sig-label">Handtekening penningmeester</p>
-                <div class="sig-line"></div>
-                <p class="sig-identity">Datum: _______________</p>
-            </td>
-            <td>
-                <p class="sig-label">Handtekening voorzitter</p>
-                <div class="sig-line"></div>
-                <p class="sig-identity">Datum: _______________</p>
-            </td>
-        </tr>
-    </table>
+        <table class="signature-table">
+            <?php if ( ! empty( $vertegenwoordigers ) ): ?>
+                <?php foreach ( array_chunk( $vertegenwoordigers, 2 ) as $vertegenwoordigers_per2 ): ?>
+                <tr>
+                    <?php foreach ( $vertegenwoordigers_per2 as $v ): ?>
+                    <td>
+                        <div class="sig-identity">
+                            <?= esc_html( $v->first_name . ' ' . $v->last_name ) ?><br>
+                            <em><?= esc_html( EMEVzw\Config::legal_capacity_label( $v->legal_capacity ?? 'bestuurder' ) ) ?><?= ! empty( $v->function_title ) ? ' · ' . esc_html( EMEVzw\Config::function_title_label( $v->function_title ) ) : '' ?></em>
+                        </div>
+                        <div class="sig-label">Handtekening</div>
+                        <div class="sig-line"></div>
+                    </td>
+                    <?php endforeach; ?>
+                    <?php if ( count( $vertegenwoordigers_per2 ) === 1 ): ?>
+                    <td></td>
+                    <?php endif; ?>
+                </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr>
+                    <td>
+                        <div class="sig-label">Handtekening (identiteit/hoedanigheid vertegenwoordiger)</div>
+                        <div class="sig-line"></div>
+                    </td>
+                    <td></td>
+                </tr>
+            <?php endif; ?>
+        </table>
     </div>
 
 </div>

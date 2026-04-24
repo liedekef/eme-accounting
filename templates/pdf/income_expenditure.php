@@ -19,20 +19,7 @@ $email      = esc_html( $config->email ?? '' );
 $court      = esc_html( $config->court ?? '' );
 $currency   = $config->currency;
 
-// Vertegenwoordigers: zoek op function_title (voorzitter + secretaris)
-$active_board       = EMEVzw\Config::get_active_board_members();
-$vertegenwoordigers = [];
-foreach ( $active_board as $m ) {
-    $func_lower = strtolower( $m->function_title ?? '' );
-    if ( preg_match( '/(voorzitter|president|chair)/i', $func_lower ) ) {
-        $vertegenwoordigers[] = $m;
-    } elseif ( preg_match( '/(secretaris|secretary)/i', $func_lower ) ) {
-        $vertegenwoordigers[] = $m;
-    }
-}
-
-// Uniek array (vermijd dubbelingen als iemand beide functies heeft)
-$vertegenwoordigers = array_unique( $vertegenwoordigers, SORT_REGULAR );
+$vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
 
 ?>
 <style>
