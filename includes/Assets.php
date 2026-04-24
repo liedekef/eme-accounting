@@ -22,6 +22,28 @@ class Assets {
         wp_enqueue_script( 'emeaccounting-select', EME_PLUGIN_URL . 'js/snapselect/snapselect.min.js', [], EME_VERSION );
         wp_enqueue_style('emeaccounting-select-css', EME_PLUGIN_URL . 'js/snapselect/snapselect.min.css' );
         wp_enqueue_script( 'emeaccounting-sortable', EME_PLUGIN_URL . 'js/sortable/sortable.min.js', [ ], EME_VERSION, true );
+        wp_enqueue_style( 'emeaccounting-fdatepicker', EME_PLUGIN_URL . 'js/fdatepicker/css/fdatepicker.min.css', [], EME_VERSION );
+        wp_enqueue_script( 'emeaccounting-fdatepicker', EME_PLUGIN_URL . 'js/fdatepicker/js/fdatepicker.min.js', [ ], EME_VERSION );
+
+        wp_enqueue_style( 'emeaccounting-ftable-css', EME_PLUGIN_URL . 'js/ftable/themes/lightcolor/gray/ftable.min.css' );
+        wp_enqueue_style( 'emeaccounting-ftables-css', EME_PLUGIN_URL . 'css/ftables.css', [], EME_VERSION );
+        wp_enqueue_script( 'emeaccounting-ftable', EME_PLUGIN_URL . 'js/ftable/ftable.min.js', [ ], EME_VERSION );
+        $locale_code     = determine_locale();
+        $locale_code     = str_replace( '_', '-', $locale_code );
+        // for english, no translation code is needed)
+        if ( $locale_code != 'en-US' ) {
+            $locale_code     = substr( $locale_code, 0, 2 );
+            $locale_file     = EME_PLUGIN_DIR . "js/ftable/localization/ftable.$locale_code.js";
+            if ( file_exists( $locale_file ) ) {
+                $locale_file_url = EME_PLUGIN_URL . "js/ftable/localization/ftable.$locale_code.js";
+                wp_enqueue_script( 'emeaccounting-ftable-locale', $locale_file_url, '', EME_VERSION );
+            }
+            $locale_file     = EME_PLUGIN_DIR . "js/fdatepicker/js/i18n/fdatepicker.$locale_code.js";
+            if ( file_exists( $locale_file ) ) {
+                $locale_file_url    = EME_PLUGIN_URL . "js/fdatepicker/js/i18n/fdatepicker.$locale_code.js";
+                wp_enqueue_script( 'emeaccounting-fdatepick-locale', $locale_file_url, '', EME_VERSION );
+            }
+        }
 
         wp_enqueue_style( 'emeaccounting', EME_ACCOUNTING_URL . 'assets/css/admin.css', [], EME_ACCOUNTING_VERSION );
         wp_enqueue_script( 'emeaccounting', EME_ACCOUNTING_URL . 'assets/js/admin.js', [ 'emeaccounting-sortable' ], EME_ACCOUNTING_VERSION, true );
@@ -54,21 +76,6 @@ class Assets {
             ],
         ] );
         if ( $plugin_page === 'emeaccounting-journal' ) {
-            wp_enqueue_script( 'emeaccounting-ftable', EME_PLUGIN_URL . 'js/ftable/ftable.min.js', [ ], EME_VERSION );
-            $locale_code     = determine_locale();
-            $locale_code     = str_replace( '_', '-', $locale_code );
-            // for english, no translation code is needed)
-            if ( $locale_code != 'en-US' ) {
-                $locale_code     = substr( $locale_code, 0, 2 );
-                $locale_file     = EME_PLUGIN_DIR . "js/ftable/localization/ftable.$locale_code.js";
-                if ( file_exists( $locale_file ) ) {
-                    $locale_file_url = EME_PLUGIN_URL . "js/ftable/localization/ftable.$locale_code.js";
-                    wp_enqueue_script( 'emeaccounting-ftable-locale', $locale_file_url, '', EME_VERSION );
-                }
-            }
-            wp_enqueue_style( 'emeaccounting-ftable-css', EME_PLUGIN_URL . 'js/ftable/themes/lightcolor/gray/ftable.min.css' );
-            wp_enqueue_style( 'emeaccounting-ftables-css', EME_PLUGIN_URL . 'css/ftables.css', [], EME_VERSION );
-
             wp_enqueue_script( 'emeaccounting-journal', EME_ACCOUNTING_URL . 'assets/js/journal.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
         }
 

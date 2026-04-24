@@ -249,7 +249,9 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <option value="<?= $y ?>" ><?= $y ?></option>
                 <?php endforeach; ?>
             </select>
-            <input type="search" placeholder="Filter op omschrijving" name="eme-acc-search-filter" id="eme-acc-search-filter">
+            <input type='hidden' id='eme-daterange-filter' name='eme-daterange-filter'>
+            <input type='text' id='localized_daterange-filter' placeholder='<?php esc_html_e( 'Filter op daterange', 'eme-accounting' ); ?>' data-alt-field='eme-daterange-filter' data-autoclose='false' data-range='true' data-multiple-separator=' -- ' data-date='' style='width: 22ch;' class='eme_formfield_fdate'>
+            <input type="search" placeholder="Filter op omschrijving" size="17" name="eme-acc-search-filter" id="eme-acc-search-filter">
             <input type="search" placeholder="Bedrag" name="eme-acc-amount-filter" id="eme-acc-amount-filter" size="8">
             <select name="account_id" id="eme-acc-account-filter">
                 <option value="0"><?php esc_html_e( 'Alle rekeningen', 'eme-accounting' ); ?></option>

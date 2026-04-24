@@ -187,6 +187,7 @@
                 direction: document.querySelector('#eme-acc-direction-filter')?.value || '',
                 coa_id: document.querySelector('#eme-acc-coa-filter')?.value || '',
                 search: document.querySelector('#eme-acc-search-filter')?.value || '',
+                daterange: document.querySelector('#eme-daterange-filter')?.value || '',
                 amount: document.querySelector('#eme-acc-amount-filter')?.value || '',
                 eme_event_id: document.querySelector('#eme-acc-event-filter')?.value || ''
             })
@@ -376,6 +377,13 @@
         const url = new URL(window.location.href);
         url.searchParams.delete('edit');
         window.history.replaceState({}, document.title, url.toString());
+    }
+
+    if (typeof FDatepicker !== 'undefined') {
+        new FDatepicker('#localized_daterange-filter', {
+            fieldsizing: true,
+            format: 'd/m/Y'
+        });
     }
 
 })();

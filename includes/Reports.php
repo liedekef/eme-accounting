@@ -206,13 +206,13 @@ class Reports {
                  WHERE j.fiscal_year = %d
                    AND j.eme_event_id IS NOT NULL
                    AND j.is_closing_entry = 0
-                 GROUP BY j.eme_event_id
-                 ORDER BY j.eme_event_id",
+                 GROUP BY j.eme_event_id",
                 $year
             )
         );
 
         $summary = [];
+
         foreach ( $rows as $row ) {
             $event = eme_get_event( (int) $row->eme_event_id );
             $summary[ (int) $row->eme_event_id ] = [
@@ -222,8 +222,14 @@ class Reports {
                 'event_end'   => $event ? eme_localized_datetime($event['event_end']) : null,
                 'total_in'    => (float) $row->total_in,
                 'total_out'   => (float) $row->total_out,
+                'real_start'  => $event ? $event['event_start'] : null
             ];
         }
+
+        // sort on original start date
+        usort($summary, function($a, $b) {
+            return strcmp($a['real_start'], $b['real_start']);
+        });
 
         return [ 'summary' => $summary ];
     }

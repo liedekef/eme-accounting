@@ -458,6 +458,7 @@ class Journal {
             'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
             'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? (int) $_POST['amount'] : null,
             'search'       => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
+            'daterange'    => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
         ];
 
         $total = self::count_entries( $args );
@@ -563,6 +564,13 @@ class Journal {
             $where[]   = "({$p}account_id = %d OR {$p}contra_account_id = %d)";
             $prepare[] = (int) $args['account_id'];
             $prepare[] = (int) $args['account_id'];
+        }
+        if ( ! empty( $args['daterange'] ) ) {
+            [$date_from,$date_to] = explode(',',$args['daterange']);
+            $where[]   = "{$p}entry_date >= %s";
+            $where[]   = "{$p}entry_date <= %s";
+            $prepare[] = $date_from;
+            $prepare[] = $date_to;
         }
         if ( ! empty( $args['direction'] ) ) {
             if ($args['direction'] == 'transfer') {
