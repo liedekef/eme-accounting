@@ -97,7 +97,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
-                    <select name="coa_id" id="category_coa_id" required class="eme_snapselect" data-live-search="true">
+                    <select name="coa_id" id="category_coa_id" required class="eme_snapselect" data-live-search="true" data-open-on-focus-if-empty="true">
                         <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                         <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                         <?php foreach ( $coa_accounts as $id => $acc ): 
