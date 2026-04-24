@@ -14,7 +14,7 @@ $int = fn( string $field, int $default ) => $p && property_exists($p, $field)? (
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Staat van het Vermogen', 'eme-accounting' ); echo " Jaar ".esc_html($year);
 if (!$p->id)
-      echo '<span style="margin-left:8px;color:#d63638;border-color:#d63638"> NOT NIET BEWAARD </span>';
+      echo '<span style="margin-left:8px;color:#d63638;border-color:#d63638"> NOG NIET BEWAARD </span>';
 ?>
 </h1>
 <p class="description">
