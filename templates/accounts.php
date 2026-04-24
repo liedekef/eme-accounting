@@ -25,8 +25,6 @@ $currency  = $config->currency;
     <div class="eme-acc-field"><label><?php esc_html_e( 'IBAN', 'eme-accounting' ); ?></label><input type="text" name="iban" maxlength="34" placeholder="BE68 5390 0754 7034"></div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'BIC', 'eme-accounting' ); ?></label><input type="text" name="bic" maxlength="11"></div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'Begindatum', 'eme-accounting' ); ?></label><input type="date" name="opening_date"></div>
-</div>
-<div class="eme-acc-row">
     <div class="eme-acc-field"><label><?php esc_html_e( 'Beginsaldo (€)', 'eme-accounting' ); ?></label><input type="number" name="opening_balance" step="0.01" value="0.00"></div>
 </div>
     <div class="eme-acc-field"><label><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?></label><textarea name="description"></textarea></div>
