@@ -138,4 +138,43 @@ foreach ( $fiscal_years as $f ) {
 <p><button type="submit" class="button button-primary submit-btn" <?= $is_closed ? 'disabled' : '' ?>><?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?></button></p>
 </form>
 </fieldset>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     OVERZICHT ALLE BOEKJAREN
+     ══════════════════════════════════════════════════════════════════ -->
+<?php
+$all_budget_years = EMEAccounting\Budget::get_all_years_summary();
+if ( $all_budget_years ):
+    $fmt = fn( float $v ) => number_format( $v, 2, ',', '.' ) . ' €';
+?>
+<h2 style="margin-top:28px"><?php esc_html_e( 'Overzicht per boekjaar', 'eme-accounting' ); ?></h2>
+<table class="eme-acc-pub-table widefat">
+    <thead><tr>
+        <th><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></th>
+        <th><?php esc_html_e( 'Begroot ontvangsten', 'eme-accounting' ); ?></th>
+        <th><?php esc_html_e( 'Begroot uitgaven', 'eme-accounting' ); ?></th>
+        <th><?php esc_html_e( 'Begroot saldo', 'eme-accounting' ); ?></th>
+        <th><?php esc_html_e( 'Acties', 'eme-accounting' ); ?></th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ( $all_budget_years as $row ): ?>
+    <tr>
+        <td><strong><?= (int) $row->fiscal_year ?></strong></td>
+        <td><?= esc_html( $fmt( $row->total_in ) ) ?></td>
+        <td><?= esc_html( $fmt( $row->total_out ) ) ?></td>
+        <td style="<?= $row->saldo < 0 ? 'color:#d63638;font-weight:600' : '' ?>">
+            <?= esc_html( $fmt( $row->saldo ) ) ?>
+        </td>
+        <td>
+            <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-budget&year=' . (int) $row->fiscal_year ) ) ?>"
+               class="button button-small"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></a>
+            <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_budget&year=' . (int) $row->fiscal_year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
+               class="button button-small" target="_blank">PDF</a>
+        </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+<?php endif; ?>
+
 </div>

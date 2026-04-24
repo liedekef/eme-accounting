@@ -48,6 +48,40 @@ class Budget {
         );
     }
 
+    /**
+     * Get a summary of budgeted in/out/saldo for every fiscal year that has
+     * at least one budget line.  Uses a JOIN with the COA table so that the
+     * direction (in/out) is resolved in SQL rather than in PHP.
+     *
+     * Returns an array of objects ordered by fiscal_year ASC, each with:
+     *   ->fiscal_year  int
+     *   ->total_in     float   (sum of budgeted_amount where coa.direction = 'in')
+     *   ->total_out    float   (sum of budgeted_amount where coa.direction = 'out')
+     *   ->saldo        float   (total_in − total_out)
+     */
+    public static function get_all_years_summary(): array {
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            "SELECT
+                b.fiscal_year,
+                SUM(CASE WHEN c.direction = 'in'  THEN b.budgeted_amount ELSE 0 END) AS total_in,
+                SUM(CASE WHEN c.direction = 'out' THEN b.budgeted_amount ELSE 0 END) AS total_out
+             FROM `{$wpdb->prefix}emeacc_budget` b
+             INNER JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` c ON c.id = b.coa_id
+             GROUP BY b.fiscal_year
+             ORDER BY b.fiscal_year ASC"
+        );
+
+        foreach ( $rows as $r ) {
+            $r->fiscal_year = (int)   $r->fiscal_year;
+            $r->total_in    = (float) $r->total_in;
+            $r->total_out   = (float) $r->total_out;
+            $r->saldo       = $r->total_in - $r->total_out;
+        }
+
+        return $rows;
+    }
+
     public static function save( array $data ): int|\WP_Error {
         global $wpdb;
         $fiscal_year = (int) ( $data['fiscal_year'] ?? gmdate( 'Y' ) );

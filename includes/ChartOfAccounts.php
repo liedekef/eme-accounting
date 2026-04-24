@@ -23,7 +23,7 @@ class ChartOfAccounts {
             return;
         }
 
-$accounts = [
+        $accounts = [
             // Ontvangsten
             [ 'code' => '01', 'name' => 'Lidgelden', 'direction' => 'in', 'children' => [
                 [ 'code' => '01-000001', 'name' => 'Lidgelden' ],
