@@ -155,6 +155,7 @@ if (!$p->id)
         <div class="eme-acc-patrimony-row">
             <label><?= esc_html( $label ) ?></label>
             <input type="text" name="<?= esc_attr( $name ) ?>" value="<?= $val( $name ) ?>"
+                   oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                    class="eme-acc-amount" data-section="assets" style="width:120px;text-align:right">
         </div>
         <?php endforeach; ?>
@@ -174,6 +175,7 @@ if (!$p->id)
         <div class="eme-acc-patrimony-row">
             <label><?= esc_html( $label ) ?></label>
             <input type="text" name="<?= esc_attr( $name ) ?>" value="<?= $val( $name ) ?>"
+                   oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                    class="eme-acc-amount" data-section="rights" style="width:120px;text-align:right">
         </div>
         <?php endforeach; ?>
@@ -198,6 +200,7 @@ if (!$p->id)
         <div class="eme-acc-patrimony-row">
             <label><?= esc_html( $label ) ?></label>
             <input type="text" name="<?= esc_attr( $name ) ?>" value="<?= $val( $name ) ?>"
+                   oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                    class="eme-acc-amount" data-section="liab" style="width:120px;text-align:right">
         </div>
         <?php endforeach; ?>
@@ -217,6 +220,7 @@ if (!$p->id)
         <div class="eme-acc-patrimony-row">
             <label><?= esc_html( $label ) ?></label>
             <input type="text" name="<?= esc_attr( $name ) ?>" value="<?= $val( $name ) ?>"
+                   oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                    class="eme-acc-amount" data-section="oblig" style="width:120px;text-align:right">
         </div>
         <?php endforeach; ?>

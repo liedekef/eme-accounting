@@ -17,6 +17,10 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
+function parseBE(val) {
+    return parseFloat(String(val).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
 function flashButton(btn, text) {
     const orig = btn.textContent;
     btn.textContent = text;
@@ -64,9 +68,6 @@ function ajax(action, data, onSuccess, onError) {
 
     const { nonce, ajaxUrl, i18n } = emeAccounting;
 
-    function parseBE(val) {
-        return parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0;
-    }
     /* ═══════════════════════════════════════════════════════════════════
      * SINGLE SUBMIT DISPATCHER
      * ═══════════════════════════════════════════════════════════════════ */
@@ -454,13 +455,16 @@ function ajax(action, data, onSuccess, onError) {
      * DEPRECIATION PAGE
      * ═══════════════════════════════════════════════════════════════════ */
     function handleAssetSave(form) {
-        ajax('eme_accounting_save_asset', formToObj(form), () => location.reload());
+        const assetToSave = formToObj(form);
+        assetToSave.purchase_price = parseBE(String(assetToSave.purchase_price));
+        assetToSave.residual_value = parseBE(String(assetToSave.residual_value));
+        ajax('eme_accounting_save_asset', assetToSave, () => location.reload());
     }
 
     function updateDepreciationPreview() {
-        const price    = parseFloat(document.querySelector('#purchase_price')?.value)    || 0;
+        const price    = parseBE(document.querySelector('#purchase_price')?.value  || '0');
         const life     = parseInt(document.querySelector('#useful_life_years')?.value)   || 1;
-        const residual = parseFloat(document.querySelector('#residual_value')?.value)    || 0;
+        const residual = parseBE(document.querySelector('#residual_value')?.value  || '0');
         const method   = document.querySelector('#method')?.value;
         const preview  = document.querySelector('#depreciation-preview');
         if (!preview) return;
@@ -474,8 +478,8 @@ function ajax(action, data, onSuccess, onError) {
         form.querySelector('[name="id"]').value              = d.id;
         form.querySelector('[name="name"]').value            = d.name;
         form.querySelector('[name="purchase_date"]').value    = d.purchaseDate;
-        form.querySelector('[name="purchase_price"]').value   = d.purchasePrice;
-        form.querySelector('[name="residual_value"]').value = d.residualValue;
+        form.querySelector('[name="purchase_price"]').value   = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(d.purchasePrice) || 0);
+        form.querySelector('[name="residual_value"]').value = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(d.residualValue) || 0);
         form.querySelector('#current_book_value').value = d.currentBookValue;
         form.querySelector('[name="useful_life_years"]').value = d.usefulLifeYears;
         form.querySelector('[name="method"]').value           = d.method;
@@ -518,7 +522,7 @@ function ajax(action, data, onSuccess, onError) {
             if (coaId && amount && coaId.value) {
                 data.lines.push({
                     coa_id: coaId.value,
-                    budgeted_amount: amount.value
+                    budgeted_amount: parseBE(amount.value)
                 });
             }
         });

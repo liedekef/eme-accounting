@@ -124,8 +124,11 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <div class="eme-acc-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bedrag (€)', 'eme-accounting' ); ?> *</label>
-                    <input type="number" name="amount" required step="0.01" min="0.01"
-                           value="<?= esc_attr( $edit_entry->amount ?? '' ) ?>">
+                    <input type="text" name="amount" required
+                           inputmode="decimal"
+                           oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
+                           value="<?= esc_attr( $edit_entry->amount > 0 ? number_format( (float) $edit_entry->amount, 2, ',', '.' ) : '' ) ?>"
+                           placeholder="0,00">
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Event', 'eme-accounting' ); ?></label>
@@ -220,9 +223,6 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                         <option value="0" <?= selected( (int) ( $edit_entry->is_reconciled ?? 1 ), 0, false ) ?>><?php esc_html_e( 'Nee', 'eme-accounting' ); ?></option>
                         <option value="1" <?= selected( (int) ( $edit_entry->is_reconciled ?? 1 ), 1, false ) ?>><?php esc_html_e( 'Ja', 'eme-accounting' ); ?></option>
                     </select>
-                    <span class="description">
-                        <?php esc_html_e( 'Als dit overeenkomt met een echte verrichting op een rekening, laat dit op "Ja" staan.', 'eme-accounting' ); ?>
-                    </span>
                 </div>
                 <?php else: ?>
                     <input type="hidden" name="is_reconciled" value="1">

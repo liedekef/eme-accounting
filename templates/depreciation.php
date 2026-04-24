@@ -26,7 +26,10 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Aankoopprijs (€)', 'eme-accounting' ); ?> *</label>
-        <input type="number" name="purchase_price" id="purchase_price" required step="0.01" min="0.01">
+        <input type="text" name="purchase_price" id="purchase_price" required
+               inputmode="decimal"
+               oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
+               placeholder="0,00">
     </div>
 </div>
 <div class="eme-acc-row">
@@ -40,7 +43,10 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Restwaarde na volledige afschrijving (€)', 'eme-accounting' ); ?></label>
-        <input type="number" name="residual_value" id="residual_value" step="0.01" min="0" value="0">
+        <input type="text" name="residual_value" id="residual_value"
+               inputmode="decimal"
+               oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
+               placeholder="0,00" value="0,00">
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Huidge waarde (€)', 'eme-accounting' ); ?></label>

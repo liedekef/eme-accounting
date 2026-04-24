@@ -102,10 +102,12 @@ foreach ( $fiscal_years as $f ) {
     </td>
     <td>
         <?php if ($c->parent_id): ?>
-        <input type="number" name="lines[<?= $c->id ?>][budgeted_amount]" 
-               value="<?= $budget > 0 ? $budget : '' ?>" 
-               step="0.01" min="0" style="width:120px"
-               data-orig="<?= $budget > 0 ? $budget : '' ?>"
+        <input type="text" name="lines[<?= $c->id ?>][budgeted_amount]" 
+               value="<?= $budget > 0 ? number_format( (float) $budget, 2, ',', '.' ) : '' ?>" 
+               inputmode="decimal"
+               oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
+               style="width:120px"
+               data-orig="<?= $budget > 0 ? number_format( (float) $budget, 2, ',', '.' ) : '' ?>"
                <?= $is_closed ? 'disabled' : '' ?>>
         <?php endif; ?>
     </td>

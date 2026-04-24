@@ -15,7 +15,9 @@
         const isNewEntry = !form.querySelector('input[name="id"]') ||
             !form.querySelector('input[name="id"]').value;
         btn.disabled = true;
-        ajax('eme_accounting_save_entry', formToObj(form),
+        const journalEntryToSave = formToObj(form);
+        journalEntryToSave.amount = parseBE(String(journalEntryToSave.amount));  // Belgische notatie normaliseren
+        ajax('eme_accounting_save_entry', journalEntryToSave,
             (data) => {
                 if (isNewEntry) {
                     flashButton(btn, emeAccounting.i18n.saving);
