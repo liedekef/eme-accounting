@@ -1,0 +1,480 @@
+/**
+ * Journal page – ftable met createAction/updateAction + formCreated
+ *
+ * Strategie:
+ * - fields: enkel list-kolommen + form-only fields (type hidden/select/text/textarea)
+ * - formCreated: doet direction↔COA linking, fiscal year check, SnapSelect events
+ *   en amount Belgische notatie — precies zoals de originele initJournalLinking()
+ * - input: callback enkel voor amount (Belgische notatie invoer)
+ * - options: function + dependsOn voor coa_id en contra_account_id
+ */
+(function () {
+
+    const ajaxUrl  = emeAccounting.ajaxUrl;
+    const nonce    = emeAccounting.nonce;
+    const i18n     = emeAccounting.i18n;
+    const accounts = (window.emeAccJournalData || {}).accounts || [];  // [{Value, DisplayText}]
+    const allCoa   = (window.emeAccJournalData || {}).coa     || [];  // [{Value, DisplayText, Group, direction, disabled}]
+    const today    = (window.emeAccJournalData || {}).today   || '';
+    const editId   = (window.emeAccJournalData || {}).editId  || 0;
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * HELPERS
+     * ═══════════════════════════════════════════════════════════════════ */
+
+    function parseBEAmount(str) {
+        return parseFloat(String(str).replace(/\./g, '').replace(',', '.')) || 0;
+    }
+
+    function checkFiscalYear(dateVal, fySpan) {
+        if (!fySpan) return;
+        if (!dateVal) { fySpan.textContent = ''; return; }
+        const fd = new FormData();
+        fd.append('action', 'eme_accounting_check_fiscal_year');
+        fd.append('nonce', nonce);
+        fd.append('date', dateVal);
+        fetch(ajaxUrl, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(r => {
+                if (r.success && r.data) {
+                    const fy = r.data;
+                    fySpan.textContent = fy.year + ' (' + fy.start_date + ' – ' + fy.end_date + ')';
+                    fySpan.style.color = fy.status === 'closed' ? '#d63638' : '#2271b1';
+                    if (fy.status === 'closed')
+                        fySpan.textContent += ' [' + (i18n.fyClosed || 'Afgesloten') + ']';
+                } else {
+                    fySpan.textContent = r.data || (i18n.noFyFound || '—');
+                    fySpan.style.color = '#d63638';
+                }
+            })
+            .catch(() => { fySpan.textContent = '—'; });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * FILTER FORM SUBMIT
+     * ═══════════════════════════════════════════════════════════════════ */
+    document.addEventListener('submit', function (e) {
+        const form = e.target.closest('form');
+        if (form && form.id === 'eme-acc-filter-form') {
+            e.preventDefault();
+            JournalTable.reload();
+        }
+    });
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * JOURNAL FTABLE
+     * ═══════════════════════════════════════════════════════════════════ */
+    const container = document.querySelector('#JournalTableContainer');
+    if (!container) return;
+
+    const JournalTable = new FTable('#JournalTableContainer', {
+        title: '',
+        paging: true,
+        sorting: true,
+        sortingResetButton: true,
+        multiSorting: true,
+        defaultSorting: 'entry_date DESC, id DESC',
+        selecting: false,
+        multiselect: false,
+        actions: {
+            listAction:   ajaxUrl + '?action=eme_accounting_journal_list&nonce='  + nonce,
+            createAction: ajaxUrl + '?action=eme_accounting_save_entry&nonce='    + nonce,
+            updateAction: ajaxUrl + '?action=eme_accounting_save_entry&nonce='    + nonce,
+            deleteAction: ajaxUrl + '?action=eme_accounting_delete_entry&nonce='  + nonce,
+        },
+
+        deleteConfirmation: function (data) {
+            data.deleteConfirmMessage = data.record.direction === 'transfer'
+                ? 'Weet u zeker dat u deze transfer van ' + formatCurrency(data.record.amount)
+                  + ' wil verwijderen? Dit verwijdert beide entries van de transfer.'
+                : 'Weet u zeker dat u deze boeking van ' + formatCurrency(data.record.amount)
+                  + ' wil verwijderen?';
+        },
+        recordDeleted: function () { JournalTable.reload(); },
+
+        /* ── FIELDS ──────────────────────────────────────────────────── */
+        fields: {
+            id: { key: true, width: '1%', columnResizable: false, list: false },
+
+            /* ── List columns (originele volgorde) ── */
+            entry_date: {
+                title: i18n.date || 'Datum',
+                sortable: true,
+                list: true,
+                type: 'date',
+                defaultValue: new Date().toISOString().split('T')[0],
+                dateFormat: "d/m/Y",
+                // form input: native date + fiscal year span
+                input: function (data) {
+                    const { inputField, record } = data;
+
+                    const wrap = document.createElement('div');
+                    wrap.appendChild(inputField);
+
+                    const fy = document.createElement('span');
+                    fy.className = 'eme-acc-fy-info';
+                    fy.style.cssText = 'display:block;margin-top:4px;font-size:12px;font-weight:bold;min-height:1.2em';
+                    wrap.appendChild(fy);
+
+                    return wrap;
+                },
+            },
+            description: {
+                title: i18n.description || 'Omschrijving',
+                sortable: true,
+                list: true,
+                create: false, edit: false,  // rendered separately below as description_input
+                display: function (data) {
+                    return '<a href="' + data.record.edit_url + '">' + esc(data.value) + '</a>';
+                },
+            },
+            coa_name: {
+                title: i18n.category || 'Categorie',
+                sortable: false, searchable: false,
+                list: true,
+                create: false, edit: false,
+                display: function (data) {
+                    return data.value ? '<span class="eme-acc-tag">' + esc(data.value) + '</span>' : '';
+                },
+            },
+            bank_statement_ref: {
+                title: i18n.bankref || 'Bankref.',
+                sortable: false, searchable: false,
+                inputAttributes: 'maxlength=100',
+                display: function (data) {
+                    if (!data.value) return '';
+                    return '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;'
+                         + 'text-overflow:ellipsis;white-space:nowrap" title="' + esc(data.value) + '">'
+                         + esc(data.value) + '</span>';
+                },
+            },
+            eme_event: {
+                title: i18n.event || 'Event',
+                sortable: false, visibility: 'hidden',
+                create: false, edit: false,
+            },
+            account_name: {
+                title: i18n.account || 'Rekening',
+                sortable: false, searchable: false,
+                list: true,
+                create: false, edit: false,
+            },
+            amount: {
+                title: i18n.amount || 'Bedrag',
+                sortable: true, searchable: false,
+                display: function (data) {
+                    const v = formatCurrency(data.value);
+                    const c = data.value < 0 ? 'red' : 'green';
+                    return '<span style="color:' + c + ';font-weight:bold">' + v + '</span>';
+                },
+                input: function (data) {
+                    const raw = (data.record && data.record.amount != null) ? data.record.amount : '';
+                    const inp = document.createElement('input');
+                    inp.type        = 'text';
+                    inp.name        = 'amount';
+                    inp.id          = 'Edit-amount';
+                    inp.required    = true;
+                    inp.inputMode   = 'decimal';
+                    inp.placeholder = '0,00';
+                    inp.value       = new Intl.NumberFormat('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(Math.abs(raw)) || 0);
+                    inp.addEventListener('input', function () {
+                        this.value = this.value.replace(/[^0-9,.]/g, '');
+                    });
+                    inp.addEventListener('blur', function () {
+                        const v = parseBEAmount(this.value);
+                        if (v > 0) this.value = v.toFixed(2).replace('.', ',');
+                    });
+                    return inp;
+                },
+            },
+            is_reconciled: {
+                title: i18n.reconciled || 'Vereffend',
+                width: '1%', sortable: false, searchable: false,
+                defaultValue: '1',
+                options: [
+                    { Value: '0', DisplayText: 'Nee' },
+                    { Value: '1', DisplayText: 'Ja'  },
+                ],
+                display: function (data) {
+                    if (data.value) {
+                        const title = data.record.reconciled_at ? esc(data.record.reconciled_at) : '';
+                        return '<span class="eme-acc-tag eme-acc-reconciled" title="' + title + '">✓</span>';
+                    }
+                    return '<span class="eme-acc-tag eme-acc-pending">'
+                         + esc(i18n.pending || 'Openstaand') + '</span>';
+                },
+            },
+
+            /* ── Form-only fields (list: false) ── */
+
+            // description opnieuw als form-veld (create/edit), maar list:false
+            // zodat het los staat van de list-kolom hierboven
+            description_input: {
+                title: i18n.description || 'Omschrijving',
+                list: false,
+                inputAttributes: 'required maxlength=255',
+                // We moeten zelf de name overschrijven want ftable gebruikt de key ('description_input')
+                input: function (data) {
+                    const val = (data.record && data.record.description) ? data.record.description : '';
+                    const inp = document.createElement('input');
+                    inp.type      = 'text';
+                    inp.name      = 'description';   // ← post als 'description'
+                    inp.id        = 'Edit-description_input';
+                    inp.required  = true;
+                    inp.maxLength = 255;
+                    inp.value     = val;
+                    return inp;
+                },
+            },
+            booking_date: {
+                title: i18n.bookingDate || 'Boekingsdatum bank',
+                type: 'date',
+                list: false,
+                explain: 'Valutadatum (optioneel)',
+            },
+            direction: {
+                title: i18n.direction || 'Richting',
+                defaultValue: 'out',
+                options: [
+                    { Value: 'in',       DisplayText: 'Ontvangst (+)' },
+                    { Value: 'out',      DisplayText: 'Uitgave (–)'   },
+                    { Value: 'transfer', DisplayText: 'Transfer'      },
+                ],
+            },
+            coa_id: {
+                title: i18n.coa || 'Rekeningstelsel',
+                list: false,
+                dependsOn: 'direction',
+                options: function (data) {
+                    const dir = (data.dependedValues && data.dependedValues.direction)
+                              || (data.record && data.record.direction)
+                              || 'out';
+
+                    // Toon/verberg het COA-veld via de container
+                    const coaCont = data.form
+                        ? data.form.querySelector('#ftable-input-field-container-div-coa_id')
+                        : null;
+
+                    if (dir === 'transfer') {
+                        if (coaCont) coaCont.style.display = 'none';
+                        return [{ Value: '', DisplayText: '— Niet van toepassing —' }];
+                    }
+                    if (coaCont) coaCont.style.display = '';
+
+                    const opts = [{ Value: '', DisplayText: '— Kies rekening —' }];
+                    allCoa.forEach(function (c) {
+                        if (c.Value === data.value) {
+                            c.selected=true;
+                        }
+                        if (c.direction === dir) opts.push(c);
+                    });
+                    return opts;
+                },
+            },
+            eme_event_id: {
+                title: i18n.event || 'Event',
+                list: false,
+                // SnapSelect wordt geïnitialiseerd in formCreated
+                input: function (data) {
+                    const eventId    = data.record ? (data.record.eme_event_id    || 0)  : 0;
+                    const eventLabel = data.record ? (data.record.eme_event_label || '') : '';
+
+                    const wrap = document.createElement('div');
+
+                    const sel = document.createElement('select');
+                    sel.name      = 'eme_event_id';
+                    sel.id        = 'Edit-eme_event_id';
+                    sel.className = 'eme_snapselect_events_class';
+                    sel.style.width = '100%';
+
+                    if (eventId && eventLabel) {
+                        const opt = document.createElement('option');
+                        opt.value = String(eventId);
+                        opt.textContent = eventLabel;
+                        opt.setAttribute('selected', 'selected');
+                        sel.appendChild(opt);
+                    }
+                    wrap.appendChild(sel);
+
+                    const cbLabel = document.createElement('label');
+                    cbLabel.style.cssText = 'display:block;font-size:12px;margin-top:4px';
+                    const cb = document.createElement('input');
+                    cb.type  = 'checkbox';
+                    cb.name  = 'eventsearch_all';
+                    cb.id    = 'eventsearch_all';
+                    cb.value = '1';
+                    cbLabel.appendChild(cb);
+                    cbLabel.appendChild(document.createTextNode(
+                        ' ' + (i18n.searchAllEvents || 'Zoek door alle events')
+                    ));
+                    wrap.appendChild(cbLabel);
+                    return wrap;
+                },
+            },
+            account_id: {
+                title: i18n.account || 'Rekening',
+                list: false,
+                inputAttributes: 'required',
+                options: [{ Value: '', DisplayText: '— Kies rekening —' }, ...accounts],
+            },
+            contra_account_id: {
+                title: i18n.contra || 'Tegenrekening',
+                list: false,
+                dependsOn: 'direction',
+                options: function (data) {
+                    const dir = (data.dependedValues && data.dependedValues.direction)
+                              || (data.record && data.record.direction)
+                              || '';
+
+                    const contraCont = data.form
+                        ? data.form.querySelector('#ftable-input-field-container-div-contra_account_id')
+                        : null;
+                    const contraSelect = data.form
+                        ? data.form.querySelector('[name="contra_account_id"]')
+                        : null;
+
+                    if (dir === 'transfer') {
+                        if (contraCont)  contraCont.style.display = '';
+                        if (contraSelect) contraSelect.required   = true;
+                    } else {
+                        if (contraCont)  contraCont.style.display = 'none';
+                        if (contraSelect) contraSelect.required   = false;
+                    }
+                    return [{ Value: '', DisplayText: '— (geen) —' }, ...accounts];
+                },
+            },
+            payment_method: {
+                title: i18n.payment || 'Betaalmethode',
+                list: false,
+                options: [
+                    { Value: '',             DisplayText: '—'                  },
+                    { Value: 'bank',         DisplayText: 'Bankoverschrijving'  },
+                    { Value: 'cash',         DisplayText: 'Cash'                },
+                    { Value: 'card',         DisplayText: 'Bankkaart'           },
+                    { Value: 'direct_debit', DisplayText: 'Domiciliëring'       },
+                    { Value: 'mollie',       DisplayText: 'Mollie / Online'     },
+                ],
+            },
+            attachment_url: {
+                title: i18n.attach  || 'Bijlage URL',
+                list: false, type: 'url',
+            },
+            notes: {
+                title: i18n.notes   || 'Notities',
+                list: false, type: 'textarea',
+            },
+            // is_reconciled voor create: verborgen in formCreated (defaultValue='1')
+            transfer_id:   { list: false, create: false, edit: false, type: 'hidden' },
+            reconciled_at: { list: false, create: false, edit: false, type: 'hidden' },
+        },
+
+        listQueryParams: function () {
+            return {
+                fiscal_year:  document.querySelector('#eme-acc-year-filter')?.value      || '',
+                account_id:   document.querySelector('#eme-acc-account-filter')?.value   || '',
+                direction:    document.querySelector('#eme-acc-direction-filter')?.value  || '',
+                coa_id:       document.querySelector('#eme-acc-coa-filter')?.value        || '',
+                search:       document.querySelector('#eme-acc-search-filter')?.value     || '',
+                daterange:    document.querySelector('#eme-daterange-filter')?.value      || '',
+                amount:       document.querySelector('#eme-acc-amount-filter')?.value     || '',
+                eme_event_id: document.querySelector('#eme-acc-event-filter')?.value      || '',
+            };
+        },
+
+        /* ── formCreated ─────────────────────────────────────────────── */
+        formCreated: function (args) {
+            const form     = args.form;
+            const formType = args.formType;
+            const record   = args.record;
+
+            /* 1. Direction-select: lock bij edit */
+            const dirSel = form.querySelector('[name="direction"]');
+            if (formType === 'edit' && dirSel) {
+                dirSel.disabled = true;
+            }
+
+            /* 2. Fiscal year span: koppel aan entry_date input */
+            const dateInp = form.querySelector('[name="entry_date"]');
+            const fySpan  = form.querySelector('.eme-acc-fy-info');
+            if (dateInp && fySpan) {
+                dateInp.addEventListener('change', function () {
+                    checkFiscalYear(dateInp.value, fySpan);
+                });
+            }
+
+            /* 3. Amount: Belgische notatie herstellen voor edit */
+            const amtInp = form.querySelector('[name="amount"]');
+            if (amtInp && record && record.amount != null && record.amount !== '') {
+                // PHP stuurt amount terug als float-string bv "12.50"
+                // Zet om naar Belgische notatie voor weergave
+                const v = parseBEAmount(String(record.amount));
+                if (v > 0) amtInp.value = v.toFixed(2).replace('.', ',');
+            }
+
+            /* 4. is_reconciled verbergen bij create (default=1 via defaultValue) */
+            if (formType === 'create') {
+                const reconCont = form.querySelector('#ftable-input-field-container-div-is_reconciled');
+                if (reconCont) reconCont.style.display = 'none';
+            }
+
+            /* 5. Transfer: alles read-only + notice */
+            if (record && record.transfer_id) {
+                form.querySelectorAll('input,select,textarea').forEach(function (el) {
+                    el.disabled = true;
+                });
+                const notice = document.createElement('p');
+                notice.style.cssText = 'color:#d63638;margin-bottom:12px';
+                notice.textContent = i18n.transferReadOnly
+                    || 'Transfer boekingen kunnen niet bewerkt worden.';
+                form.insertBefore(notice, form.firstChild);
+            }
+
+            initSnapSelect(form.querySelector('#Edit-coa_id'));
+            initSnapSelectRemote('select.eme_snapselect_events_class', {
+                placeholder: 'Selecteer event',
+                showClearButton: true,
+                data: function(search, page) {
+                    return {
+                        action: 'eme_accounting_events_list',
+                        entry_date: form.querySelector('#Edit-entry_date')?.value || 0,
+                        search_all: form.querySelector('#eventsearch_all')?.checked ? 1 : 0,
+                        nonce: nonce
+                    };
+                }
+            });
+
+        },
+    });
+
+    JournalTable.load();
+
+    /* ── Filter selects → immediate reload ── */
+    document.querySelectorAll('#eme-acc-filter-form select').forEach(function (sel) {
+        sel.addEventListener('change', function () { JournalTable.reload(); });
+    });
+
+    /* ── Date range picker ── */
+    if (typeof FDatepicker !== 'undefined') {
+        new FDatepicker('#localized_daterange-filter', {
+            fieldsizing: true, format: 'd/m/Y'
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+     * OPEN EDIT FORM voor ?edit=<id> in de URL
+     * ═══════════════════════════════════════════════════════════════════ */
+    if (editId) {
+        JournalTable.on('recordsLoaded', function handler() {
+            JournalTable.off('recordsLoaded', handler);
+
+            const getUrl = ajaxUrl + '?action=eme_accounting_get_entry&nonce=' + nonce + '&id=' + editId;
+            JournalTable.editRecordViaAjax(editId, getUrl);
+
+            // Verwijder ?edit= uit de URL
+            const u = new URL(window.location.href);
+            u.searchParams.delete('edit');
+            window.history.replaceState({}, document.title, u.toString());
+        });
+    }
+
+})();

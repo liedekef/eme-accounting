@@ -20,10 +20,9 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
         <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting&year='+this.value">
             <?php foreach ( $fiscal_years as $f ): ?>
             <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
-                <?= (int) $f->year ?>
-                <?php if ( $f->status === 'closed' ): ?>
-                    (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
-                <?php endif; ?>
+            <?php echo (int) $f->year;
+                  if ( $f->status === 'closed' ) esc_html_e( 'gesloten', 'eme-accounting' );
+            ?>
             </option>
             <?php endforeach; ?>
         </select>

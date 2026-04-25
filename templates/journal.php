@@ -12,7 +12,7 @@ $edit_id     = isset( $_GET['edit'] )       ? (int) $_GET['edit']               
 $accounts    = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $edit_entry  = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
-$years       = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
+$fiscal_years = EMEAccounting\FiscalYear::get_all();
 
 // $form_disabled may already be set by Menu.php (read-only access profile).
 // Journal can only further restrict it (e.g. closed fiscal year, transfer entry, inactive account).
@@ -241,8 +241,12 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
         <form method="get" id="eme-acc-filter-form">
             <select name="year" id="eme-acc-year-filter">
                 <option value=""><?php esc_html_e( 'Filter op boekjaar', 'eme-accounting' ); ?></option>
-                <?php foreach ( $years as $y ): ?>
-                <option value="<?= $y ?>" ><?= $y ?></option>
+                <?php foreach ( $fiscal_years as $f ): ?>
+                    <option value="<?= (int) $f->year ?>">
+                            <?php echo (int) $f->year;
+                                  if ( $f->status === 'closed' ) esc_html_e( 'gesloten', 'eme-accounting' );
+                            ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
             <input type='hidden' id='eme-daterange-filter' name='eme-daterange-filter'>
