@@ -9,23 +9,25 @@ $year       = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' )
 $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 $accounts   = EMEAccounting\Accounts::get_all();
 $recent     = EMEAccounting\Journal::get_entries( [ 'fiscal_year' => $year, 'limit' => 10 ] );
-$years      = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 4 );
+$fiscal_years = EMEAccounting\FiscalYear::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
 <fieldset <?= $form_disabled ?>>
     <h1><?php esc_html_e( 'EME Boekhouding – Dashboard', 'eme-accounting' ); ?></h1>
 
     <div class="eme-acc-toolbar">
-        <form method="get">
-            <input type="hidden" name="page" value="emeaccounting">
-            <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?>
-                <select name="year" id="eme-acc-year-select" onchange="this.form.submit()">
-                    <?php foreach ( $years as $y ): ?>
-                    <option value="<?= $y ?>" <?= selected( $y, $year, false ); ?>><?= $y ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-        </form>
+        <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?>
+        <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting&year='+this.value">
+            <?php foreach ( $fiscal_years as $f ): ?>
+            <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
+                <?= (int) $f->year ?>
+                <?php if ( $f->status === 'closed' ): ?>
+                    (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
+                <?php endif; ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+        </label>
         <div class="spacer"></div>
         <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>" class="button button-primary">
             + <?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?>

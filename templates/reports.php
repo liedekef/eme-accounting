@@ -1,7 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 $year  = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
-$years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
+$fiscal_years = EMEAccounting\FiscalYear::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
 <fieldset>
@@ -25,8 +25,13 @@ $years = range( (int) gmdate( 'Y' ), (int) gmdate( 'Y' ) - 5 );
     <div class="eme-acc-field" id="report_year_div">
         <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
         <select id="report_year">
-            <?php foreach ( $years as $y ): ?>
-            <option value="<?= $y ?>" <?= selected( $y, $year, false ) ?>><?= $y ?></option>
+            <?php foreach ( $fiscal_years as $f ): ?>
+            <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
+                <?= (int) $f->year ?>
+                <?php if ( $f->status === 'closed' ): ?>
+                    (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
+                <?php endif; ?>
+            </option>
             <?php endforeach; ?>
         </select>
     </div>
