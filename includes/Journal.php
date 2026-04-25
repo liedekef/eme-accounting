@@ -269,14 +269,13 @@ class Journal {
         $allowed_directions = [ 'in', 'out', 'transfer' ];
         $direction          = in_array( $data['direction'] ?? 'out', $allowed_directions, true )
             ? $data['direction']
-            : 'out';
+            : null;
 
         $row = [
             'entry_date'         => $entry_date,
             'booking_date'       => ! empty( $data['booking_date'] ) ? eme_sanitize_request( $data['booking_date'] ) : null,
             'description'        => eme_sanitize_request( $data['description'] ?? '' ),
             'amount'             => round( (float) $data['amount'], 2 ),
-            'direction'          => $direction,
             'account_id'         => (int) $data['account_id'],
             'coa_id'             => ! empty( $data['coa_id'] ) ? (int) $data['coa_id'] : null,
             'bank_statement_ref' => eme_sanitize_request( $data['bank_statement_ref'] ?? '' ),
@@ -297,12 +296,19 @@ class Journal {
 
         $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
 
+        // when editing, make sure to not change the direction (normally the field is not even passed along ...)
         if ( !empty( $id) ) {
             $orig_entry = self::get($id);
-            if ($orig_entry->direction != $direction) {
+            if (!empty($direction) && $orig_entry->direction != $direction) {
                 return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$orig_entry->direction,$direction) );
             }
         }
+
+        // if the direction is given, take it along
+        if (!empty($direction)) {
+            $row['direction'] = $direction;
+        }
+
         // Transfer requires both account_id and contra_account_id
         if ( $direction === 'transfer' ) {
             if ( !empty( $id) ) {

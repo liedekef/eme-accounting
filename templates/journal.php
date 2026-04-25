@@ -82,18 +82,11 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Richting', 'eme-accounting' ); ?></label>
-                    <?php if ($edit_entry) : ?>
-                    <input type="hidden" name="direction" id="direction" value="<?=$edit_entry->direction ?? '' ?>">
-                    <?= $edit_entry->direction == "in" ? esc_html_e( 'Ontvangst (+)', 'eme-accounting' ) : '' ?>
-                    <?= $edit_entry->direction == "out" ? esc_html_e( 'Uitgave (-)', 'eme-accounting' ) : '' ?>
-                    <?= $edit_entry->direction == "transfer" ? esc_html_e( 'Transfer', 'eme-accounting' ) : '' ?>
-                    <?php else: ?>
-                    <select name="direction" id="direction">
+                    <select name="direction" id="direction" <?= ($edit_entry) ? 'disabled' : '' ?>>
                         <option value="in"  <?= selected( $edit_entry->direction ?? '', 'in',  false ) ?>><?php esc_html_e( 'Ontvangst (+)', 'eme-accounting' ); ?></option>
                         <option value="out" <?= selected( $edit_entry->direction ?? '', 'out', false ) ?>><?php esc_html_e( 'Uitgave (–)', 'eme-accounting' ); ?></option>
                         <option value="transfer" <?= selected( $edit_entry->direction ?? '', 'transfer', false ) ?>><?php esc_html_e( 'Transfer', 'eme-accounting' ); ?></option>
                     </select>
-                    <?php endif; ?>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
@@ -141,7 +134,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                         if ( $event ) {
                             $myevents[ $event_id ] = $event['event_name']. ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
                         } else {
-                            $myevents[ $event_id ] = __('onbekend event','eme_accounting');
+                            $myevents[ $event_id ] = __('onbekend event','eme-accounting');
                         }
                     }
                     echo eme_ui_select( $event_id, 'eme_event_id', $myevents, '', 0, 'eme_snapselect_events_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
