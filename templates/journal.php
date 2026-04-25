@@ -125,7 +125,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bedrag (€)', 'eme-accounting' ); ?> *</label>
                     <input type="text" name="amount" required
-                           inputmode="decimal"
+                           inputmode="decimal" size="5"
                            oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                            value="<?= esc_attr( $edit_entry && $edit_entry->amount > 0 ? number_format( (float) $edit_entry->amount, 2, ',', '.' ) : '' ) ?>"
                            placeholder="0,00">
