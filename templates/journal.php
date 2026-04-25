@@ -127,7 +127,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                     <input type="text" name="amount" required
                            inputmode="decimal"
                            oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
-                           value="<?= esc_attr( $edit_entry->amount > 0 ? number_format( (float) $edit_entry->amount, 2, ',', '.' ) : '' ) ?>"
+                           value="<?= esc_attr( $edit_entry && $edit_entry->amount > 0 ? number_format( (float) $edit_entry->amount, 2, ',', '.' ) : '' ) ?>"
                            placeholder="0,00">
                 </div>
                 <div class="eme-acc-field">
@@ -151,7 +151,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
                     <?php if ( $form_disabled && $inactive_account ): ?>
-                    <input type="hidden" name="account_id" value="<?= (int) $edit_entry->account_id ?>">
+                    <input type="hidden" name="account_id" value="<?= $edit_entry ? (int) $edit_entry->account_id : 0 ?>">
                     <span style="color:#d63638"><?= __( 'Inactief: ', 'eme-accounting' ) . esc_html( $inactive_account->name ) . ( $inactive_account->iban ? ' (' . $inactive_account->iban . ')' : '' ) ?></span>
                     <?php else: ?>
                     <select name="account_id" required>
