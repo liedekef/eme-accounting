@@ -16,10 +16,14 @@ use EMEAccounting\Capabilities;
 class Journal {
 
     public static function init(): void {
-        add_action( 'wp_ajax_eme_accounting_save_entry',   [ __CLASS__, 'ajax_save' ] );
-        add_action( 'wp_ajax_eme_accounting_delete_entry', [ __CLASS__, 'ajax_delete' ] );
-        add_action( 'wp_ajax_eme_accounting_journal_list',  [ __CLASS__, 'ajax_list' ] );
-        add_action( 'wp_ajax_eme_accounting_events_list',  [ __CLASS__, 'ajax_events_snapselect' ] );
+        add_action( 'wp_ajax_eme_accounting_save_entry',              [ __CLASS__, 'ajax_save' ] );
+        add_action( 'wp_ajax_eme_accounting_delete_entry',            [ __CLASS__, 'ajax_delete' ] );
+        add_action( 'wp_ajax_eme_accounting_journal_list',            [ __CLASS__, 'ajax_list' ] );
+        add_action( 'wp_ajax_eme_accounting_events_list',             [ __CLASS__, 'ajax_events_snapselect' ] );
+        add_action( 'wp_ajax_eme_accounting_del_journal_attachment',  [ __CLASS__, 'ajax_delete_attachment' ] );
+
+        // Auto-delete attachment files when a journal entry is removed.
+        add_action( 'eme_accounting_journal_deleted', [ __CLASS__, 'on_entry_deleted' ] );
     }
 
     /* ------------------------------------------------------------------
@@ -429,6 +433,8 @@ class Journal {
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
         }
+        // Handle optional file uploads (multipart form, input name="files[]").
+        \EMEFileAttachments::upload( $result, 'journal' );
         wp_send_json_success( [ 'id' => $result ] );
     }
 
@@ -440,6 +446,30 @@ class Journal {
             wp_send_json_error( $result->get_error_message() );
         }
         wp_send_json( [ 'Result' => 'OK' ] );
+    }
+
+    /**
+     * AJAX: delete a single journal attachment file.
+     * Expected POST fields: id, type, key, random_id, name, nonce.
+     */
+    public static function ajax_delete_attachment(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'journal' );
+
+        $type = isset( $_POST['type'] ) ? sanitize_key( $_POST['type'] ) : '';
+        if ( $type !== 'journal' ) {
+            wp_send_json_error( 'Invalid attachment type.' );
+        }
+
+        \EMEFileAttachments::ajax_delete();
+    }
+
+    /**
+     * Called by the eme_accounting_journal_deleted action.
+     * Removes all attachment files for the deleted entry.
+     */
+    public static function on_entry_deleted( int $entry_id ): void {
+        \EMEFileAttachments::delete_all( $entry_id, 'journal' );
     }
 
     public static function ajax_list(): void {
@@ -496,6 +526,7 @@ class Journal {
                 'account_name'       => $entry->account_name ?? '',
                 'amount'             => $signed_amount,
                 'direction'          => $entry->direction,
+                'files'              => $entry->files,
                 'is_reconciled'      => (bool) $entry->is_reconciled,
                 'reconciled_at'      => $entry->is_reconciled && $entry->reconciled_at
                                             ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE )
@@ -647,9 +678,13 @@ class Journal {
                 {$limit}";
 
         if ( empty( $prepare ) ) {
-            return $wpdb->get_results( $sql );
+            $rows = $wpdb->get_results( $sql );
+        } else {
+            $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) );
         }
-
-        return $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) );
+        foreach ($rows as &$row) {
+            $row->files = \EMEFileAttachments::get_links_html($row->id, 'journal');
+        }
+        return $rows;
     }
 }

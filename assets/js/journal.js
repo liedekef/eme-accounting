@@ -47,6 +47,30 @@
         );
     }
 
+    function handleDeleteUpload(btn) {
+        if (!confirm(emeAccounting.i18n.confirm_delete)) return;
+        const parentlink = btn.closest('.del_upload-button');
+        let id = parentlink.dataset.id;
+        let name = parentlink.dataset.name;
+        let type = parentlink.dataset.type;
+        let random_id = parentlink.dataset.random_id;
+        let key = parentlink.dataset.key;
+
+        const formData = {
+            id: id,
+            name: name,
+            type: type,
+            key: key,
+            random_id: random_id,
+        };
+
+        ajax('eme_accounting_del_journal_attachment', formData, 
+            () => {
+                const spanEl = document.getElementById('span_' + random_id);
+                if (spanEl) spanEl.remove();
+            });
+    }
+
     /* ═══════════════════════════════════════════════════════════════════
      * SINGLE SUBMIT DISPATCHER
      * ═══════════════════════════════════════════════════════════════════ */
@@ -70,7 +94,9 @@
      * SINGLE CLICK DISPATCHER
      * ═══════════════════════════════════════════════════════════════════ */
     const clickHandlers = {
-        'eme-acc-delete-entry':   handleJournalDelete
+        'eme-acc-delete-entry': handleJournalDelete,
+        'del_upload-button':    handleDeleteUpload
+
     };
     document.addEventListener('click', function (e) {
         for (const [cls, handler] of Object.entries(clickHandlers)) {
@@ -119,9 +145,6 @@
                     title: emeAccounting.i18n.date || 'Datum',
                     sortable: true
                 },
-                edit_url: {
-                    list: false
-                },
                 description: {
                     title: emeAccounting.i18n.description || 'Omschrijving',
                     sortable: true,
@@ -145,6 +168,11 @@
                         if (!data.value) return '';
                         return '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
                     }
+                },
+                files : {
+                    title: emeAccounting.i18n.files || 'Categorie',
+                    sortable: false,
+                    searchable: false
                 },
                 eme_event: {
                     title: emeAccounting.i18n.event || 'Event',

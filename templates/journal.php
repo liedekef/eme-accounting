@@ -51,7 +51,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
     <!-- Add / Edit form -->
     <div class="eme-acc-form-box">
         <h2><?= $edit_entry ? esc_html__( 'Boeking bewerken', 'eme-accounting' ) : esc_html__( 'Nieuwe boeking', 'eme-accounting' ) ?></h2>
-        <form id="eme-acc-journal-form">
+        <form id="eme-acc-journal-form" enctype="multipart/form-data">
         <fieldset <?= $form_disabled ?>>
             <?php if ( $edit_entry ): ?>
             <input type="hidden" name="id" value="<?= (int) $edit_entry->id ?>">
@@ -220,6 +220,25 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <?php else: ?>
                     <input type="hidden" name="is_reconciled" value="1">
                 <?php endif; ?>
+            </div>
+
+            <div class="eme-acc-row">
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'Bijlagen', 'eme-accounting' ); ?></label>
+                    <?php if ( $edit_entry ):
+                        $existing_files = \EMEFileAttachments::get_delete_links_html( (int) $edit_entry->id, 'journal' );
+                        if ( $existing_files ):
+                    ?>
+                    <div id="eme-acc-journal-attachments" class="eme-acc-attachments">
+                        <?= $existing_files // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from EMEFileAttachments ?>
+                    </div>
+                    <?php endif; endif; ?>
+                    <?php if ( ! $form_disabled ): ?>
+                    <input type="file" name="files[]" id="journal-files" multiple
+                           accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt">
+                    <span class="description"><?php esc_html_e( 'Optioneel: één of meerdere bestanden (PDF, afbeelding, …)', 'eme-accounting' ); ?></span>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <p>

@@ -6,6 +6,13 @@ defined( 'ABSPATH' ) || exit;
 class Assets {
     public static function init(): void {
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
+
+        // Initialise EMEFileAttachments storage root for journal entries.
+        $upload = wp_upload_dir();
+        \EMEFileAttachments::init(
+            $upload['basedir'] . '/eme-accounting',
+            $upload['baseurl'] . '/eme-accounting'
+        );
     }
 
     public static function enqueue( string $hook ): void {
@@ -52,7 +59,7 @@ class Assets {
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'i18n'    => [
                 'confirm_delete' => __( 'Zeker verwijderen?', 'eme-accounting' ),
-                'confirm_delete_patrimony' => __( 'Staat van Vermogen verwijderen?', 'eme-accounting' ),
+                'confirm_delete_patrimony' => __( 'Staat van Vermogen verwijderen?', 'eme-vzw-helper' ),
                 'confirm_delete_budget'    => __( 'Begroting van dit boekjaar verwijderen?', 'eme-accounting' ),
                 'save'           => __( 'Opslaan', 'eme-accounting' ),
                 'update'         => __( 'Bijwerken', 'eme-accounting' ),
@@ -62,6 +69,7 @@ class Assets {
                 'date'           => __( 'Datum', 'eme-accounting' ),
                 'description'    => __( 'Omschrijving', 'eme-accounting' ),
                 'category'       => __( 'Categorie', 'eme-accounting' ),
+                'files'          => __( 'Bijlagen', 'eme-accounting' ),
                 'bankref'        => __( 'Bankref.', 'eme-accounting' ),
                 'account'        => __( 'Rekening', 'eme-accounting' ),
                 'amount'         => __( 'Bedrag', 'eme-accounting' ),

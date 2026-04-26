@@ -1,0 +1,431 @@
+<?php
+
+/**
+ * Standalone file-attachment helper.
+ *
+ * Storage layout on disk:
+ *   {upload_dir}/{type}/{id}/{random_id}-{key}-{sanitized_filename}
+ *
+ * -------------------------------------------------------------------------
+ * QUICK-START
+ * -------------------------------------------------------------------------
+ *
+ * 1. Bootstrap (once, e.g. in your plugin's init action):
+ *
+ *      EMEFileAttachments::init( wp_upload_dir()['basedir'] . '/my-plugin',
+ *                             wp_upload_dir()['baseurl'] . '/my-plugin' );
+ *
+ * 2. Upload on form save (multipart/form-data form, input name="files[]"):
+ *
+ *      $entry_id = Journal::save( $_POST );
+ *      if ( is_int( $entry_id ) ) {
+ *          EMEFileAttachments::upload( $entry_id, 'journal' );
+ *      }
+ *
+ * 3. Render links in a list / edit screen:
+ *
+ *      $row['files'] = EMEFileAttachments::get_links_html( $entry_id, 'journal' );
+ *      // or
+ *      $links = EMEFileAttachments::get_links( $entry_id, 'journal' );
+ *      $row['files'] = implode( '', $links );
+ *
+ * 4. AJAX delete – register the action in your plugin:
+ *
+ *      add_action( 'wp_ajax_my_plugin_del_attachment',
+ *                  [ 'EMEFileAttachments', 'ajax_delete' ] );
+ *
+ *    In the JS delete handler, POST:
+ *      action, nonce, id, type, key, random_id, name
+ *    (these are already present as data-* attributes on the delete button
+ *     rendered by get_uploaded_file_linkdelete / get_links_html)
+ *
+ * 5. Auto-cleanup when a record is deleted:
+ *
+ *      EMEFileAttachments::delete_all( $entry_id, 'journal' );
+ */
+class EMEFileAttachments {
+
+    /** @var string  Absolute path to the upload root. */
+    private static string $base_dir = '';
+
+    /** @var string  Public URL to the upload root. */
+    private static string $base_url = '';
+
+    /* ------------------------------------------------------------------
+     * Bootstrap
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Set the storage root.  Call once before any other method.
+     *
+     * @param string $base_dir  Absolute server path, no trailing slash.
+     * @param string $base_url  Matching public URL, no trailing slash.
+     */
+    public static function init( string $base_dir, string $base_url ): void {
+        self::$base_dir = rtrim( $base_dir, '/\\' );
+        self::$base_url = rtrim( $base_url, '/' );
+    }
+
+    /* ------------------------------------------------------------------
+     * Write
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Move uploaded files (from $_FILES[$file_key]) into storage.
+     *
+     * @param int    $id        Record ID (journal entry, asset, laptop …).
+     * @param string $type      Subdirectory name, e.g. 'journal', 'assets'.
+     * @param string $file_key  The HTML input name attribute, default 'files'.
+     */
+    public static function upload( int $id, string $type, string $file_key = 'files' ): void {
+        if ( empty( $_FILES ) || empty( $_FILES[ $file_key ] ) ) {
+            return;
+        }
+
+        $target = self::target_dir( $id, $type );
+        self::mkdir_with_index( $target );
+
+        $file_entry = $_FILES[ $file_key ];
+
+        // Normalise single-file upload to the same array shape as multi.
+        if ( ! is_array( $file_entry['name'] ) ) {
+            foreach ( [ 'name', 'tmp_name', 'size', 'error' ] as $k ) {
+                $file_entry[ $k ] = [ $file_entry[ $k ] ];
+            }
+        }
+
+        $total = count( $file_entry['name'] );
+        for ( $i = 0; $i < $total; $i++ ) {
+            $original  = $file_entry['name'][ $i ];
+            $tmp       = $file_entry['tmp_name'][ $i ];
+            $size      = $file_entry['size'][ $i ];
+            $error     = $file_entry['error'][ $i ];
+
+            if ( $error === UPLOAD_ERR_NO_FILE || empty( $original ) || $size === 0 ) {
+                continue;
+            }
+            if ( $error !== UPLOAD_ERR_OK ) {
+                continue;
+            }
+
+            $stored = self::sanitize_filename( $original, $file_key );
+            if ( $stored === false ) {
+                continue;
+            }
+
+            $dest = $target . '/' . $stored;
+            if ( file_exists( $dest ) ) {
+                continue; // already uploaded (same random prefix makes this rare)
+            }
+
+            move_uploaded_file( $tmp, $dest );
+        }
+    }
+
+    /**
+     * Delete ALL attachments for a record (call when the record itself is deleted).
+     *
+     * @param int    $id
+     * @param string $type
+     */
+    public static function delete_all( int $id, string $type ): void {
+        $dir = self::target_dir( $id, $type );
+        if ( is_dir( $dir ) ) {
+            self::del_tree( $dir );
+        }
+    }
+
+    /**
+     * Delete a single stored file by its stored filename (incl. random prefix).
+     *
+     * @param string $stored_filename  e.g. "abc123-files-invoice.pdf"
+     * @param int    $id
+     * @param string $type
+     */
+    public static function delete_one( string $stored_filename, int $id, string $type ): void {
+        $path = self::target_dir( $id, $type ) . '/' . $stored_filename;
+        if ( is_file( $path ) ) {
+            unlink( $path );
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * Read
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Return raw file-info arrays for all attachments of a record,
+     * optionally filtered by key.
+     *
+     * Each element:
+     *   id, type, random_id, key, field_name, name, url, mimetype
+     *
+     * @param  int    $id
+     * @param  string $type
+     * @param  string $key   Pass '' to return all keys, or e.g. 'files' to filter.
+     * @return array<int,array<string,mixed>>
+     */
+    public static function get_files( int $id, string $type, string $key = 'files' ): array {
+        $res = [];
+        $dir = self::target_dir( $id, $type );
+
+        if ( ! is_dir( $dir ) ) {
+            return $res;
+        }
+
+        $handle = opendir( $dir );
+        if ( ! $handle ) {
+            return $res;
+        }
+
+        while ( ( $entry = readdir( $handle ) ) !== false ) {
+            if ( $entry === '.' || $entry === '..' || $entry === 'index.html' ) {
+                continue;
+            }
+
+            // Expected format: {random_id}-{key}-{filename}   (max 3 parts)
+            $info = explode( '-', $entry, 3 );
+            if ( count( $info ) !== 3 ) {
+                continue;
+            }
+
+            if ( $key !== '' && $info[1] !== $key ) {
+                continue;
+            }
+
+            $res[] = [
+                'id'         => $id,
+                'type'       => $type,
+                'random_id'  => $info[0],
+                'key'        => $info[1],
+                'field_name' => $entry,
+                'name'       => $info[2],
+                'url'        => self::$base_url . "/$type/$id/$entry",
+                'mimetype'   => mime_content_type( $dir . '/' . $entry ),
+            ];
+        }
+        closedir( $handle );
+
+        return $res;
+    }
+
+    /**
+     * Return rendered HTML link+delete-button strings.
+     *
+     * The delete button carries the data-* attributes expected by the AJAX
+     * handler (ajax_delete / your custom JS).
+     *
+     * @param  int    $id
+     * @param  string $type
+     * @param  string $key
+     * @return string[]
+     */
+    public static function get_links( int $id, string $type, string $key = 'files' ): array {
+        $links = [];
+        foreach ( self::get_files( $id, $type, $key ) as $file ) {
+            $links[] = self::render_link( $file );
+        }
+        return $links;
+    }
+    public static function get_delete_links( int $id, string $type, string $key = 'files' ): array {
+        $links = [];
+        foreach ( self::get_files( $id, $type, $key ) as $file ) {
+            $links[] = self::render_link( $file, true );
+        }
+        return $links;
+    }
+
+    /**
+     * Convenience wrapper – returns a single imploded HTML string.
+     *
+     * @param  int    $id
+     * @param  string $type
+     * @param  string $key
+     * @return string
+     */
+    public static function get_links_html( int $id, string $type, string $key = 'files' ): string {
+        return implode( '', self::get_links( $id, $type, $key ) );
+    }
+    public static function get_delete_links_html( int $id, string $type, string $key = 'files' ): string {
+        return implode( '', self::get_delete_links( $id, $type, $key ) );
+    }
+
+    /**
+     * Render a single link + delete button for a file-info array.
+     *
+     * @param  array<string,mixed> $file  One element from get_files().
+     * @param  boolean $deletelink
+     * @return string
+     */
+    public static function render_link( array $file, bool $deletelink = false ): string {
+        $name      = esc_html( $file['name'] );
+        $url       = esc_url( $file['url'] );
+        $id        = (int) $file['id'];
+        $type      = esc_attr( $file['type'] );
+        $random_id = esc_attr( $file['random_id'] );
+        $key       = esc_attr( $file['key'] );
+
+        $is_image = str_starts_with( $file['mimetype'], 'image/' );
+        $link_class = $is_image ? 'image-preview-link norowselectonclick' : 'norowselectonclick';
+        $link = "<a id='upload-{$random_id}' class='{$link_class}' target='_blank' href='{$url}'>{$name}</a>";
+
+        if ($deletelink) {
+            $link .= " <a class='del_upload-button norowselectonclick' href='#'"
+                . " data-id='{$id}'"
+                . " data-name='{$name}'"
+                . " data-random_id='{$random_id}'"
+                . " data-type='{$type}'"
+                . " data-key='{$key}'>"
+                . "<span class='norowselectonclick'>❌</span>"
+                . "</a>";
+        }
+
+        return "<div id='span_{$random_id}'>{$link}<br></div>";
+    }
+
+    /* ------------------------------------------------------------------
+     * AJAX
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Generic AJAX delete handler.
+     *
+     * Wire this up yourself so you can apply the correct nonce and
+     * capability check for your plugin:
+     *
+     *   add_action( 'wp_ajax_my_plugin_del_attachment', function() {
+     *       check_ajax_referer( 'my_nonce', 'nonce' );
+     *       current_user_can( 'manage_options' ) || wp_die( 'Forbidden', 403 );
+     *       EMEFileAttachments::ajax_delete();
+     *   } );
+     *
+     * Expected POST fields: id, type, key, random_id, name
+     */
+    public static function ajax_delete(): void {
+        $id        = isset( $_POST['id'] )        ? (int) $_POST['id']                              : 0;
+        $type      = isset( $_POST['type'] )      ? sanitize_key( $_POST['type'] )                  : '';
+        $random_id = isset( $_POST['random_id'] ) ? self::sanitize_filepart( $_POST['random_id'] )  : '';
+        $key       = isset( $_POST['key'] )       ? sanitize_key( $_POST['key'] )                   : '';
+        $raw_name  = isset( $_POST['name'] )      ? trim( $_POST['name'] )                          : '';
+
+        if ( ! $id || ! $type || ! $random_id || ! $key || ! $raw_name ) {
+            wp_send_json_error( 'Missing parameters.' );
+        }
+
+        // Reconstruct stored filename from the posted components.
+        $dot      = strrpos( $raw_name, '.' );
+        $namepart = $dot !== false ? substr( $raw_name, 0, $dot ) : $raw_name;
+        $ext      = $dot !== false ? substr( $raw_name, $dot + 1 ) : 'none';
+
+        $clean_name = self::sanitize_filepart( $namepart );
+        $clean_ext  = self::sanitize_filepart( $ext );
+
+        if ( ! $clean_name || ! $clean_ext ) {
+            wp_send_json_error( 'Invalid filename.' );
+        }
+
+        $stored = "{$random_id}-{$key}-{$clean_name}.{$clean_ext}";
+        self::delete_one( $stored, $id, $type );
+
+        wp_send_json_success();
+    }
+
+    /* ------------------------------------------------------------------
+     * Internal helpers
+     * ------------------------------------------------------------------ */
+
+    private static function target_dir( int $id, string $type ): string {
+        return self::$base_dir . '/' . $type . '/' . $id;
+    }
+
+    /**
+     * Create a directory (recursively) and drop an empty index.html in it
+     * to prevent directory listing.
+     */
+    private static function mkdir_with_index( string $path ): bool {
+        $ok = true;
+        if ( ! is_dir( $path ) ) {
+            $ok = mkdir( $path, 0777, true );
+        }
+        if ( $ok && is_writable( $path ) && ! is_file( $path . '/index.html' ) ) {
+            touch( $path . '/index.html' );
+        }
+        return $ok;
+    }
+
+    /**
+     * Recursively delete a directory and all its contents.
+     */
+    private static function del_tree( string $dir ): bool {
+        foreach ( array_diff( scandir( $dir ), [ '.', '..' ] ) as $item ) {
+            $full = "$dir/$item";
+            is_dir( $full ) ? self::del_tree( $full ) : unlink( $full );
+        }
+        return rmdir( $dir );
+    }
+
+    /**
+     * Build the stored filename:  {random_id}-{key}-{sanitized_name}
+     *
+     * Returns false when the name cannot be sanitized to a safe string.
+     *
+     * @param  string $original  Original filename as provided by the browser.
+     * @param  string $key       The file-input key (= HTML name attribute).
+     * @return string|false
+     */
+    private static function sanitize_filename( string $original, string $key ): string|false {
+        $original = trim( $original );
+        if ( $original === '' ) {
+            return false;
+        }
+
+        $namepart = pathinfo( $original, PATHINFO_FILENAME );
+        $ext      = pathinfo( $original, PATHINFO_EXTENSION );
+        if ( $ext === '' ) {
+            $ext = 'none';
+        }
+
+        $clean_name = self::sanitize_filepart( $namepart );
+        $clean_ext  = self::sanitize_filepart( $ext );
+
+        if ( $clean_name === '' || $clean_ext === '' ) {
+            return false;
+        }
+
+        $filename = "{$clean_name}.{$clean_ext}";
+
+        // Collapse repeated separators.
+        $filename = preg_replace( [ '/ +/', '/_+/', '/-+/' ], '-', $filename );
+        // Clean up around dots.
+        $filename = preg_replace( [ '/-*\.-*/', '/\.{2,}/' ], '.', $filename );
+        $filename = trim( $filename, '.-' );
+
+        if ( $filename === '' ) {
+            return false;
+        }
+
+        return self::random_id() . '-' . $key . '-' . $filename;
+    }
+
+    /**
+     * Sanitize a single filename component (name or extension):
+     * keep letters, digits, spaces, hyphens; replace everything else with _.
+     */
+    private static function sanitize_filepart( string $part ): string {
+        return trim( preg_replace( '/[^\da-z \-]/i', '_', $part ) );
+    }
+
+    /**
+     * Generate a cryptographically random hex string (46 chars).
+     */
+    private static function random_id(): string {
+        $length = 46;
+        if ( function_exists( 'random_bytes' ) ) {
+            return substr( bin2hex( random_bytes( (int) ceil( $length / 2 ) ) ), 0, $length );
+        }
+        if ( function_exists( 'openssl_random_pseudo_bytes' ) ) {
+            return substr( bin2hex( openssl_random_pseudo_bytes( (int) ceil( $length / 2 ) ) ), 0, $length );
+        }
+        return substr( uniqid(), 0, 13 ) . '_' . substr( md5( (string) mt_rand() ), 0, 32 );
+    }
+}

@@ -22,6 +22,7 @@ define( 'EME_ACCOUNTING_FILE',    __FILE__ );
 define( 'EME_ACCOUNTING_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'EME_ACCOUNTING_URL',     plugin_dir_url( __FILE__ ) );
 
+require_once('includes/EMEFileAttachments.php');
 /* ------------------------------------------------------------------
  * Autoloader
  * ------------------------------------------------------------------ */
