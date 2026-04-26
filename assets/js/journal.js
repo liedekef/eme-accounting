@@ -218,7 +218,7 @@
                 coa_id: document.querySelector('#eme-acc-coa-filter')?.value || '',
                 search: document.querySelector('#eme-acc-search-filter')?.value || '',
                 daterange: document.querySelector('#eme-daterange-filter')?.value || '',
-                amount: document.querySelector('#eme-acc-amount-filter')?.value || '',
+                amount: parseBE(document.querySelector('#eme-acc-amount-filter')?.value || ''),
                 eme_event_id: document.querySelector('#eme-acc-event-filter')?.value || ''
             })
         });
