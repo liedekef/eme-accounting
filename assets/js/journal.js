@@ -410,7 +410,7 @@
     }
 
     if (typeof FDatepicker !== 'undefined') {
-        new FDatepicker('#localized_daterange-filter', {
+        new FDatepicker('#eme-daterange-filter', {
             fieldsizing: true,
             format: 'd/m/Y'
         });
