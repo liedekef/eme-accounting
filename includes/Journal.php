@@ -90,8 +90,8 @@ class Journal {
             }
         }
         if ( $args['amount'] > 0 ) {
-            $where[]   = 'amount = %d';
-            $prepare[] = (int) $args['amount'];
+            $where[]   = 'amount = %f';
+            $prepare[] = $args['amount'];
         }
         if ( $args['coa_id'] > 0 ) {
             $where[]   = 'coa_id = %d';
@@ -509,7 +509,7 @@ class Journal {
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
             'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
             'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
-            'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? (int) $_POST['amount'] : null,
+	    'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ): null,
             'search'       => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
             'daterange'    => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
         ];
@@ -639,8 +639,8 @@ class Journal {
             $prepare[] = (int) $args['coa_id'];
         }
         if ( ! empty( $args['amount'] ) ) {
-            $where[]   = "{$p}amount = %d";
-            $prepare[] = (int) $args['amount'];
+            $where[]   = "{$p}amount = %f";
+            $prepare[] = $args['amount'];
         }
         if ( ! empty( $args['eme_event_id'] ) ) {
             $where[]   = "{$p}eme_event_id = %d";
