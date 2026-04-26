@@ -15,6 +15,9 @@ use EMEAccounting\Capabilities;
  */
 class Journal {
 
+    /** @var \EMEFileAttachments */
+    private static \EMEFileAttachments $attachments;
+
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_save_entry',              [ __CLASS__, 'ajax_save' ] );
         add_action( 'wp_ajax_eme_accounting_delete_entry',            [ __CLASS__, 'ajax_delete' ] );
@@ -24,6 +27,13 @@ class Journal {
 
         // Auto-delete attachment files when a journal entry is removed.
         add_action( 'eme_accounting_journal_deleted', [ __CLASS__, 'on_entry_deleted' ] );
+
+        // Create EMEFileAttachments instance for journal entries.
+        $upload = wp_upload_dir();
+        self::$attachments = new \EMEFileAttachments(
+            $upload['basedir'] . '/eme-accounting',
+            $upload['baseurl'] . '/eme-accounting'
+        );
     }
 
     /* ------------------------------------------------------------------
@@ -434,7 +444,7 @@ class Journal {
             wp_send_json_error( $result->get_error_message() );
         }
         // Handle optional file uploads (multipart form, input name="files[]").
-        \EMEFileAttachments::upload( $result, 'journal' );
+        self::$attachments->upload( $result, 'journal' );
         wp_send_json_success( [ 'id' => $result ] );
     }
 
@@ -461,7 +471,14 @@ class Journal {
             wp_send_json_error( 'Invalid attachment type.' );
         }
 
-        \EMEFileAttachments::ajax_delete();
+        self::$attachments->ajax_delete();
+    }
+
+    /**
+     * For usage in templates
+     */
+    public static function get_attachments(): \EMEFileAttachments {
+        return self::$attachments;
     }
 
     /**
@@ -469,7 +486,7 @@ class Journal {
      * Removes all attachment files for the deleted entry.
      */
     public static function on_entry_deleted( int $entry_id ): void {
-        \EMEFileAttachments::delete_all( $entry_id, 'journal' );
+        self::$attachments->delete_all( $entry_id, 'journal' );
     }
 
     public static function ajax_list(): void {
@@ -683,7 +700,7 @@ class Journal {
             $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) );
         }
         foreach ($rows as &$row) {
-            $row->files = \EMEFileAttachments::get_links_html($row->id, 'journal');
+            $row->files = self::$attachments->get_links_html($row->id, 'journal');
         }
         return $rows;
     }

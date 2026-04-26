@@ -226,7 +226,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bijlagen', 'eme-accounting' ); ?></label>
                     <?php if ( $edit_entry ):
-                        $existing_files = \EMEFileAttachments::get_delete_links_html( (int) $edit_entry->id, 'journal' );
+                        $existing_files = EMEAccounting\Journal::get_attachments()->get_delete_links_html( (int) $edit_entry->id, 'journal' );
                         if ( $existing_files ):
                     ?>
                     <div id="eme-acc-journal-attachments" class="eme-acc-attachments">

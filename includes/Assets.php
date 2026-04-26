@@ -6,13 +6,6 @@ defined( 'ABSPATH' ) || exit;
 class Assets {
     public static function init(): void {
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
-
-        // Initialise EMEFileAttachments storage root for journal entries.
-        $upload = wp_upload_dir();
-        \EMEFileAttachments::init(
-            $upload['basedir'] . '/eme-accounting',
-            $upload['baseurl'] . '/eme-accounting'
-        );
     }
 
     public static function enqueue( string $hook ): void {

@@ -10,60 +10,67 @@
  * QUICK-START
  * -------------------------------------------------------------------------
  *
- * 1. Bootstrap (once, e.g. in your plugin's init action):
+ * 1. Create an instance (once per plugin, e.g. in your plugin's init action):
  *
- *      EMEFileAttachments::init( wp_upload_dir()['basedir'] . '/my-plugin',
- *                             wp_upload_dir()['baseurl'] . '/my-plugin' );
+ *      $upload = wp_upload_dir();
+ *      $attachments = new EMEFileAttachments(
+ *          $upload['basedir'] . '/my-plugin',
+ *          $upload['baseurl'] . '/my-plugin'
+ *      );
+ *
+ *    Store it somewhere accessible, e.g. as a static property on your main class.
+ *    Each plugin has its own instance → zero conflicts between plugins.
  *
  * 2. Upload on form save (multipart/form-data form, input name="files[]"):
  *
  *      $entry_id = Journal::save( $_POST );
  *      if ( is_int( $entry_id ) ) {
- *          EMEFileAttachments::upload( $entry_id, 'journal' );
+ *          $attachments->upload( $entry_id, 'journal' );
  *      }
  *
  * 3. Render links in a list / edit screen:
  *
- *      $row['files'] = EMEFileAttachments::get_links_html( $entry_id, 'journal' );
+ *      $row['files'] = $attachments->get_links_html( $entry_id, 'journal' );
  *      // or
- *      $links = EMEFileAttachments::get_links( $entry_id, 'journal' );
+ *      $links = $attachments->get_links( $entry_id, 'journal' );
  *      $row['files'] = implode( '', $links );
  *
  * 4. AJAX delete – register the action in your plugin:
  *
- *      add_action( 'wp_ajax_my_plugin_del_attachment',
- *                  [ 'EMEFileAttachments', 'ajax_delete' ] );
+ *      add_action( 'wp_ajax_my_plugin_del_attachment', function() use ( $attachments ) {
+ *          check_ajax_referer( 'my_nonce', 'nonce' );
+ *          current_user_can( 'manage_options' ) || wp_die( 'Forbidden', 403 );
+ *          $attachments->ajax_delete();
+ *      } );
  *
  *    In the JS delete handler, POST:
  *      action, nonce, id, type, key, random_id, name
  *    (these are already present as data-* attributes on the delete button
- *     rendered by get_uploaded_file_linkdelete / get_links_html)
+ *     rendered by get_links / get_links_html)
  *
  * 5. Auto-cleanup when a record is deleted:
  *
- *      EMEFileAttachments::delete_all( $entry_id, 'journal' );
+ *      $attachments->delete_all( $entry_id, 'journal' );
  */
 class EMEFileAttachments {
 
     /** @var string  Absolute path to the upload root. */
-    private static string $base_dir = '';
+    private string $base_dir;
 
     /** @var string  Public URL to the upload root. */
-    private static string $base_url = '';
+    private string $base_url;
 
     /* ------------------------------------------------------------------
-     * Bootstrap
+     * Constructor
      * ------------------------------------------------------------------ */
 
     /**
-     * Set the storage root.  Call once before any other method.
-     *
      * @param string $base_dir  Absolute server path, no trailing slash.
      * @param string $base_url  Matching public URL, no trailing slash.
      */
-    public static function init( string $base_dir, string $base_url ): void {
-        self::$base_dir = rtrim( $base_dir, '/\\' );
-        self::$base_url = rtrim( $base_url, '/' );
+    public function __construct( string $base_dir, string $base_url ) {
+        $this->base_dir = rtrim( $base_dir, '/\\' );
+        $this->base_url = rtrim( $base_url, '/' );
     }
 
     /* ------------------------------------------------------------------
@@ -77,13 +84,13 @@ class EMEFileAttachments {
      * @param string $type      Subdirectory name, e.g. 'journal', 'assets'.
      * @param string $file_key  The HTML input name attribute, default 'files'.
      */
-    public static function upload( int $id, string $type, string $file_key = 'files' ): void {
+    public function upload( int $id, string $type, string $file_key = 'files' ): void {
         if ( empty( $_FILES ) || empty( $_FILES[ $file_key ] ) ) {
             return;
         }
 
-        $target = self::target_dir( $id, $type );
-        self::mkdir_with_index( $target );
+        $target = $this->target_dir( $id, $type );
+        $this->mkdir_with_index( $target );
 
         $file_entry = $_FILES[ $file_key ];
 
@@ -108,7 +115,7 @@ class EMEFileAttachments {
                 continue;
             }
 
-            $stored = self::sanitize_filename( $original, $file_key );
+            $stored = $this->sanitize_filename( $original, $file_key );
             if ( $stored === false ) {
                 continue;
             }
@@ -128,10 +135,10 @@ class EMEFileAttachments {
      * @param int    $id
      * @param string $type
      */
-    public static function delete_all( int $id, string $type ): void {
-        $dir = self::target_dir( $id, $type );
+    public function delete_all( int $id, string $type ): void {
+        $dir = $this->target_dir( $id, $type );
         if ( is_dir( $dir ) ) {
-            self::del_tree( $dir );
+            $this->del_tree( $dir );
         }
     }
 
@@ -142,8 +149,8 @@ class EMEFileAttachments {
      * @param int    $id
      * @param string $type
      */
-    public static function delete_one( string $stored_filename, int $id, string $type ): void {
-        $path = self::target_dir( $id, $type ) . '/' . $stored_filename;
+    public function delete_one( string $stored_filename, int $id, string $type ): void {
+        $path = $this->target_dir( $id, $type ) . '/' . $stored_filename;
         if ( is_file( $path ) ) {
             unlink( $path );
         }
@@ -165,9 +172,9 @@ class EMEFileAttachments {
      * @param  string $key   Pass '' to return all keys, or e.g. 'files' to filter.
      * @return array<int,array<string,mixed>>
      */
-    public static function get_files( int $id, string $type, string $key = 'files' ): array {
+    public function get_files( int $id, string $type, string $key = 'files' ): array {
         $res = [];
-        $dir = self::target_dir( $id, $type );
+        $dir = $this->target_dir( $id, $type );
 
         if ( ! is_dir( $dir ) ) {
             return $res;
@@ -200,7 +207,7 @@ class EMEFileAttachments {
                 'key'        => $info[1],
                 'field_name' => $entry,
                 'name'       => $info[2],
-                'url'        => self::$base_url . "/$type/$id/$entry",
+                'url'        => $this->base_url . "/$type/$id/$entry",
                 'mimetype'   => mime_content_type( $dir . '/' . $entry ),
             ];
         }
@@ -220,17 +227,17 @@ class EMEFileAttachments {
      * @param  string $key
      * @return string[]
      */
-    public static function get_links( int $id, string $type, string $key = 'files' ): array {
+    public function get_links( int $id, string $type, string $key = 'files' ): array {
         $links = [];
-        foreach ( self::get_files( $id, $type, $key ) as $file ) {
-            $links[] = self::render_link( $file );
+        foreach ( $this->get_files( $id, $type, $key ) as $file ) {
+            $links[] = $this->render_link( $file );
         }
         return $links;
     }
-    public static function get_delete_links( int $id, string $type, string $key = 'files' ): array {
+    public function get_delete_links( int $id, string $type, string $key = 'files' ): array {
         $links = [];
-        foreach ( self::get_files( $id, $type, $key ) as $file ) {
-            $links[] = self::render_link( $file, true );
+        foreach ( $this->get_files( $id, $type, $key ) as $file ) {
+            $links[] = $this->render_link( $file, true );
         }
         return $links;
     }
@@ -243,11 +250,11 @@ class EMEFileAttachments {
      * @param  string $key
      * @return string
      */
-    public static function get_links_html( int $id, string $type, string $key = 'files' ): string {
-        return implode( '', self::get_links( $id, $type, $key ) );
+    public function get_links_html( int $id, string $type, string $key = 'files' ): string {
+        return implode( '', $this->get_links( $id, $type, $key ) );
     }
-    public static function get_delete_links_html( int $id, string $type, string $key = 'files' ): string {
-        return implode( '', self::get_delete_links( $id, $type, $key ) );
+    public function get_delete_links_html( int $id, string $type, string $key = 'files' ): string {
+        return implode( '', $this->get_delete_links( $id, $type, $key ) );
     }
 
     /**
@@ -257,7 +264,7 @@ class EMEFileAttachments {
      * @param  boolean $deletelink
      * @return string
      */
-    public static function render_link( array $file, bool $deletelink = false ): string {
+    public function render_link( array $file, bool $deletelink = false ): string {
         $name      = esc_html( $file['name'] );
         $url       = esc_url( $file['url'] );
         $id        = (int) $file['id'];
@@ -301,10 +308,10 @@ class EMEFileAttachments {
      *
      * Expected POST fields: id, type, key, random_id, name
      */
-    public static function ajax_delete(): void {
+    public function ajax_delete(): void {
         $id        = isset( $_POST['id'] )        ? (int) $_POST['id']                              : 0;
         $type      = isset( $_POST['type'] )      ? sanitize_key( $_POST['type'] )                  : '';
-        $random_id = isset( $_POST['random_id'] ) ? self::sanitize_filepart( $_POST['random_id'] )  : '';
+        $random_id = isset( $_POST['random_id'] ) ? $this->sanitize_filepart( $_POST['random_id'] )  : '';
         $key       = isset( $_POST['key'] )       ? sanitize_key( $_POST['key'] )                   : '';
         $raw_name  = isset( $_POST['name'] )      ? trim( $_POST['name'] )                          : '';
 
@@ -317,15 +324,15 @@ class EMEFileAttachments {
         $namepart = $dot !== false ? substr( $raw_name, 0, $dot ) : $raw_name;
         $ext      = $dot !== false ? substr( $raw_name, $dot + 1 ) : 'none';
 
-        $clean_name = self::sanitize_filepart( $namepart );
-        $clean_ext  = self::sanitize_filepart( $ext );
+        $clean_name = $this->sanitize_filepart( $namepart );
+        $clean_ext  = $this->sanitize_filepart( $ext );
 
         if ( ! $clean_name || ! $clean_ext ) {
             wp_send_json_error( 'Invalid filename.' );
         }
 
         $stored = "{$random_id}-{$key}-{$clean_name}.{$clean_ext}";
-        self::delete_one( $stored, $id, $type );
+        $this->delete_one( $stored, $id, $type );
 
         wp_send_json_success();
     }
@@ -334,15 +341,15 @@ class EMEFileAttachments {
      * Internal helpers
      * ------------------------------------------------------------------ */
 
-    private static function target_dir( int $id, string $type ): string {
-        return self::$base_dir . '/' . $type . '/' . $id;
+    private function target_dir( int $id, string $type ): string {
+        return $this->base_dir . '/' . $type . '/' . $id;
     }
 
     /**
      * Create a directory (recursively) and drop an empty index.html in it
      * to prevent directory listing.
      */
-    private static function mkdir_with_index( string $path ): bool {
+    private function mkdir_with_index( string $path ): bool {
         $ok = true;
         if ( ! is_dir( $path ) ) {
             $ok = mkdir( $path, 0777, true );
@@ -356,10 +363,10 @@ class EMEFileAttachments {
     /**
      * Recursively delete a directory and all its contents.
      */
-    private static function del_tree( string $dir ): bool {
+    private function del_tree( string $dir ): bool {
         foreach ( array_diff( scandir( $dir ), [ '.', '..' ] ) as $item ) {
             $full = "$dir/$item";
-            is_dir( $full ) ? self::del_tree( $full ) : unlink( $full );
+            is_dir( $full ) ? $this->del_tree( $full ) : unlink( $full );
         }
         return rmdir( $dir );
     }
@@ -373,7 +380,7 @@ class EMEFileAttachments {
      * @param  string $key       The file-input key (= HTML name attribute).
      * @return string|false
      */
-    private static function sanitize_filename( string $original, string $key ): string|false {
+    private function sanitize_filename( string $original, string $key ): string|false {
         $original = trim( $original );
         if ( $original === '' ) {
             return false;
@@ -385,8 +392,8 @@ class EMEFileAttachments {
             $ext = 'none';
         }
 
-        $clean_name = self::sanitize_filepart( $namepart );
-        $clean_ext  = self::sanitize_filepart( $ext );
+        $clean_name = $this->sanitize_filepart( $namepart );
+        $clean_ext  = $this->sanitize_filepart( $ext );
 
         if ( $clean_name === '' || $clean_ext === '' ) {
             return false;
@@ -404,21 +411,21 @@ class EMEFileAttachments {
             return false;
         }
 
-        return self::random_id() . '-' . $key . '-' . $filename;
+        return $this->random_id() . '-' . $key . '-' . $filename;
     }
 
     /**
      * Sanitize a single filename component (name or extension):
      * keep letters, digits, spaces, hyphens; replace everything else with _.
      */
-    private static function sanitize_filepart( string $part ): string {
+    private function sanitize_filepart( string $part ): string {
         return trim( preg_replace( '/[^\da-z \-]/i', '_', $part ) );
     }
 
     /**
      * Generate a cryptographically random hex string (46 chars).
      */
-    private static function random_id(): string {
+    private function random_id(): string {
         $length = 46;
         if ( function_exists( 'random_bytes' ) ) {
             return substr( bin2hex( random_bytes( (int) ceil( $length / 2 ) ) ), 0, $length );
