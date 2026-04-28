@@ -108,18 +108,21 @@
     font-size: 15px;
 }
 .eme-acc-row {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-gap: 16px;
+  margin-bottom: 12px;
+}
+.eme-acc-row-4{
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  grid-gap: 16px;
+  margin-bottom: 12px;
 }
 .eme-acc-field {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    flex-shrink: 1;
-    flex-grow: 1;
-    min-width: 160px;
 }
 .eme-acc-field label {
     font-size: 12px;
@@ -278,4 +281,9 @@
 }
 .row-actions a:hover {
     text-decoration: underline;
+}
+
+/* snapselect */
+.eme_snapselect_events_class {
+    max-width: 50%;
 }

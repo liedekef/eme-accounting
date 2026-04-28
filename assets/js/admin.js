@@ -656,10 +656,11 @@ function initSnapSelectRemote(selector, options = {}) {
     }
 
     document.getElementById('report_type')?.addEventListener('change', function() {
-        document.getElementById('report-date-wrap').style.display = this.value === 'patrimony' ? '' : 'none';
-        document.getElementById('report_year_div').style.display = this.value === 'patrimony' ? 'none' : '';
-        document.getElementById('btn-export-pdf').style.display = (this.value === 'income_expenditure' || this.value === 'financial_year') ? '' : 'none';
-        document.getElementById('btn-export-csv').style.display = this.value === 'events' ? 'none' : '';
+        const t = this.value;
+        document.getElementById('report-date-wrap').style.display = t === 'patrimony' ? '' : 'none';
+        document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
+        document.getElementById('btn-export-pdf').style.display   = (t === 'income_expenditure' || t === 'financial_year') ? '' : 'none';
+        document.getElementById('btn-export-csv').style.display   = (t === 'events' || t === 'vat_report') ? 'none' : '';
     });
 
     function handleLoadReport() {
@@ -722,6 +723,7 @@ function initSnapSelectRemote(selector, options = {}) {
         else if (type === 'patrimony')     renderPatrimony(data, container);
         else if (type === 'events')        renderEventsReport(data, container);
         else if (type === 'financial_year') renderFinancialYearReport(data, container);
+        else if (type === 'vat_report')     renderVatReport(data, container);
         else                               renderDiary(data, container);
     }
 
@@ -896,6 +898,49 @@ function initSnapSelectRemote(selector, options = {}) {
         const saldo = totalIn - totalOut;
         html += `<p style="font-size:16px;font-weight:600;margin-top:16px">
             Saldo: <span class="amount ${saldo >= 0 ? 'in' : 'out'}">${formatCurrency(saldo)}</span></p>`;
+        container.innerHTML = html;
+    }
+
+    function renderVatReport(data, container) {
+        const fmt = (n) => new Intl.NumberFormat('nl-BE', { style: 'currency', currency: 'EUR' }).format(n);
+
+        let html = `<h2>BTW-aangifte overzicht – ${esc(data.fiscal_year)}</h2>
+            <table class="widefat fixed striped" style="max-width:680px">
+                <thead>
+                    <tr>
+                        <th>Kwartaal</th>
+                        <th style="text-align:right">BTW op ontvangsten (te betalen)</th>
+                        <th style="text-align:right">BTW op uitgaven (aftrekbaar)</th>
+                        <th style="text-align:right">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        Object.values(data.quarters).forEach(q => {
+            const balStyle = q.balance < 0 ? 'color:#d63638' : (q.balance > 0 ? 'color:#00a32a' : '');
+            html += `<tr>
+                <td><strong>Q${q.quarter}</strong></td>
+                <td style="text-align:right">${q.vat_in  > 0 ? fmt(q.vat_in)  : '–'}</td>
+                <td style="text-align:right">${q.vat_out > 0 ? fmt(q.vat_out) : '–'}</td>
+                <td style="text-align:right;${balStyle}"><strong>${fmt(q.balance)}</strong></td>
+            </tr>`;
+        });
+
+        html += `</tbody>
+            <tfoot>
+                <tr style="font-weight:bold;border-top:2px solid #ccc">
+                    <td>Totaal</td>
+                    <td style="text-align:right">${fmt(data.totals.vat_in)}</td>
+                    <td style="text-align:right">${fmt(data.totals.vat_out)}</td>
+                    <td style="text-align:right">${fmt(data.totals.balance)}</td>
+                </tr>
+            </tfoot>
+        </table>
+        <p style="color:#646970;margin-top:8px;font-size:12px">
+            Saldo = BTW op ontvangsten − BTW op uitgaven.
+            Positief = te betalen aan FOD Financiën. Negatief = tegoed.
+        </p>`;
+
         container.innerHTML = html;
     }
 

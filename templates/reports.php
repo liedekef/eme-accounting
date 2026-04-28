@@ -13,6 +13,9 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
         <select id="report_type">
             <optgroup label="Extern">
                 <option value="income_expenditure"><?php esc_html_e( 'Staat van Ontvangsten en Uitgaven', 'eme-accounting' ); ?></option>
+                <?php if ( (bool) ( \EMEVzw\Config::get()->vat_liable ?? false ) ): ?>
+                <option value="vat_report"><?php esc_html_e( 'BTW-aangifte overzicht', 'eme-accounting' ); ?></option>
+                <?php endif; ?>
             </optgroup>
             <optgroup label="Intern">
                 <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen (intern)', 'eme-accounting' ); ?></option>

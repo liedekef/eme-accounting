@@ -416,4 +416,31 @@
         });
     }
 
+    // voor BTW berekeningen
+    const vatCode    = document.getElementById('vat_code');
+    const vatAmount  = document.getElementById('vat_amount');
+    const amountFld  = document.querySelector('[name=amount]');
+
+    function parseLocalFloat( val ) {
+        return parseFloat( val.replace(/\./g, '').replace(',', '.') ) || 0;
+    }
+
+    function recalcVat() {
+        const rate = parseFloat( vatCode.value );
+        if ( isNaN(rate) || rate <= 0 ) {
+            vatAmount.value = '';
+            return;
+        }
+        const amount = parseLocalFloat( amountFld.value );
+        if ( amount <= 0 ) return;
+        // Bedrag is incl. BTW: BTW = amount - amount / (1 + rate/100)
+        const vat = amount - amount / ( 1 + rate / 100 );
+        vatAmount.value = vat.toFixed(2).replace('.', ',');
+    }
+
+    if ( vatCode && vatAmount && amountFld ) {
+        vatCode.addEventListener('change', recalcVat);
+        amountFld.addEventListener('input', recalcVat);
+    }
+
 })();

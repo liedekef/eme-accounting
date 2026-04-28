@@ -564,12 +564,13 @@ class Journal {
         Capabilities::require_view_ajax( 'journal' );
 
         global $wpdb;
+        $settings = get_option( 'eme_accounting_settings', [] );
         header( 'Content-type: application/json; charset=utf-8' );
         // snapselect gives us paging, but currently we ignore it here and return everything we can
-        $q         = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
-        $year      = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
-        $search_all= isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
-        $scope="-3m--12m";
+        $q          = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
+        $year       = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
+        $search_all = isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
+        $scope      = $settings['eme_scope'];
         if ($search_all) {
             $scope="all";
         //} else {

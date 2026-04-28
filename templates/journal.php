@@ -115,7 +115,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 </div>
             </div>
 
-            <div class="eme-acc-row">
+            <div class="eme-acc-row-4">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bedrag (€)', 'eme-accounting' ); ?> *</label>
                     <input type="text" name="amount" required
@@ -140,7 +140,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                     }
                     echo eme_ui_select( $event_id, 'eme_event_id', $myevents, '', 0, 'eme_snapselect_events_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
                     ?>
-                    <span><input id="eventsearch_all" name='eventsearch_all' value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just the ones from 3 months ago till 12 months in the future.', 'events-made-easy' ); ?></span>
+                    <span><input id="eventsearch_all" name='eventsearch_all' value='1' type='checkbox'> <?php esc_html_e( 'Vink dit aan om alle evenementen te doorzoeken en niet enkel de scope ingesteld in de settings.', 'events-made-easy' ); ?></span>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
@@ -333,7 +333,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <?php
                  echo eme_ui_select( 0, 'eme-acc-event-filter', [], '', 0, 'eme_snapselect_filterevents_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
             ?>
-            <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just the ones from 3 months ago till 12 months in the future.', 'events-made-easy' ); ?></span>
+            <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Vink dit aan om alle evenementen te doorzoeken en niet enkel de scope ingesteld in de settings.', 'events-made-easy' ); ?></span>
             <button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
 
         </form>
@@ -342,34 +342,3 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
     <!-- Journal entries table -->
     <div id="JournalTableContainer"></div>
 </div>
-<?php if ( $vat_liable ): ?>
-<script>
-(function() {
-    const vatCode    = document.getElementById('vat_code');
-    const vatAmount  = document.getElementById('vat_amount');
-    const amountFld  = document.querySelector('[name=amount]');
-
-    if ( ! vatCode || ! vatAmount || ! amountFld ) return;
-
-    function parseLocalFloat( val ) {
-        return parseFloat( val.replace(/\./g, '').replace(',', '.') ) || 0;
-    }
-
-    function recalcVat() {
-        const rate = parseFloat( vatCode.value );
-        if ( isNaN(rate) || rate <= 0 ) {
-            vatAmount.value = '';
-            return;
-        }
-        const amount = parseLocalFloat( amountFld.value );
-        if ( amount <= 0 ) return;
-        // Bedrag is incl. BTW: BTW = amount - amount / (1 + rate/100)
-        const vat = amount - amount / ( 1 + rate / 100 );
-        vatAmount.value = vat.toFixed(2).replace('.', ',');
-    }
-
-    vatCode.addEventListener('change', recalcVat);
-    amountFld.addEventListener('input', recalcVat);
-})();
-</script>
-<?php endif; ?>

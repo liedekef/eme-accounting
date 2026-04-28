@@ -321,6 +321,68 @@ class Reports {
         ];
     }
 
+
+    /**
+     * BTW-aangifte rapport: per kwartaal de BTW-bedragen uit de journal entries.
+     *
+     * @param  int $year  Fiscal year
+     * @return array{fiscal_year: int, quarters: array}
+     */
+    public static function vat_report( int $year ): array {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT direction,
+                        QUARTER(entry_date)      AS quarter,
+                        COALESCE(SUM(vat_amount), 0) AS total_vat
+                 FROM `{$wpdb->prefix}emeacc_journal`
+                 WHERE fiscal_year = %d
+                   AND vat_amount > 0
+                   AND vat_code != ''
+                   AND is_closing_entry = 0
+                 GROUP BY direction, QUARTER(entry_date)
+                 ORDER BY quarter",
+                $year
+            )
+        );
+
+        // Pre-seed all 4 quarters with 0
+        $quarters = [];
+        for ( $q = 1; $q <= 4; $q++ ) {
+            $quarters[ $q ] = [
+                'quarter'     => $q,
+                'vat_in'      => 0.0,  // BTW op ontvangsten (te betalen)
+                'vat_out'     => 0.0,  // BTW op uitgaven (aftrekbaar)
+                'balance'     => 0.0,  // te betalen - aftrekbaar
+            ];
+        }
+
+        foreach ( $rows as $row ) {
+            $q = (int) $row->quarter;
+            if ( $row->direction === 'in' ) {
+                $quarters[ $q ]['vat_in'] += (float) $row->total_vat;
+            } else {
+                $quarters[ $q ]['vat_out'] += (float) $row->total_vat;
+            }
+        }
+
+        // Calculate balance per quarter
+        foreach ( $quarters as $q => $data ) {
+            $quarters[ $q ]['balance'] = $data['vat_in'] - $data['vat_out'];
+        }
+
+        return [
+            'fiscal_year' => $year,
+            'quarters'    => $quarters,
+            'totals'      => [
+                'vat_in'  => array_sum( array_column( $quarters, 'vat_in' ) ),
+                'vat_out' => array_sum( array_column( $quarters, 'vat_out' ) ),
+                'balance' => array_sum( array_column( $quarters, 'balance' ) ),
+            ],
+        ];
+    }
+
     public static function ajax_export(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
@@ -335,6 +397,7 @@ class Reports {
             'patrimony'          => self::patrimony( $_GET['date'] ?? '' ),
             'events'             => self::events_report( $year, $event_id ),
             'financial_year'    => self::financial_year_report( $year ),
+            'vat_report'         => self::vat_report( $year ),
             default              => self::diary( [ 'fiscal_year' => $year ] ),
         };
 

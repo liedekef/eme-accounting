@@ -11,6 +11,7 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
     $settings = [
         'default_income_account' => (int)    ( $_POST['default_income_account']  ?? 0 ),
         'delete_on_uninstall'    => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
+        'eme_scope'              => eme_sanitize_request( $_POST['eme_scope'] ?? '-3m--12m' ),
         'eme_auto_booking'       => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
         'default_coa'            => (int)    ( $_POST['default_coa'] ?? 0 ),
     ];
@@ -34,6 +35,7 @@ $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'delete_on_uninstall'    => 'no',
     'default_coa'            => 0,
     'eme_auto_booking'       => 0,
+    'eme_scope'              => '-3m--12m',
 ] );
 $accounts     = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
@@ -82,6 +84,15 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
 <div class="eme-acc-form-box">
 <h2><?php esc_html_e( 'Integratie met Events Made Easy', 'eme-accounting' ); ?></h2>
 <table class="form-table">
+<tr>
+    <th><?php esc_html_e( 'Range bij doorzoeken van evenementen', 'eme-accounting' ); ?></th>
+    <td>
+        <label>
+            <input type="text" name="eme_scope" value="<?= esc_html($settings['eme_scope']) ?>">
+            <?php _e( "Definiëer de scope van evenementen die je standaard wil doorzoeken. Default is van 3 maand in het verleden tot 12 maand in de toekomst. Voor alle mogelijkheden, zie <a href='https://www.e-dynamics.be/wordpress/eme-docs/eme_events/' target='_blank'>de Events Made Easy documentatie</a>", 'eme-accounting'); ?>
+        </label>
+    </td>
+</tr>
 <tr>
     <th><?php esc_html_e( 'Automatisch boeken bij betaling', 'eme-accounting' ); ?></th>
     <td>
