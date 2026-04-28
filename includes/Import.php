@@ -228,7 +228,8 @@ class Import {
 
     private static function detect_format( string $content, string $ext ): string {
         if ( $ext === 'cod' || $ext === 'coda' ) return 'coda';
-        if ( str_contains( $content, 'Datum verrichting;Beschrijving;Bedrag;Valutadatum' ) ) return 'belfius';
+
+        if ( str_contains( $content, 'Rekening;Boekingsdatum;Rekeninguittrekselnummer' ) && str_contains( $content, 'Transactie;Valutadatum;Bedrag') ) return 'belfius';
         if ( str_contains( $content, 'Rekeningnummer;Naam van de rekening' ) ) return 'bnp';
         if ( str_contains( $content, 'Rekeningnummer;Naam rekening' ) ) return 'kbc';
         if ( str_contains( $content, 'Rekening;Boekingsdatum;Valutadatum;Bedrag' ) ) return 'ing';
@@ -286,16 +287,22 @@ class Import {
     }
 
     private static function parse_generic_csv( string $content ): array|\WP_Error {
-        // Auto-detect delimiter
+        // Auto-detect delimiter by counting which character appears the most
         $delimiters = [ ';', ',', "\t", '|' ];
         $counts     = [];
         foreach ( $delimiters as $d ) {
-            $counts[ $d ] = substr_count( strtok( $content, "\n" ), $d );
+            // we take the whole file, not just the first line
+            //$counts[ $d ] = substr_count( strtok( $content, "\n" ), $d );
+            $counts[ $d ] = substr_count( $d );
         }
         arsort( $counts );
         $delimiter = array_key_first( $counts );
 
-        return self::parse_csv_generic( $content, $delimiter, [] );
+        return self::parse_csv_generic( $content, $delimiter, [
+                'date'             => 'Boekingsdatum',
+                'amount'           => 'Bedrag',
+                'description'      => 'Mededelingen'
+        ] );
     }
 
     /**
@@ -313,35 +320,46 @@ class Import {
             return new \WP_Error( 'empty_file', __( 'Bestand bevat geen transacties.', 'eme-accounting' ) );
         }
 
-        $header = str_getcsv( array_shift( $lines ), $delimiter );
-        $header = array_map( 'trim', $header );
-
-        // Build reverse map: csv_header => normalised_key
+        // Scan lines until we find one that contains all required col_map columns.
+        $header  = null;
         $reverse = [];
-        foreach ( $col_map as $norm => $csv ) {
-            $idx = array_search( $csv, $header, true );
-            if ( $idx !== false ) {
-                $reverse[ $idx ] = $norm;
+        foreach ( $lines as $key => $line ) {
+            $candidate = array_map( 'trim', str_getcsv( $line, $delimiter ) );
+            $found = [];
+            foreach ( $col_map as $norm => $csv ) {
+                $idx = array_search( $csv, $candidate, true );
+                if ( $idx !== false ) {
+                    $found[ $idx ] = $norm;
+                }
             }
+            // Only accept this line as header if ALL col_map columns are present.
+            if ( count( $found ) === count( $col_map ) ) {
+                $header  = $candidate;
+                $reverse = $found;
+                // Remove all lines up to and including the header.
+                $lines = array_slice( $lines, $key + 1 );
+                break;
+            }
+        }
+
+        if ( $header === null ) {
+            return new \WP_Error(
+                'no_header',
+                sprintf(
+                    __( 'Kolomhoofden niet gevonden in bestand. Verwachte kolommen: %s.', 'eme-accounting' ),
+                    implode( ', ', array_values( $col_map ) )
+                )
+            );
         }
 
         $result = [];
         foreach ( $lines as $raw ) {
             $cells = str_getcsv( $raw, $delimiter );
 
-            if ( $col_map ) {
-                $row = [];
-                foreach ( $reverse as $idx => $norm ) {
-                    $row[ $norm ] = trim( $cells[ $idx ] ?? '' );
+            $row = [];
+            foreach ( $reverse as $idx => $norm ) {
+                $row[ $norm ] = trim( $cells[ $idx ] ?? '' );
                 }
-            } else {
-                // Generic: take first columns by position
-                $row = [
-                    'date'        => trim( $cells[0] ?? '' ),
-                    'description' => trim( $cells[1] ?? '' ),
-                    'amount'      => trim( $cells[2] ?? '' ),
-                ];
-            }
 
             // Normalise date (d/m/Y or d-m-Y → Y-m-d)
             $date = $row['date'] ?? '';

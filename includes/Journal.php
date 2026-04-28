@@ -702,7 +702,7 @@ class Journal {
         foreach ($rows as &$row) {
             $row->files = self::$attachments->get_links_html($row->id, 'journal');
         }
-        unset ($row) // delete last row reference
+        unset($row); // delete last row reference
         return $rows;
     }
 }
