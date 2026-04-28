@@ -276,14 +276,34 @@ class Import {
     }
 
     private static function parse_belfius_csv( string $content ): array|\WP_Error {
-        return self::parse_csv_generic( $content, ';', [
+        // belfius has the reference in the Transaction column
+        $rows = self::parse_csv_generic( $content, ';', [
             'date'             => 'Boekingsdatum',
             'value_date'       => 'Valutadatum',
             'amount'           => 'Bedrag',
             'description'      => 'Mededelingen',
             'counterparty_name'=> 'Naam tegenpartij bevat',
             'counterparty_iban'=> 'Rekening tegenpartij',
+            'transaction'      => 'Transactie',
         ] );
+
+        if ( is_wp_error( $rows ) ) {
+            return $rows;
+        }
+
+        foreach ( $rows as &$row ) {
+            $ref = '';
+            if ( ! empty( $row['transaction'] ) ) {
+                $pos = strrpos( $row['transaction'], 'REF. :' );
+                if ( $pos !== false ) {
+                    $ref = trim( substr( $row['transaction'], $pos + strlen( 'REF. :' ) ) );
+                }
+            }
+            $row['bank_ref'] = $ref;
+            unset( $row['transaction'] );
+        }
+        unset( $row );
+        return $rows;
     }
 
     private static function parse_generic_csv( string $content ): array|\WP_Error {
@@ -324,7 +344,7 @@ class Import {
         $header  = null;
         $reverse = [];
         foreach ( $lines as $key => $line ) {
-            $candidate = array_map( 'trim', str_getcsv( $line, $delimiter ) );
+            $candidate = array_map( 'trim', str_getcsv( $line, $delimiter, '\\' ) );
             $found = [];
             foreach ( $col_map as $norm => $csv ) {
                 $idx = array_search( $csv, $candidate, true );
@@ -354,7 +374,7 @@ class Import {
 
         $result = [];
         foreach ( $lines as $raw ) {
-            $cells = str_getcsv( $raw, $delimiter );
+            $cells = str_getcsv( $raw, $delimiter, '\\' );
 
             $row = [];
             foreach ( $reverse as $idx => $norm ) {
