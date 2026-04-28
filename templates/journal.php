@@ -139,7 +139,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                     }
                     echo eme_ui_select( $event_id, 'eme_event_id', $myevents, '', 0, 'eme_snapselect_events_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
                     ?>
-                    <span><input id="eventsearch_all" name='eventsearch_all' value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just future ones.', 'events-made-easy' ); ?></span>
+                    <span><input id="eventsearch_all" name='eventsearch_all' value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just the ones from 3 months ago till 12 months in the future.', 'events-made-easy' ); ?></span>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
@@ -308,7 +308,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <?php
                  echo eme_ui_select( 0, 'eme-acc-event-filter', [], '', 0, 'eme_snapselect_filterevents_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
             ?>
-            <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just future ones.', 'events-made-easy' ); ?></span>
+            <span><input id="filter_eventsearch_all" value='1' type='checkbox'> <?php esc_html_e( 'Check this box to search through all events and not just the ones from 3 months ago till 12 months in the future.', 'events-made-easy' ); ?></span>
             <button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
 
         </form>
