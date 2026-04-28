@@ -509,7 +509,7 @@ class Journal {
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
             'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
             'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
-	    'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ): null,
+	        'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ): null,
             'search'       => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
             'daterange'    => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
         ];
@@ -565,7 +565,7 @@ class Journal {
         $q         = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
         $year      = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
         $search_all= isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
-        $scope="future";
+        $scope="-3m--12m";
         if ($search_all) {
             $scope="all";
         //} else {
@@ -575,10 +575,10 @@ class Journal {
         $pagesize  = isset( $_REQUEST['pagesize'] ) ? intval( $_REQUEST['pagesize'] ) : 20;
         $mysql_pagesize = $pagesize+1;
         $start     = ( isset( $_REQUEST['page'] ) && intval( $_REQUEST['page'] ) > 0 ) ? ( intval( $_REQUEST['page'] ) - 1 ) * $pagesize : 0;
-        //$prepared_sql = $wpdb->prepare( "event_name LIKE %s", '%'.$wpdb->esc_like($q).'%' );
-        //$events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
+        $prepared_sql = $wpdb->prepare( "event_name LIKE %s", '%'.$wpdb->esc_like($q).'%' );
+        $events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
         // eme_search_events understands past/future/all scopes only
-        $events     = eme_search_events( $q, $scope, 1, 0, 0, $start, $mysql_pagesize );
+        //$events     = eme_search_events( $q, $scope, 1, 0, 0, $start, $mysql_pagesize );
         $records     = [];
         foreach ( $events as $event ) {
             $records[] = [
