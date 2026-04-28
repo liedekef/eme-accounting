@@ -3,6 +3,7 @@ defined( 'ABSPATH' ) || exit;
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 $config =  \EMEVzw\Config::get();
 $currency  = $config->currency;
+$vat_liable = (bool) ( $config->vat_liable ?? false );
 
 $year        = isset( $_GET['year'] )       ? (int) $_GET['year']                : (int) gmdate( 'Y' );
 $account_id  = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']          : 0;
@@ -175,6 +176,30 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 </div>
             </div>
 
+            <?php if ( $vat_liable ): ?>
+            <div class="eme-acc-row" id="vat-row">
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'BTW-tarief', 'eme-accounting' ); ?></label>
+                    <select name="vat_code" id="vat_code" <?= $form_disabled ?>>
+                        <option value=""><?php esc_html_e( '— geen BTW —', 'eme-accounting' ); ?></option>
+                        <option value="6"      <?= selected( $edit_entry->vat_code  ?? '', '6',      false ) ?>>6%</option>
+                        <option value="12"     <?= selected( $edit_entry->vat_code  ?? '', '12',     false ) ?>>12%</option>
+                        <option value="21"     <?= selected( $edit_entry->vat_code  ?? '', '21',     false ) ?>>21%</option>
+                        <option value="exempt" <?= selected( $edit_entry->vat_code  ?? '', 'exempt', false ) ?>><?php esc_html_e( 'Vrijgesteld', 'eme-accounting' ); ?></option>
+                    </select>
+                </div>
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'BTW-bedrag (€)', 'eme-accounting' ); ?></label>
+                    <input type="text" name="vat_amount" id="vat_amount" size="5"
+                           inputmode="decimal" <?= $form_disabled ?>
+                           oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
+                           value="<?= esc_attr( $edit_entry && $edit_entry->vat_amount > 0 ? number_format( (float) $edit_entry->vat_amount, 2, ',', '.' ) : '' ) ?>"
+                           placeholder="0,00">
+                    <span class="description"><?php esc_html_e( 'Auto-berekend op basis van bedrag incl. BTW, maar overschrijfbaar.', 'eme-accounting' ); ?></span>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Bank statement info -->
             <div class="eme-acc-row">
                 <div class="eme-acc-field" style="flex:2">
@@ -317,3 +342,34 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
     <!-- Journal entries table -->
     <div id="JournalTableContainer"></div>
 </div>
+<?php if ( $vat_liable ): ?>
+<script>
+(function() {
+    const vatCode    = document.getElementById('vat_code');
+    const vatAmount  = document.getElementById('vat_amount');
+    const amountFld  = document.querySelector('[name=amount]');
+
+    if ( ! vatCode || ! vatAmount || ! amountFld ) return;
+
+    function parseLocalFloat( val ) {
+        return parseFloat( val.replace(/\./g, '').replace(',', '.') ) || 0;
+    }
+
+    function recalcVat() {
+        const rate = parseFloat( vatCode.value );
+        if ( isNaN(rate) || rate <= 0 ) {
+            vatAmount.value = '';
+            return;
+        }
+        const amount = parseLocalFloat( amountFld.value );
+        if ( amount <= 0 ) return;
+        // Bedrag is incl. BTW: BTW = amount - amount / (1 + rate/100)
+        const vat = amount - amount / ( 1 + rate / 100 );
+        vatAmount.value = vat.toFixed(2).replace('.', ',');
+    }
+
+    vatCode.addEventListener('change', recalcVat);
+    amountFld.addEventListener('input', recalcVat);
+})();
+</script>
+<?php endif; ?>

@@ -285,6 +285,8 @@ class Journal {
             ? $data['direction']
             : null;
 
+        $vat_liable = (bool) ( \EMEVzw\Config::get()->vat_liable ?? false );
+
         $row = [
             'entry_date'         => $entry_date,
             'booking_date'       => ! empty( $data['booking_date'] ) ? eme_sanitize_request( $data['booking_date'] ) : null,
@@ -295,8 +297,8 @@ class Journal {
             'bank_statement_ref' => eme_sanitize_request( $data['bank_statement_ref'] ?? '' ),
             'bank_statement_seq' => eme_sanitize_request( $data['bank_statement_seq'] ?? '' ),
             'payment_method'     => eme_sanitize_request( $data['payment_method'] ?? '' ),
-            'vat_code'           => eme_sanitize_request( $data['vat_code'] ?? '' ),
-            'vat_amount'         => round( (float) ( $data['vat_amount'] ?? 0 ), 2 ),
+            'vat_code'           => $vat_liable ? eme_sanitize_request( $data['vat_code'] ?? '' ) : '',
+            'vat_amount'         => $vat_liable ? round( (float) str_replace( ',', '.', $data['vat_amount'] ?? '0' ), 2 ) : 0.00,
             'eme_payment_id'     => ! empty( $data['eme_payment_id'] ) ? (int) $data['eme_payment_id'] : null,
             'eme_event_id'       => ! empty( $data['eme_event_id'] ) ? (int) $data['eme_event_id'] : null,
             'attachment_url'     => esc_url_raw( $data['attachment_url'] ?? '' ),
@@ -544,6 +546,8 @@ class Journal {
                 'amount'             => $signed_amount,
                 'direction'          => $entry->direction,
                 'files'              => $entry->files,
+                'vat_code'           => $entry->vat_code ?? '',
+                'vat_amount'         => $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',
                 'is_reconciled'      => (bool) $entry->is_reconciled,
                 'reconciled_at'      => $entry->is_reconciled && $entry->reconciled_at
                                             ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE )
