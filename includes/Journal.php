@@ -573,8 +573,8 @@ class Journal {
         $year        = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
         $search_all  = isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
         $scope       = $settings['eme_scope'];
-        $eme_cat_ids = join(',',$settings['eme_cat_ids']);
-        $eme_exclude_cat_ids = join(',',$settings['eme_exclude_cat_ids']);
+        $eme_cat_ids = implode(',',$settings['eme_cat_ids']);
+        $eme_exclude_cat_ids = implode('+',$settings['eme_exclude_cat_ids']);
         if ($search_all) {
             $scope="all";
         //} else {
