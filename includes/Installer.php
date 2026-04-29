@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '16';
+    const DB_VERSION        = '17';
 
     public static function activate(): void {
         self::create_tables();
@@ -55,6 +55,9 @@ class Installer {
         }
         if ( (int) $current_version < 16 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_accounts ADD COLUMN opening_date DATE DEFAULT NULL" );
+        }
+        if ( (int) $current_version < 17 ) {
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN counterparty_vat_number VARCHAR(100) NOT NULL DEFAULT ''" );
         }
     }
 
@@ -160,6 +163,7 @@ class Installer {
             payment_method      VARCHAR(50)     NOT NULL DEFAULT '',
             vat_code            VARCHAR(10)     NOT NULL DEFAULT '',
             vat_amount          DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            counterparty_vat_number VARCHAR(100)    NOT NULL DEFAULT '',
             eme_payment_id      BIGINT UNSIGNED              DEFAULT NULL,
             eme_event_id        BIGINT UNSIGNED              DEFAULT NULL,
             attachment_url      VARCHAR(500)    NOT NULL DEFAULT '',

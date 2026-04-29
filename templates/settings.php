@@ -4,6 +4,7 @@ defined( 'ABSPATH' ) || exit;
 use EMEAccounting\Capabilities;
 
 $config = \EMEVzw\Config::get();
+$eme_categories = eme_get_categories();
 
 // ── Handle: general settings ────────────────────────────────────────────────
 if ( isset( $_POST['eme_accounting_settings_nonce'] )
@@ -12,6 +13,8 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
         'default_income_account' => (int)    ( $_POST['default_income_account']  ?? 0 ),
         'delete_on_uninstall'    => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
         'eme_scope'              => eme_sanitize_request( $_POST['eme_scope'] ?? '-3m--12m' ),
+        'eme_cat_ids'            => eme_sanitize_request( $_POST['eme_cat_ids'] ?? '' ),
+        'eme_exclude_cat_ids'    => eme_sanitize_request( $_POST['eme_exclude_cat_ids'] ?? '' ),
         'eme_auto_booking'       => (int) (bool) ( $_POST['eme_auto_booking'] ?? 0 ),
         'default_coa'            => (int)    ( $_POST['default_coa'] ?? 0 ),
     ];
@@ -36,6 +39,8 @@ $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'default_coa'            => 0,
     'eme_auto_booking'       => 0,
     'eme_scope'              => '-3m--12m',
+    'eme_cat_ids'            => '',
+    'eme_exclude_cat_ids'    => '',
 ] );
 $accounts     = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
@@ -93,6 +98,28 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
         </label>
     </td>
 </tr>
+<?php if ( !empty( $eme_categories ) ): ?>
+<tr>
+    <th><?php esc_html_e( 'Event categorieën bij doorzoeken van evenementen', 'eme-accounting' ); ?></th>
+    <td>
+    <label>
+            <?php
+            echo eme_ui_multiselect_key_value( $settings['eme_cat_ids'], 'eme_cat_ids', $eme_categories, 'category_id', 'category_name', 3, '', 0, 'eme_snapselect' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_multiselect()
+            ?>
+            <?php _e( "Beperk het doorzoeken van evenementen tot bepaalde categorieën", 'eme-accounting'); ?>
+    </label>
+    <br>
+    <br>
+    <label>
+            <?php
+            echo eme_ui_multiselect_key_value( $settings['eme_exclude_cat_ids'], 'eme_exclude_cat_ids', $eme_categories, 'category_id', 'category_name', 3, '', 0, 'eme_snapselect' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_multiselect()
+            ?>
+            <?php _e( "En/of excludeer bepaalde categorieën bij het doorzoeken van evenementen", 'eme-accounting'); ?>
+    </label>
+    </td>
+</tr>
+<?php endif; ?>
+
 <tr>
     <th><?php esc_html_e( 'Automatisch boeken bij betaling', 'eme-accounting' ); ?></th>
     <td>

@@ -299,6 +299,7 @@ class Journal {
             'payment_method'     => eme_sanitize_request( $data['payment_method'] ?? '' ),
             'vat_code'           => $vat_liable ? eme_sanitize_request( $data['vat_code'] ?? '' ) : '',
             'vat_amount'         => $vat_liable ? round( (float) str_replace( ',', '.', $data['vat_amount'] ?? '0' ), 2 ) : 0.00,
+            'counterparty_vat_number' => eme_sanitize_request( $data['counterparty_vat_number'] ?? '' ),
             'eme_payment_id'     => ! empty( $data['eme_payment_id'] ) ? (int) $data['eme_payment_id'] : null,
             'eme_event_id'       => ! empty( $data['eme_event_id'] ) ? (int) $data['eme_event_id'] : null,
             'attachment_url'     => esc_url_raw( $data['attachment_url'] ?? '' ),
@@ -548,6 +549,7 @@ class Journal {
                 'files'              => $entry->files,
                 'vat_code'           => $entry->vat_code ?? '',
                 'vat_amount'         => $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',
+                'counterparty_vat_number' => $entry->counterparty_vat_number,
                 'is_reconciled'      => (bool) $entry->is_reconciled,
                 'reconciled_at'      => $entry->is_reconciled && $entry->reconciled_at
                                             ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE )
@@ -567,10 +569,12 @@ class Journal {
         $settings = get_option( 'eme_accounting_settings', [] );
         header( 'Content-type: application/json; charset=utf-8' );
         // snapselect gives us paging, but currently we ignore it here and return everything we can
-        $q          = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
-        $year       = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
-        $search_all = isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
-        $scope      = $settings['eme_scope'];
+        $q           = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
+        $year        = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
+        $search_all  = isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
+        $scope       = $settings['eme_scope'];
+        $eme_cat_ids = join(',',$settings['eme_cat_ids']);
+        $eme_exclude_cat_ids = join(',',$settings['eme_exclude_cat_ids']);
         if ($search_all) {
             $scope="all";
         //} else {
@@ -581,7 +585,7 @@ class Journal {
         $mysql_pagesize = $pagesize+1;
         $start     = ( isset( $_REQUEST['page'] ) && intval( $_REQUEST['page'] ) > 0 ) ? ( intval( $_REQUEST['page'] ) - 1 ) * $pagesize : 0;
         $prepared_sql = $wpdb->prepare( "event_name LIKE %s", '%'.$wpdb->esc_like($q).'%' );
-        $events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, extra_conditions: ['prepared'=>$prepared_sql]);
+        $events       = eme_get_events(limit: $mysql_pagesize, offset: $start, scope: $scope, category:$eme_cat_ids, notcategory: $eme_exclude_cat_ids, extra_conditions: ['prepared'=>$prepared_sql]);
         // eme_search_events understands past/future/all scopes only
         //$events     = eme_search_events( $q, $scope, 1, 0, 0, $start, $mysql_pagesize );
         $records     = [];

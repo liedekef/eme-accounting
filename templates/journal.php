@@ -180,7 +180,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <div class="eme-acc-row" id="vat-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'BTW-tarief', 'eme-accounting' ); ?></label>
-                    <select name="vat_code" id="vat_code" <?= $form_disabled ?>>
+                    <select name="vat_code" id="vat_code">
                         <option value=""><?php esc_html_e( '— geen BTW —', 'eme-accounting' ); ?></option>
                         <option value="6"      <?= selected( $edit_entry->vat_code  ?? '', '6',      false ) ?>>6%</option>
                         <option value="12"     <?= selected( $edit_entry->vat_code  ?? '', '12',     false ) ?>>12%</option>
@@ -191,11 +191,17 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'BTW-bedrag (€)', 'eme-accounting' ); ?></label>
                     <input type="text" name="vat_amount" id="vat_amount" size="5"
-                           inputmode="decimal" <?= $form_disabled ?>
+                           inputmode="decimal"
                            oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                            value="<?= esc_attr( $edit_entry && $edit_entry->vat_amount > 0 ? number_format( (float) $edit_entry->vat_amount, 2, ',', '.' ) : '' ) ?>"
                            placeholder="0,00">
                     <span class="description"><?php esc_html_e( 'Auto-berekend op basis van bedrag incl. BTW, maar overschrijfbaar.', 'eme-accounting' ); ?></span>
+                </div>
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'BTW-nummer tegenpartij', 'eme-accounting' ); ?></label>
+                    <input type="text" name="counterparty_vat_number" id="counterparty_vat_number" size="40"
+                           value="<?= esc_attr( $edit_entry->counterparty_vat_number ?? '' ) ?>">
+                    <span class="description"><?php esc_html_e( 'BTW nummer tegenpartij indien BTW toepasbaar is.', 'eme-accounting' ); ?></span>
                 </div>
             </div>
             <?php endif; ?>
