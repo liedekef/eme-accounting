@@ -319,9 +319,10 @@ class Import {
         $delimiter = array_key_first( $counts );
 
         return self::parse_csv_generic( $content, $delimiter, [
-                'date'             => 'Boekingsdatum',
+                'date'             => 'Datum',
                 'amount'           => 'Bedrag',
-                'description'      => 'Mededelingen'
+                'counterparty_name'=> 'Naam',
+                'description'      => 'Omschrijving'
         ] );
     }
 
