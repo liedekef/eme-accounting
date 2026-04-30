@@ -440,7 +440,11 @@ function initSnapSelectRemote(selector, options = {}) {
                 }
                 if (d.pending > 0) loadPendingLines(d.log_id);
             })
-            .catch(() => alert('Verbindingsfout met server.'));
+            .catch(error => {
+                btn.textContent = 'Importeren';
+                btn.disabled = false;
+                alert('Verbindingsfout met server.');
+            });
     }
 
     function loadPendingLines(logId) {
