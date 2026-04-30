@@ -124,12 +124,7 @@ class Import {
         // Run automatic matching
         $matched = self::auto_match( $log_id, $account_id );
 
-        return (object) [
-            'log_id'    => $log_id,
-            'total'     => $inserted,
-            'matched'   => $matched,
-            'unmatched' => $inserted-$matched
-        ];
+        return $log_id;
     }
 
     /* ------------------------------------------------------------------

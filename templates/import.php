@@ -6,7 +6,6 @@ $accounts  = EMEAccounting\Accounts::get_dropdown( 'asset' );
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $log_id    = isset( $_GET['log_id'] ) ? (int) $_GET['log_id'] : 0;
 $lines     = $log_id ? EMEAccounting\Import::get_all_lines( $log_id ) : [];
-$stat_counters = $log_id ? EMEAccounting\Import::get_status_counters( $log_id ) : (object)[];
 
 global $wpdb;
 $import_logs = $wpdb->get_results(
@@ -144,7 +143,9 @@ $import_logs = $wpdb->get_results(
     <th></th>
 </tr></thead>
 <tbody>
-<?php foreach ( $import_logs as $log ): ?>
+<?php foreach ( $import_logs as $log ):
+        $stat_counters = EMEAccounting\Import::get_status_counters( $log->id );
+?>
 <tr data-import-log="<?= (int) $log->id ?>">
     <td><?= (int) $log->id ?></td>
     <td><?= esc_html( date_i18n( 'd/m/Y H:i', strtotime( $log->import_date ) ) ) ?></td>
@@ -157,7 +158,7 @@ $import_logs = $wpdb->get_results(
     <td><span class="eme-acc-tag eme-acc-ignored"><?= (int) ($stat_counters->ignored ?? 0) ?></span></td>
     <td>
         <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
-        <a href="#" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import' ) ) ?>" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>
     </td>
 </tr>
 <?php endforeach; ?>
