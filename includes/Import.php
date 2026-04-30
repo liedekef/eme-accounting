@@ -375,7 +375,7 @@ class Import {
 
         $result = [];
         foreach ( $lines as $raw ) {
-            $cells = str_getcsv( $line, $delimiter, '"', '\\' );
+            $cells = str_getcsv( $raw, $delimiter, '"', '\\' );
 
             $row = [];
             foreach ( $reverse as $idx => $norm ) {
@@ -583,6 +583,7 @@ class Import {
             'import_line_id'    => $line->id,
             'is_reconciled'     => 1,
             'coa_id'            => (int) ( $_POST['coa_id'] ?? 0 ),
+            'eme_event_id'      => (int) ( $_POST['eme_event_id'] ?? 0 ),
         ] );
 
         if ( is_wp_error( $journal_id ) ) {

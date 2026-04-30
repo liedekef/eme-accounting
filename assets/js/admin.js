@@ -499,9 +499,10 @@ function initSnapSelectRemote(selector, options = {}) {
 
     function handleCreateFromLine(btn) {
         const row      = btn.closest('tr');
-        const category = row?.querySelector('.category-input')?.value ?? '';
+        const coa_id = row?.querySelector('[name=coa_id]')?.value ?? '';
+        const eme_event_id = row?.querySelector('[name=eme_event_id]')?.value ?? '';
         ajax('eme_accounting_create_entry_from_line',
-            { line_id: btn.dataset.lineId, category },
+            { line_id: btn.dataset.lineId, coa_id: coa_id, eme_event_id: eme_event_id },
             (data) => { alert(`Boeking aangemaakt (ID: ${data.journal_id})`); location.reload(); }
         );
     }

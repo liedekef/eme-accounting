@@ -133,7 +133,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                         $event_id = $edit_entry->eme_event_id;
                         $event = eme_get_event(  $event_id);
                         if ( $event ) {
-                            $myevents[ $event_id ] = $event['event_name']. ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
+                            $myevents[ $event_id ] = eme_translate($event['event_name']) . ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
                         } else {
                             $myevents[ $event_id ] = __('onbekend event','eme-accounting');
                         }

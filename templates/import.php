@@ -88,8 +88,10 @@ $import_logs = $wpdb->get_results(
     <td>
         <?php if ( $line->status === 'pending' ): ?>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="button button-small btn-ignore-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Negeer', 'eme-accounting' ); ?></button>
             <input type="number" class="journal-id-input" placeholder="Dagboek ID" style="width:80px;padding:2px 4px">
             <button class="button button-small btn-reconcile-manual" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Link', 'eme-accounting' ); ?></button>
+            <br>
              <select name="coa_id" required class="eme_snapselect" data-live-search="true">
                  <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
                  <?php if ($line->amount >= 0): ?>
@@ -115,9 +117,8 @@ $import_logs = $wpdb->get_results(
                         </optgroup>
                  <?php endif; ?>
              </select>
-
-            <button class="button button-small btn-create-from-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?></button>
-            <button class="button button-small btn-ignore-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Negeer', 'eme-accounting' ); ?></button>
+             <select name="eme_event_id" class="eme_snapselect_events_class"></select>
+             <button class="button button-small btn-create-from-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?></button>
         </div>
         <?php endif; ?>
     </td>
