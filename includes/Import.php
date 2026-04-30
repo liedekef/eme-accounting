@@ -56,9 +56,9 @@ class Import {
      * @param  int    $account_id
      * @param  array  $file       $_FILES element
      * @param  string $format     csv|coda|bnp|kbc|ing|belfius|auto
-     * @return object             Import log row or error.
+     * @return int|\WP_Error      Import log row id or error.
      */
-    public static function process_upload( int $account_id, array $file, string $format = 'auto' ): object {
+    public static function process_upload( int $account_id, array $file, string $format = 'auto' ): int|\WP_Error {
         global $wpdb;
 
         if ( $file['error'] !== UPLOAD_ERR_OK ) {
@@ -526,11 +526,11 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         $account_id = (int) ( $_POST['account_id'] ?? 0 );
         $format     = eme_sanitize_request( $_POST['format'] ?? 'auto' );
-        $result     = self::process_upload( $account_id, $_FILES['import_file'], $format );
-        if ( is_wp_error( $result ) ) {
-            wp_send_json_error( $result->get_error_message() );
+        $log_id = self::process_upload( $account_id, $_FILES['import_file'], $format );
+        if ( is_wp_error( $log_id ) ) {
+            wp_send_json_error( $log_id->get_error_message() );
         }
-        wp_send_json_success( (array) $result );
+        wp_send_json_success( [ 'log_id' => $log_id ] );
     }
 
     public static function ajax_reconcile_line(): void {

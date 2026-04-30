@@ -428,32 +428,15 @@ function initSnapSelectRemote(selector, options = {}) {
                 btn.textContent = 'Importeren';
                 btn.disabled = false;
                 if (!r.success) { alert(r.data || 'Importfout'); return; }
-                const d         = r.data;
-                const resultDiv = document.querySelector('#import-result');
-                if (resultDiv) {
-                    resultDiv.innerHTML = `<div class="notice notice-success"><p>
-                        Import klaar: <strong>${d.total}</strong> regels —
-                        <strong>${d.matched}</strong> gematcht —
-                        <strong>${d.unmatched}</strong> nog te verifiëren.
-                    </p></div>`;
-                    resultDiv.style.display = 'block';
-                }
-                if (d.pending > 0) loadPendingLines(d.log_id);
+                const d = r.data;
+                window.location.href = window.location.pathname
+                    + '?page=emeaccounting-import&log_id=' + d.log_id;
             })
             .catch(error => {
                 btn.textContent = 'Importeren';
                 btn.disabled = false;
                 alert('Verbindingsfout met server.');
             });
-    }
-
-    function loadPendingLines(logId) {
-        const section = document.querySelector('#reconcile-section');
-        if (!section) return;
-        section.innerHTML = '<p>Laden...</p>';
-        fetch(`${ajaxUrl}?action=eme_accounting_reconcile_view&nonce=${nonce}&log_id=${logId}`)
-            .then(r => r.text())
-            .then(html => { section.innerHTML = html; });
     }
 
     function handleAutoReconcile(btn) {

@@ -52,7 +52,6 @@ $import_logs = $wpdb->get_results(
 </div>
 <p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Importeren', 'eme-accounting' ); ?></button></p>
 </form>
-<div id="import-result" style="display:none"></div>
 </div>
 
 <?php if ( $log_id && $lines ): ?>
