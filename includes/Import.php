@@ -313,7 +313,7 @@ class Import {
         foreach ( $delimiters as $d ) {
             // we take the whole file, not just the first line
             //$counts[ $d ] = substr_count( strtok( $content, "\n" ), $d );
-            $counts[ $d ] = substr_count( $d );
+            $counts[ $d ] = substr_count( $content, $d );
         }
         arsort( $counts );
         $delimiter = array_key_first( $counts );
