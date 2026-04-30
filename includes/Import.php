@@ -345,7 +345,7 @@ class Import {
         $header  = null;
         $reverse = [];
         foreach ( $lines as $key => $line ) {
-            $candidate = array_map( 'trim', str_getcsv( $line, $delimiter, '\\' ) );
+            $candidate = array_map( 'trim', str_getcsv( $line, $delimiter, '"', '\\' ) );
             $found = [];
             foreach ( $col_map as $norm => $csv ) {
                 $idx = array_search( $csv, $candidate, true );
@@ -375,7 +375,7 @@ class Import {
 
         $result = [];
         foreach ( $lines as $raw ) {
-            $cells = str_getcsv( $raw, $delimiter, '\\' );
+            $cells = str_getcsv( $line, $delimiter, '"', '\\' );
 
             $row = [];
             foreach ( $reverse as $idx => $norm ) {
