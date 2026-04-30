@@ -139,7 +139,7 @@ $import_logs = $wpdb->get_results(
     <th><?php esc_html_e( 'Bestand', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Totaal', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Gematcht', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Manual', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Manueel', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Open', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Genegeerd', 'eme-accounting' ); ?></th>
     <th></th>
