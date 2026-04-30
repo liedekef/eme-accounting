@@ -124,23 +124,11 @@ class Import {
         // Run automatic matching
         $matched = self::auto_match( $log_id, $account_id );
 
-        $wpdb->update(
-            $wpdb->prefix . 'emeacc_import_log',
-            [
-                'total_lines'     => $inserted,
-                'matched_lines'   => $matched,
-                'unmatched_lines' => $inserted - $matched,
-            ],
-            [ 'id' => $log_id ],
-            null,
-            [ '%d' ]
-        );
-
         return (object) [
-            'log_id'   => $log_id,
-            'total'    => $inserted,
-            'matched'  => $matched,
-            'pending'  => $inserted - $matched,
+            'log_id'    => $log_id,
+            'total'     => $inserted,
+            'matched'   => $matched,
+            'unmatched' => $inserted-$matched
         ];
     }
 
@@ -470,6 +458,33 @@ class Import {
     /* ------------------------------------------------------------------
      * QUERY HELPERS
      * ------------------------------------------------------------------ */
+
+    /**
+     * @return object
+     */
+    public static function get_status_counters( int $log_id ): object {
+        global $wpdb;
+
+        if ( ! $log_id ) {
+            return (object) [];
+        }
+
+        $results = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT status, COUNT(*) as count FROM `{$wpdb->prefix}emeacc_import_lines`
+                WHERE import_log_id = %d GROUP BY status",
+        $log_id
+            )
+        );
+
+        $counters = [];
+        foreach ( $results as $row ) {
+            $counters[$row->status] = (int) $row->count;
+        }
+
+        return (object) $counters;
+    }
+
 
     /**
      * @return object[]

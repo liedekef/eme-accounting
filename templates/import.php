@@ -6,6 +6,7 @@ $accounts  = EMEAccounting\Accounts::get_dropdown( 'asset' );
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $log_id    = isset( $_GET['log_id'] ) ? (int) $_GET['log_id'] : 0;
 $lines     = $log_id ? EMEAccounting\Import::get_all_lines( $log_id ) : [];
+$stat_counters = $log_id ? EMEAccounting\Import::get_status_counters( $log_id ) : (object)[];
 
 global $wpdb;
 $import_logs = $wpdb->get_results(
@@ -138,7 +139,9 @@ $import_logs = $wpdb->get_results(
     <th><?php esc_html_e( 'Bestand', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Totaal', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Gematcht', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Manual', 'eme-accounting' ); ?></th>
     <th><?php esc_html_e( 'Open', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Genegeerd', 'eme-accounting' ); ?></th>
     <th></th>
 </tr></thead>
 <tbody>
@@ -149,8 +152,10 @@ $import_logs = $wpdb->get_results(
     <td><?= esc_html( $log->account_name ) ?></td>
     <td style="font-size:11px"><?= esc_html( $log->filename ) ?> <span class="eme-acc-tag"><?= esc_html( $log->format ) ?></span></td>
     <td><?= (int) $log->total_lines ?></td>
-    <td><span class="eme-acc-tag eme-acc-reconciled"><?= (int) $log->matched_lines ?></span></td>
-    <td><?= $log->unmatched_lines > 0 ? '<span class="eme-acc-tag eme-acc-pending">' . (int) $log->unmatched_lines . '</span>' : '–' ?></td>
+    <td><span class="eme-acc-tag eme-acc-reconciled"><?= (int) ($stat_counters->matched ?? 0) ?></span></td>
+    <td><span class="eme-acc-tag eme-acc-manual"><?= (int) ($stat_counters->manual ?? 0) ?></span></td>
+    <td><span class="eme-acc-tag eme-acc-pending"><?= (int) ($stat_counters->pending ?? 0) ?></span></td>
+    <td><span class="eme-acc-tag eme-acc-ignored"><?= (int) ($stat_counters->ignored ?? 0) ?></span></td>
     <td>
         <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
         <a href="#" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>

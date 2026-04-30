@@ -434,7 +434,7 @@ function initSnapSelectRemote(selector, options = {}) {
                     resultDiv.innerHTML = `<div class="notice notice-success"><p>
                         Import klaar: <strong>${d.total}</strong> regels —
                         <strong>${d.matched}</strong> gematcht —
-                        <strong>${d.pending}</strong> nog te verifiëren.
+                        <strong>${d.unmatched}</strong> nog te verifiëren.
                     </p></div>`;
                     resultDiv.style.display = 'block';
                 }
