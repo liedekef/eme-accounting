@@ -75,6 +75,8 @@ class Assets {
                 'confirmClose'   => __( 'Boekjaar %s afsluiten? Dit kan niet ongedaan gemaakt worden.', 'eme-accounting' ),
                 'confirmReopen'  => __( 'Boekjaar %s heropenen? De afsluitboekingen worden verwijderd.', 'eme-accounting' ),
                 'confirmDelete'   => __( 'Boekjaar %s verwijderen?', 'eme-accounting' ),
+                'translate_fdateformat'        => get_option( 'date_format' ),
+                'translate_fdatetimeformat'    => get_option( 'date_format' ) . ' ' . get_option( 'time_format' ),
             ],
         ] );
         if ( $plugin_page === 'emeaccounting-journal' ) {

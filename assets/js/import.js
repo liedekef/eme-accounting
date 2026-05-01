@@ -59,33 +59,35 @@
             },
             fields: {
                 id: { key: true, list: false },
-
                 transaction_date: {
                     type: 'date',
+                    dateFormat: i18n.translate_fdateformat,
                     title: 'Datum', list: true, create: false, edit: false,
                 },
                 description: {
                     title: 'Omschrijving', list: true, create: false, edit: false,
-                    display: ( { value } ) =>
+                    display: ( { value, record } ) =>
                         `<span title="${esc(value)}">${esc( String( value || '' ).substring( 0, 60 ) )}</span>`,
                 },
                 counterparty_name: {
                     title: 'Tegenpartij', list: true, create: false, edit: false,
-                    display: ( { record } ) =>
+                    display: ( { value, record } ) =>
                         `<span style="font-size:11px">${esc(record.counterparty_name)}<br>` +
                         `<span style="color:#646970">${esc(record.counterparty_iban)}</span></span>`,
                 },
                 bank_ref: {
                     title: 'Ref.', list: true, create: false, edit: false,
-                    display: ( { record } ) =>
+                    width: '2%',
+                    display: ( { value, record } ) =>
                         `<span style="font-size:11px">${esc(record.bank_ref || record.structured_ref)}</span>`,
                 },
                 amount: {
                     title: 'Bedrag', list: true, create: false, edit: false,
                     listClass: 'amount',
-                    display: function(data) {
-                        const formatted_val = fmtCur(data.value);
-                        if (data.value<0) {
+                    width: '2%',
+                    display: ( { value, record } ) => {
+                        const formatted_val = fmtCur(value);
+                        if (value<0) {
                             return '<span style="color: red; font-weight: bold;">' + formatted_val + '</span>';
                         } else {
                             return '<span style="color: green; font-weight: bold;">' + formatted_val + '</span>';
@@ -94,6 +96,7 @@
                 },
                 status: {
                     title: 'Status', list: true, create: false, edit: false,
+                    width: '5%',
                     display: ( { value, record } ) => {
                         let html = statusBadge[ value ] ||
                             `<span class="eme-acc-tag">${esc(value)}</span>`;
@@ -107,7 +110,7 @@
                 /* Reconciliation action controls – only shown for pending lines */
                 _actions: {
                     title: 'Acties', list: true, create: false, edit: false, sorting: false,
-                    display: ( { record } ) => {
+                    display: ( { value, record } ) => {
                         if ( record.status !== 'pending' ) return '';
                         const n    = parseFloat( record.amount );
                         const opts = ( n >= 0 ? emeAccountingImport.coaSelectIn : emeAccountingImport.coaSelectOut )
@@ -309,8 +312,8 @@
             },
             import_date: {
                 title: 'Datum', list: true, create: false, edit: false,
-                display: ( { value } ) =>
-                    value ? String( value ).substring( 0, 16 ).replace( 'T', ' ' ) : '',
+                type: 'datetime',
+                dateFormat: i18n.translate_fdatetimeformat
             },
             account_name: {
                 title: 'Rekening', list: true, create: false, edit: false,
