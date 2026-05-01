@@ -21,6 +21,29 @@
         return fetch( ajaxUrl, { method: 'POST', body: fd } ).then( r => r.json() );
     }
 
+    /* FtableModal-based confirm — returns a Promise that resolves true/false */
+    function ftConfirm( title, message ) {
+        return new Promise( ( resolve ) => {
+            const modal = new FtableModal( {
+                title,
+                content : `<p>${message}</p>`,
+                buttons : [
+                    {
+                        text      : i18n.cancel || 'Annuleren',
+                        className : 'ftable-dialog-cancelbutton',
+                        onClick   : () => { modal.close(); resolve( false ); },
+                    },
+                    {
+                        text      : i18n.confirm || 'Bevestigen',
+                        className : 'ftable-dialog-deletebutton',
+                        onClick   : () => { modal.close(); resolve( true ); },
+                    },
+                ],
+            } );
+            modal.show();
+        } );
+    }
+
     /* Currency formatter */
     function fmtCur( n ) {
         return new Intl.NumberFormat( 'nl-BE', {
@@ -300,7 +323,7 @@
                 linesTableInst?.load();
                 refreshLogCounters();
             } else {
-                alert( r.data || 'Fout' );
+                linesTableInst.showError( r.data || 'Fout' );
                 btn.textContent = origText;
             }
             btn.disabled = false;
@@ -317,6 +340,11 @@
         const wrap = e.target.closest( '.eme-import-actions' );
         const lineId = wrap?.dataset.line || null;
         if ( wrap && e.target.classList.contains( 'btn-ignore-line' ) ) {
+            const ok = await ftConfirm(
+                i18n.confirm_ignore_title || 'Lijn negeren',
+                i18n.confirm_ignore_msg   || 'Ben je zeker dat je deze lijn wil negeren?'
+            );
+            if ( ! ok ) return;
             e.target.disabled = true;
             const r = await post( 'eme_accounting_ignore_line', { line_id: lineId } );
             if ( r.success ) {
@@ -324,14 +352,14 @@
                 refreshLogCounters();
                 wrap.innerHTML = '';
             } else {
-                alert( r.data || 'Fout' );
+                linesTableInst.showError( r.data || 'Fout' );
                 e.target.disabled = false;
             }
             return;
         }
         if ( wrap && e.target.classList.contains( 'btn-reconcile-manual' ) ) {
             const jid = wrap.querySelector( '.journal-id-input' )?.value;
-            if ( ! jid ) { alert( 'Voer eerst een dagboek-ID in.' ); return; }
+            if ( ! jid ) { linesTableInst.showInfo( 'Voer eerst een dagboek-ID in.' ); return; }
             e.target.disabled = true;
             const r = await post( 'eme_accounting_reconcile_line',
                 { line_id: lineId, journal_id: jid } );
@@ -340,14 +368,22 @@
                 refreshLogCounters();
                 wrap.innerHTML = '';
             } else {
-                alert( r.data || 'Fout' );
+                linesTableInst.showError( r.data || 'Fout' );
                 e.target.disabled = false;
             }
             return;
         }
         if ( wrap && e.target.classList.contains( 'btn-create-from-line' ) ) {
             const coaId = wrap.querySelector( '.coa-select' )?.value;
-            if ( ! coaId ) { alert( 'Kies eerst een grootboekrekening.' ); return; }
+            if ( ! coaId ) { linesTableInst.showInfo( 'Kies eerst een grootboekrekening.' ); return; }
+            const description = wrap.closest( 'tr' )?.recordData?.description || '';
+            if ( /transfer/i.test( description ) ) {
+                const ok = await ftConfirm(
+                    i18n.confirm_transfer_title || 'Transfer gedetecteerd',
+                    i18n.confirm_transfer_msg   || 'De omschrijving bevat "transfer". Ben je zeker dat je een nieuwe boeking wil aanmaken?'
+                );
+                if ( ! ok ) return;
+            }
             e.target.disabled = true;
             const r = await post( 'eme_accounting_create_entry_from_line',
                 { line_id: lineId, coa_id: coaId } );
@@ -356,7 +392,7 @@
                 refreshLogCounters();
                 wrap.innerHTML = '';
             } else {
-                alert( r.data || 'Fout' );
+                linesTableInst.showError( r.data || 'Fout' );
                 e.target.disabled = false;
             }
             return;
