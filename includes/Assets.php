@@ -80,6 +80,32 @@ class Assets {
         if ( $plugin_page === 'emeaccounting-journal' ) {
             wp_enqueue_script( 'emeaccounting-journal', EME_ACCOUNTING_URL . 'assets/js/journal.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
         }
+        if ( $plugin_page === 'emeaccounting-import' ) {
+            $coa_accounts = ChartOfAccounts::get_dropdown();
+            // Build COA option arrays for ftable (direction-filtered, category headers excluded)
+            $coa_in_select = [];
+            $coa_out_select = [];
+            $coa_in_select[] = "<optgroup label='".esc_html__( 'Ontvangsten', 'eme-accounting' )."'>";
+            $coa_out_select[] = "<optgroup label='".esc_html__( 'Uitgaven', 'eme-accounting' )."'>";
+            foreach ( $coa_accounts as $id => $acc ) {
+                //if ( ! $acc || empty( $acc->parent_id ) ) continue;
+                $disabled = '';
+                if (empty( $acc->parent_id )) $disabled='disabled';
+                if ( $acc->direction === 'in' )  {
+                    $coa_in_select[] = "<option value='$id' $disabled>". esc_html__( $acc->code . ' - ' . $acc->name )."</option>";
+                }
+                if ( $acc->direction === 'out' )  {
+                    $coa_out_select[] = "<option value='$id' $disabled>". esc_html__( $acc->code . ' - ' . $acc->name )."</option>";
+                }
+            }
+            $coa_in_select[] = "</optgroup>";
+            $coa_out_select[] = "</optgroup>";
+            wp_enqueue_script( 'emeaccounting-import', EME_ACCOUNTING_URL . 'assets/js/import.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
+            wp_localize_script( 'emeaccounting-import', 'emeAccountingImport', [
+                'coaSelectIn'  => $coa_in_select,
+                'coaSelectOut' => $coa_out_select
+            ] );
+        }
 
         if ( $plugin_page === 'emeaccounting-fiscal-years' ) {
             $current_year = (int) gmdate( 'Y' );

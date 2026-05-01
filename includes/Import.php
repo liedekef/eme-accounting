@@ -25,6 +25,48 @@ class Import {
         add_action( 'wp_ajax_eme_accounting_auto_reconcile',        [ __CLASS__, 'ajax_auto_reconcile' ] );
         add_action( 'wp_ajax_eme_accounting_create_entry_from_line',[ __CLASS__, 'ajax_create_from_line' ] );
         add_action( 'wp_ajax_eme_accounting_delete_import_log',    [ __CLASS__, 'ajax_delete_log' ] );
+        add_action( 'wp_ajax_eme_accounting_list_import_lines',    [ __CLASS__, 'ajax_list_lines' ] );
+        add_action( 'wp_ajax_eme_accounting_list_import_logs',     [ __CLASS__, 'ajax_list_logs' ] );
+    }
+
+    /**
+     * ftable listAction for the import-logs overview table.
+     */
+    public static function ajax_list_logs(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'import' );
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
+             LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
+             ORDER BY il.import_date DESC LIMIT 50"
+        );
+
+        foreach ( $rows as $row ) {
+            $c = self::get_status_counters( (int) $row->id );
+            $row->cnt_matched  = (int) ( $c->matched  ?? 0 );
+            $row->cnt_manual   = (int) ( $c->manual   ?? 0 );
+            $row->cnt_pending  = (int) ( $c->pending  ?? 0 );
+            $row->cnt_ignored  = (int) ( $c->ignored  ?? 0 );
+        }
+
+        wp_send_json( [ 'Result' => 'OK', 'Records' => $rows, 'TotalRecordCount' => count( $rows ) ] );
+    }
+
+    /**
+     * ftable listAction for the import-lines child table.
+     * Expects POST param: import_log_id
+     */
+    public static function ajax_list_lines(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'import' );
+        $log_id = (int) ( $_POST['import_log_id'] ?? $_GET['import_log_id'] ?? 0 );
+        if ( ! $log_id ) {
+            wp_send_json( [ 'Result' => 'ERROR', 'Message' => 'Missing import_log_id' ] );
+        }
+        $lines = self::get_all_lines( $log_id );
+        wp_send_json( [ 'Result' => 'OK', 'Records' => $lines, 'TotalRecordCount' => count( $lines ) ] );
     }
 
     /**
@@ -43,7 +85,8 @@ class Import {
         if ( $id > 0 ) {
             self::delete_log( $id );
         }
-        wp_send_json_success();
+        // Return ftable-compatible response (deleteAction expects Result: OK)
+        wp_send_json( [ 'Result' => 'OK' ] );
     }
 
     /* ------------------------------------------------------------------
@@ -56,9 +99,9 @@ class Import {
      * @param  int    $account_id
      * @param  array  $file       $_FILES element
      * @param  string $format     csv|coda|bnp|kbc|ing|belfius|auto
-     * @return int|\WP_Error      Import log row id or error.
+     * @return object      Import log row or error.
      */
-    public static function process_upload( int $account_id, array $file, string $format = 'auto' ): int|\WP_Error {
+    public static function process_upload( int $account_id, array $file, string $format = 'auto' ): object {
         global $wpdb;
 
         if ( $file['error'] !== UPLOAD_ERR_OK ) {
@@ -124,7 +167,12 @@ class Import {
         // Run automatic matching
         $matched = self::auto_match( $log_id, $account_id );
 
-        return $log_id;
+        return (object) [
+            'log_id'    => $log_id,
+            'total'     => $inserted,
+            'matched'   => $matched,
+            'unmatched' => $inserted-$matched
+        ];
     }
 
     /* ------------------------------------------------------------------
@@ -451,6 +499,27 @@ class Import {
     }
 
     /* ------------------------------------------------------------------
+     * SINGLE LINE FETCH (for ftable Record responses)
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Fetch a single import line enriched with its journal description,
+     * formatted exactly as get_all_lines() returns rows.
+     */
+    public static function get_line( int $line_id ): ?object {
+        global $wpdb;
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT il.*, j.description as journal_description
+                 FROM `{$wpdb->prefix}emeacc_import_lines` il
+                 LEFT JOIN `{$wpdb->prefix}emeacc_journal` j ON j.id = il.journal_id
+                 WHERE il.id = %d",
+                $line_id
+            )
+        );
+    }
+
+    /* ------------------------------------------------------------------
      * QUERY HELPERS
      * ------------------------------------------------------------------ */
 
@@ -521,11 +590,11 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         $account_id = (int) ( $_POST['account_id'] ?? 0 );
         $format     = eme_sanitize_request( $_POST['format'] ?? 'auto' );
-        $log_id = self::process_upload( $account_id, $_FILES['import_file'], $format );
-        if ( is_wp_error( $log_id ) ) {
-            wp_send_json_error( $log_id->get_error_message() );
+        $result = self::process_upload( $account_id, $_FILES['import_file'], $format );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
         }
-        wp_send_json_success( [ 'log_id' => $log_id ] );
+        wp_send_json_success( (array) $result );
     }
 
     public static function ajax_reconcile_line(): void {
@@ -534,29 +603,34 @@ class Import {
         global $wpdb;
         $line_id    = (int) ( $_POST['line_id'] ?? 0 );
         $journal_id = (int) ( $_POST['journal_id'] ?? 0 );
-        $wpdb->update(
+        $res = $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'matched', 'journal_id' => $journal_id ],
-            [ 'id' => $line_id ],
+            [ 'id' => $line_id, 'is_reconciled' => 0 ],
             [ '%s', '%d' ],
             [ '%d' ]
         );
-        Journal::mark_reconciled( $journal_id );
-        wp_send_json_success();
+        if ($res) {
+            Journal::mark_reconciled( $journal_id );
+            wp_send_json_success( [ 'Record' => self::get_line( $line_id ) ] );
+        } else {
+            wp_send_json_error( 'Link niet kunnen leggen' );
+        }
     }
 
     public static function ajax_ignore_line(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
+        $line_id = (int) ( $_POST['line_id'] ?? 0 );
         $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'ignored' ],
-            [ 'id' => (int) ( $_POST['line_id'] ?? 0 ) ],
+            [ 'id' => $line_id ],
             [ '%s' ],
             [ '%d' ]
         );
-        wp_send_json_success();
+        wp_send_json_success( [ 'Record' => self::get_line( $line_id ) ] );
     }
 
     public static function ajax_auto_reconcile(): void {
@@ -608,6 +682,6 @@ class Import {
             [ '%d' ]
         );
 
-        wp_send_json_success( [ 'journal_id' => $journal_id ] );
+        wp_send_json_success( [ 'journal_id' => $journal_id, 'Record' => self::get_line( $line_id ) ] );
     }
 }

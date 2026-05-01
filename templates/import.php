@@ -1,27 +1,16 @@
 <?php
 defined( 'ABSPATH' ) || exit;
-$formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 
-$accounts  = EMEAccounting\Accounts::get_dropdown( 'asset' );
-$coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
-$log_id    = isset( $_GET['log_id'] ) ? (int) $_GET['log_id'] : 0;
-$lines     = $log_id ? EMEAccounting\Import::get_all_lines( $log_id ) : [];
-
-global $wpdb;
-$import_logs = $wpdb->get_results(
-    "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
-     LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
-     ORDER BY il.import_date DESC LIMIT 20"
-);
+$accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
 ?>
 <div class="wrap eme-acc-wrap">
-<fieldset <?= $form_disabled ?>>
 <h1><?php esc_html_e( 'Import & Reconciliatie', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
 <h2><?php esc_html_e( 'Bankafschrift importeren', 'eme-accounting' ); ?></h2>
 <p class="description"><?php esc_html_e( 'Ondersteunde formaten: CSV (BNP, KBC, ING, Belfius), CODA v2, generiek CSV.', 'eme-accounting' ); ?></p>
 <form id="eme-acc-import-form" enctype="multipart/form-data">
+<fieldset <?= $form_disabled ?>>
 <div class="eme-acc-row">
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
@@ -50,120 +39,22 @@ $import_logs = $wpdb->get_results(
     </div>
 </div>
 <p><button type="submit" class="button button-primary submit-btn"><?php esc_html_e( 'Importeren', 'eme-accounting' ); ?></button></p>
-</form>
-</div>
-
-<?php if ( $log_id && $lines ): ?>
-<div class="eme-acc-form-box">
-<h2><?php printf( esc_html__( 'Reconciliatie – import #%d', 'eme-accounting' ), $log_id ); ?></h2>
-<p>
-    <button id="btn-auto-reconcile" class="button" data-log-id="<?= $log_id ?>" data-account-id="<?= (int) ( $lines[0]->account_id ?? 0 ) ?>">
-        <?php esc_html_e( 'Auto-reconciliatie uitvoeren', 'eme-accounting' ); ?>
-    </button>
-</p>
-<table class="eme-acc-table">
-<thead><tr>
-    <th><?php esc_html_e( 'Datum', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Tegenpartij', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Ref.', 'eme-accounting' ); ?></th>
-    <th class="amount"><?php esc_html_e( 'Bedrag', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Status', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Acties', 'eme-accounting' ); ?></th>
-</tr></thead>
-<tbody>
-<?php foreach ( $lines as $line ):
-    $status_label = [ 'pending' => __( 'Te verifiëren', 'eme-accounting' ), 'matched' => __( 'Gematcht', 'eme-accounting' ), 'ignored' => __( 'Genegeerd', 'eme-accounting' ), 'manual' => __( 'Manueel', 'eme-accounting' ) ];
-    $status_class = [ 'pending' => 'pending', 'matched' => 'reconciled', 'ignored' => 'ignored', 'manual' => '' ];
-?>
-<tr>
-    <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $line->transaction_date ) ) ) ?></td>
-    <td><?= esc_html( mb_substr( $line->description, 0, 60 ) ) ?></td>
-    <td style="font-size:11px"><?= esc_html( $line->counterparty_name ) ?><br><span style="color:#646970"><?= esc_html( $line->counterparty_iban ) ?></span></td>
-    <td style="font-size:11px"><?= esc_html( $line->bank_ref ?: $line->structured_ref ) ?></td>
-    <td class="amount <?= (float) $line->amount >= 0 ? 'in' : 'out' ?>"><?= $formatter->formatCurrency( $line->amount, 'EUR' ) ?></td>
-    <td><span class="eme-acc-tag <?= esc_attr( $status_class[ $line->status ] ?? '' ) ?>"><?= esc_html( $status_label[ $line->status ] ?? $line->status ) ?></span>
-        <?php if ( $line->journal_id ): ?><br><span style="font-size:11px;color:#646970">#<?= (int) $line->journal_id ?></span><?php endif; ?></td>
-    <td>
-        <?php if ( $line->status === 'pending' ): ?>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
-            <button class="button button-small btn-ignore-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Negeer', 'eme-accounting' ); ?></button>
-            <input type="number" class="journal-id-input" placeholder="Dagboek ID" style="width:80px;padding:2px 4px">
-            <button class="button button-small btn-reconcile-manual" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Link', 'eme-accounting' ); ?></button>
-            <br>
-             <select name="coa_id" required class="eme_snapselect" data-live-search="true">
-                 <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
-                 <?php if ($line->amount >= 0): ?>
-                        <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
-                        <?php foreach ( $coa_accounts as $id => $acc ):
-                            if ( $acc && $acc->direction === 'in' ):
-                        ?>
-                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
-                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
-                        </option>
-                        <?php endif; endforeach; ?>
-                        </optgroup>
-                 <?php endif; ?>
-                 <?php if ($line->amount < 0): ?>
-                        <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
-                        <?php foreach ( $coa_accounts as $id => $acc ):
-                            if ( $acc && $acc->direction === 'out' ):
-                        ?>
-                        <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> >
-                            <?= esc_html( $acc->code . ' - ' . $acc->name ) ?>
-                        </option>
-                        <?php endif; endforeach; ?>
-                        </optgroup>
-                 <?php endif; ?>
-             </select>
-             <select name="eme_event_id" class="eme_snapselect_events_class"></select>
-             <button class="button button-small btn-create-from-line" data-line-id="<?= (int) $line->id ?>"><?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?></button>
-        </div>
-        <?php endif; ?>
-    </td>
-</tr>
-<?php endforeach; ?>
-</tbody>
-</table>
-</div>
-<?php endif; ?>
-
-<?php if ( $import_logs ): ?>
-<h2><?php esc_html_e( 'Eerdere imports', 'eme-accounting' ); ?></h2>
-<table class="eme-acc-table">
-<thead><tr>
-    <th>#</th><th><?php esc_html_e( 'Datum', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Bestand', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Totaal', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Gematcht', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Manueel', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Open', 'eme-accounting' ); ?></th>
-    <th><?php esc_html_e( 'Genegeerd', 'eme-accounting' ); ?></th>
-    <th></th>
-</tr></thead>
-<tbody>
-<?php foreach ( $import_logs as $log ):
-        $stat_counters = EMEAccounting\Import::get_status_counters( $log->id );
-?>
-<tr data-import-log="<?= (int) $log->id ?>">
-    <td><?= (int) $log->id ?></td>
-    <td><?= esc_html( date_i18n( 'd/m/Y H:i', strtotime( $log->import_date ) ) ) ?></td>
-    <td><?= esc_html( $log->account_name ) ?></td>
-    <td style="font-size:11px"><?= esc_html( $log->filename ) ?> <span class="eme-acc-tag"><?= esc_html( $log->format ) ?></span></td>
-    <td><?= (int) $log->total_lines ?></td>
-    <td><span class="eme-acc-tag eme-acc-reconciled"><?= (int) ($stat_counters->matched ?? 0) ?></span></td>
-    <td><span class="eme-acc-tag eme-acc-manual"><?= (int) ($stat_counters->manual ?? 0) ?></span></td>
-    <td><span class="eme-acc-tag eme-acc-pending"><?= (int) ($stat_counters->pending ?? 0) ?></span></td>
-    <td><span class="eme-acc-tag eme-acc-ignored"><?= (int) ($stat_counters->ignored ?? 0) ?></span></td>
-    <td>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import&log_id=' . $log->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Bekijk', 'eme-accounting' ); ?></a>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import' ) ) ?>" class="button button-small btn-delete-import-log" data-id="<?= (int) $log->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></a>
-    </td>
-</tr>
-<?php endforeach; ?>
-</tbody>
-</table>
-<?php endif; ?>
 </fieldset>
+</form>
+<div id="import-result" style="display:none"></div>
+</div>
+<!-- Reconciliation section: shown/hidden and loaded via JS when a log row is clicked -->
+<div id="eme-import-lines-section" style="display:none;">
+    <h2 id="eme-import-lines-title"></h2>
+    <p>
+        <button id="btn-auto-reconcile" class="button"><?php esc_html_e( 'Auto-reconciliatie uitvoeren', 'eme-accounting' ); ?></button>
+        <button id="btn-close-lines" class="button"><?php esc_html_e( '↑ Sluit', 'eme-accounting' ); ?></button>
+    </p>
+    <div id="eme-import-lines-table"></div>
+</div>
+<h2><?php esc_html_e( 'Eerdere imports', 'eme-accounting' ); ?></h2>
+
+<!-- ftable renders here -->
+<div id="eme-import-logs-table"></div>
+
 </div>

@@ -166,7 +166,7 @@ function initSnapSelectRemote(selector, options = {}) {
     const submitHandlers = {
         'eme-acc-account-form':        handleAccountSave,
         'eme-acc-coa-form':            handleCoaSave,
-        'eme-acc-import-form':         handleImportUpload,
+        // 'eme-acc-import-form' is now handled inline in templates/import.php
         'eme-acc-stock-form':          handleStockSave,
         'eme-acc-stock-movement-form': handleStockMovement,
         'eme-acc-asset-form':          handleAssetSave,
@@ -194,11 +194,6 @@ function initSnapSelectRemote(selector, options = {}) {
         'eme-acc-edit-coa':       handleCoaEdit,
         'eme-acc-delete-coa':     handleCoaDelete,
         'eme-acc-coa-cancel':     handleCoaCancel,
-        'btn-auto-reconcile':     handleAutoReconcile,
-        'btn-reconcile-manual':   handleManualReconcile,
-        'btn-ignore-line':        handleIgnoreLine,
-        'btn-create-from-line':   handleCreateFromLine,
-        'btn-delete-import-log': handleDeleteImportLog,
         'btn-load-report':        handleLoadReport,
         'btn-export-csv':         handleExportCsv,
         'btn-export-pdf':         handleExportPDF,
@@ -414,88 +409,9 @@ function initSnapSelectRemote(selector, options = {}) {
 
     /* ═══════════════════════════════════════════════════════════════════
      * IMPORT / RECONCILIATION PAGE
+     * All import-page logic is now handled inline in templates/import.php
+     * via ftable (childtable pattern). No handlers needed here.
      * ═══════════════════════════════════════════════════════════════════ */
-    function handleImportUpload(form) {
-        const btn = form.querySelector('.submit-btn');
-        const fd  = new FormData(form);
-        fd.append('action', 'eme_accounting_import_upload');
-        fd.append('nonce', nonce);
-        btn.textContent = 'Importeren…';
-        btn.disabled = true;
-        fetch(ajaxUrl, { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(r => {
-                btn.textContent = 'Importeren';
-                btn.disabled = false;
-                if (!r.success) { alert(r.data || 'Importfout'); return; }
-                const d = r.data;
-                window.location.href = window.location.pathname
-                    + '?page=emeaccounting-import&log_id=' + d.log_id;
-            })
-            .catch(error => {
-                btn.textContent = 'Importeren';
-                btn.disabled = false;
-                alert('Verbindingsfout met server.');
-            });
-    }
-
-    function handleAutoReconcile(btn) {
-        const originalText = btn.textContent;
-        btn.textContent = 'Bezig…';
-        btn.disabled = true;
-        ajax('eme_accounting_auto_reconcile',
-            { log_id: btn.dataset.logId, account_id: btn.dataset.accountId },
-            (data) => {
-                btn.textContent = `Auto-reconciliatie (${data.matched} gematcht)`;
-                btn.disabled = false;
-                location.reload();
-            },
-            (errorMsg) => {  // Error callback met message
-                alert(errorMsg);
-                btn.disabled = false;
-                btn.textContent = originalText;
-            }
-        );
-    }
-
-    function handleManualReconcile(btn) {
-        const row       = btn.closest('tr');
-        const journalId = row?.querySelector('.journal-id-input')?.value;
-        if (!journalId) { alert('Voer eerst een dagboek-ID in.'); return; }
-        ajax('eme_accounting_reconcile_line',
-            { line_id: btn.dataset.lineId, journal_id: journalId },
-            () => {
-                const cell = row.querySelector('td:last-child');
-                if (cell) cell.innerHTML = '<span class="recon-matched">✓ Gematcht</span>';
-            }
-        );
-    }
-
-    function handleIgnoreLine(btn) {
-        const row = btn.closest('tr');
-        ajax('eme_accounting_ignore_line', { line_id: btn.dataset.lineId }, () => {
-            row?.classList.add('recon-ignored');
-            const cell = row?.querySelector('td:last-child');
-            if (cell) cell.innerHTML = '<span class="recon-ignored">Genegeerd</span>';
-        });
-    }
-
-    function handleCreateFromLine(btn) {
-        const row      = btn.closest('tr');
-        const coa_id = row?.querySelector('[name=coa_id]')?.value ?? '';
-        const eme_event_id = row?.querySelector('[name=eme_event_id]')?.value ?? '';
-        ajax('eme_accounting_create_entry_from_line',
-            { line_id: btn.dataset.lineId, coa_id: coa_id, eme_event_id: eme_event_id },
-            (data) => { alert(`Boeking aangemaakt (ID: ${data.journal_id})`); location.reload(); }
-        );
-    }
-
-    function handleDeleteImportLog(btn) {
-        if (!confirm(i18n.confirm_delete)) return;
-        ajax('eme_accounting_delete_import_log', { id: btn.dataset.id }, () =>
-            fadeRemove(document.querySelector(`[data-import-log="${btn.dataset.id}"]`))
-        );
-    }
 
     /* ═══════════════════════════════════════════════════════════════════
      * STOCK PAGE
