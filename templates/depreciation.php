@@ -9,7 +9,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 ?>
 <div class="wrap eme-acc-wrap">
 <fieldset <?= $form_disabled ?>>
-<h1><?php esc_html_e( 'Vaste Activa & Afschrijvingen', 'eme-accounting' ); ?></h1>
+<h1><?php esc_html_e( 'Activa en Afschrijvingen', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
 <h2 id="eme-acc-asset-form-title"><?php esc_html_e( 'Activum toevoegen', 'eme-accounting' ); ?></h2>
@@ -146,7 +146,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
 </tbody>
 </table>
 <?php else: ?>
-<p><?php esc_html_e( 'Nog geen vaste activa geregistreerd.', 'eme-accounting' ); ?></p>
+<p><?php esc_html_e( 'Nog geen activa geregistreerd.', 'eme-accounting' ); ?></p>
 <?php endif; ?>
 </fieldset>
 </div>
