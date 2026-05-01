@@ -41,80 +41,78 @@
 
     const linesSection  = document.getElementById( 'eme-import-lines-section' );
     const linesTitleEl  = document.getElementById( 'eme-import-lines-title' );
-    const autoRecBtn    = document.getElementById( 'btn-auto-reconcile' );
-    const closeBtn      = document.getElementById( 'btn-close-lines' );
 
     /* ================================================================
      * LINES TABLE (reconciliation) – created once, reused per log
      * ================================================================ */
     let linesTableInst = new FTable( '#eme-import-lines-table', {
-            forcePost: true,
-            paging   : false,
-            sorting  : false,
-            actions: {
-                listAction  : ajaxUrl + '?action=eme_accounting_list_import_lines&nonce='   + nonce,
+        forcePost: true,
+        paging   : false,
+        sorting  : false,
+        actions: {
+            listAction  : ajaxUrl + '?action=eme_accounting_list_import_lines&nonce='   + nonce,
+        },
+        listQueryParams: () => {
+            return { import_log_id: activeLogId };
+        },
+        fields: {
+            id: { key: true, list: false },
+            transaction_date: {
+                type: 'date',
+                dateFormat: i18n.translate_fdateformat,
+                title: 'Datum', list: true, create: false, edit: false,
             },
-            listQueryParams: () => {
-                return { import_log_id: activeLogId };
+            description: {
+                title: 'Omschrijving', list: true, create: false, edit: false,
+                display: ( { value, record } ) =>
+                `<span title="${esc(value)}">${esc( String( value || '' ).substring( 0, 60 ) )}</span>`,
             },
-            fields: {
-                id: { key: true, list: false },
-                transaction_date: {
-                    type: 'date',
-                    dateFormat: i18n.translate_fdateformat,
-                    title: 'Datum', list: true, create: false, edit: false,
-                },
-                description: {
-                    title: 'Omschrijving', list: true, create: false, edit: false,
-                    display: ( { value, record } ) =>
-                        `<span title="${esc(value)}">${esc( String( value || '' ).substring( 0, 60 ) )}</span>`,
-                },
-                counterparty_name: {
-                    title: 'Tegenpartij', list: true, create: false, edit: false,
-                    display: ( { value, record } ) =>
-                        `<span style="font-size:11px">${esc(record.counterparty_name)}<br>` +
-                        `<span style="color:#646970">${esc(record.counterparty_iban)}</span></span>`,
-                },
-                bank_ref: {
-                    title: 'Ref.', list: true, create: false, edit: false,
-                    width: '2%',
-                    display: ( { value, record } ) =>
-                        `<span style="font-size:11px">${esc(record.bank_ref || record.structured_ref)}</span>`,
-                },
-                amount: {
-                    title: 'Bedrag', list: true, create: false, edit: false,
-                    listClass: 'amount',
-                    width: '2%',
-                    display: ( { value, record } ) => {
-                        const formatted_val = fmtCur(value);
-                        if (value<0) {
-                            return '<span style="color: red; font-weight: bold;">' + formatted_val + '</span>';
-                        } else {
-                            return '<span style="color: green; font-weight: bold;">' + formatted_val + '</span>';
-                        }
+            counterparty_name: {
+                title: 'Tegenpartij', list: true, create: false, edit: false,
+                display: ( { value, record } ) =>
+                `<span style="font-size:11px">${esc(record.counterparty_name)}<br>` +
+                `<span style="color:#646970">${esc(record.counterparty_iban)}</span></span>`,
+            },
+            bank_ref: {
+                title: 'Ref.', list: true, create: false, edit: false,
+                width: '2%',
+                display: ( { value, record } ) =>
+                `<span style="font-size:11px">${esc(record.bank_ref || record.structured_ref)}</span>`,
+            },
+            amount: {
+                title: 'Bedrag', list: true, create: false, edit: false,
+                listClass: 'amount',
+                width: '2%',
+                display: ( { value, record } ) => {
+                    const formatted_val = fmtCur(value);
+                    if (value<0) {
+                        return '<span style="color: red; font-weight: bold;">' + formatted_val + '</span>';
+                    } else {
+                        return '<span style="color: green; font-weight: bold;">' + formatted_val + '</span>';
                     }
+                }
+            },
+            status: {
+                title: 'Status', list: true, create: false, edit: false,
+                width: '5%',
+                display: ( { value, record } ) => {
+                    let html = statusBadge[ value ] ||
+                        `<span class="eme-acc-tag">${esc(value)}</span>`;
+                    if ( record.journal_id ) {
+                        html += `<br><span style="font-size:11px;color:#646970">#${record.journal_id}</span>`;
+                    }
+                    return html;
                 },
-                status: {
-                    title: 'Status', list: true, create: false, edit: false,
-                    width: '5%',
-                    display: ( { value, record } ) => {
-                        let html = statusBadge[ value ] ||
-                            `<span class="eme-acc-tag">${esc(value)}</span>`;
-                        if ( record.journal_id ) {
-                            html += `<br><span style="font-size:11px;color:#646970">#${record.journal_id}</span>`;
-                        }
-                        return html;
-                    },
-                },
+            },
 
-                /* Reconciliation action controls – only shown for pending lines */
-                _actions: {
-                    title: 'Acties', list: true, create: false, edit: false, sorting: false,
-                    display: ( { value, record } ) => {
-                        if ( record.status !== 'pending' ) return '';
-                        const n    = parseFloat( record.amount );
-                        const opts = ( n >= 0 ? emeAccountingImport.coaSelectIn : emeAccountingImport.coaSelectOut )
-                        return `
+            /* Reconciliation action controls – only shown for pending lines */
+            _actions: {
+                title: 'Acties', list: true, create: false, edit: false, sorting: false,
+                display: ( { value, record } ) => {
+                    if ( record.status !== 'pending' ) return '';
+                    const n    = parseFloat( record.amount );
+                    const opts = ( n >= 0 ? emeAccountingImport.coaSelectIn : emeAccountingImport.coaSelectOut )
+                    return `
 <div class="eme-import-actions" data-line="${record.id}">
   <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
     <button class="button button-small btn-ignore-line">Negeer</button>
@@ -130,98 +128,26 @@
     <button class="button button-small btn-create-from-line">Nieuwe boeking</button>
   </div>
 </div>`;
-                    },
                 },
-            }, // end fields
-            recordsLoaded: function () {
-                /* One delegated listener on the table elements (safe to add once
-                   because FTable recreates tbody but keeps the outer element) */
-                if ( linesTableInst.elements._importActionsListenerAdded ) return;
-                linesTableInst.elements._importActionsListenerAdded = true;
-
-                // re-init the snapselects
-                initSnapSelect('select.eme_snapselect');
-                initSnapSelectRemote('select.eme_snapselect_events_class', {
-                    placeholder: 'Selecteer event',
-                    showClearButton: true,
-                    data: function(search, page) {
-                        return {
-                            action: 'eme_accounting_events_list',
-                            entry_date: document.getElementById('entry_date')?.value || 0,
-                            search_all: document.getElementById('eventsearch_all')?.checked ? 1 : 0,
-                            nonce: nonce
-                        };
-                    }
-                });
-
-                document.addEventListener( 'click', async ( e ) => {
-                    const wrap = e.target.closest( '.eme-import-actions' );
-                    if ( ! wrap ) return;
-                    const lineId = wrap.dataset.line;
-
-                    /* ── Negeer ────────────────────────────────────── */
-                    if ( e.target.classList.contains( 'btn-ignore-line' ) ) {
-                        e.target.disabled = true;
-                        const r = await post( 'eme_accounting_ignore_line', { line_id: lineId } );
-                        if ( r.success ) {
-                            linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
-                            refreshLogCounters();
-                            // Zoek de closest div-parent met class "eme-import-actions" en maak deze leeg
-                            const actionsDiv = e.target.closest('.eme-import-actions');
-                            if (actionsDiv) {
-                                actionsDiv.innerHTML = '';
-                            }
-                        } else {
-                            alert( r.data || 'Fout' );
-                            e.target.disabled = false;
-                        }
-                    }
-
-                    /* ── Manuele link ─────────────────────────────── */
-                    if ( e.target.classList.contains( 'btn-reconcile-manual' ) ) {
-                        const jid = wrap.querySelector( '.journal-id-input' )?.value;
-                        if ( ! jid ) { alert( 'Voer eerst een dagboek-ID in.' ); return; }
-                        e.target.disabled = true;
-                        const r = await post( 'eme_accounting_reconcile_line',
-                            { line_id: lineId, journal_id: jid } );
-                        if ( r.success ) {
-                            linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
-                            refreshLogCounters();
-                            // Zoek de closest div-parent met class "eme-import-actions" en maak deze leeg
-                            const actionsDiv = e.target.closest('.eme-import-actions');
-                            if (actionsDiv) {
-                                actionsDiv.innerHTML = '';
-                            }
-                        } else {
-                            alert( r.data || 'Fout' );
-                            e.target.disabled = false;
-                        }
-                    }
-
-                    /* ── Nieuwe boeking ───────────────────────────── */
-                    if ( e.target.classList.contains( 'btn-create-from-line' ) ) {
-                        const coaId = wrap.querySelector( '.coa-select' )?.value;
-                        if ( ! coaId ) { alert( 'Kies eerst een grootboekrekening.' ); return; }
-                        e.target.disabled = true;
-                        const r = await post( 'eme_accounting_create_entry_from_line',
-                            { line_id: lineId, coa_id: coaId } );
-                        if ( r.success ) {
-                            linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
-                            refreshLogCounters();
-                            // Zoek de closest div-parent met class "eme-import-actions" en maak deze leeg
-                            const actionsDiv = e.target.closest('.eme-import-actions');
-                            if (actionsDiv) {
-                                actionsDiv.innerHTML = '';
-                            }
-                        } else {
-                            alert( r.data || 'Fout' );
-                            e.target.disabled = false;
-                        }
-                    }
-                } );
             },
-        } );
-
+        }, // end fields
+        recordsLoaded: function () {
+            // Re-init snapselects after every load (ftable rebuilds the tbody)
+            initSnapSelect('select.eme_snapselect');
+            initSnapSelectRemote('select.eme_snapselect_events_class', {
+                placeholder: 'Selecteer event',
+                showClearButton: true,
+                data: function(search, page) {
+                    return {
+                        action: 'eme_accounting_events_list',
+                        entry_date: document.getElementById('entry_date')?.value || 0,
+                        search_all: document.getElementById('eventsearch_all')?.checked ? 1 : 0,
+                        nonce: nonce
+                    };
+                }
+            });
+        },
+    } );
 
     /* Recalculate counter badges on the active log row in the logs table */
     function refreshLogCounters() {
@@ -251,9 +177,6 @@
         linesTitleEl.textContent =
             `Reconciliatie \u2013 import #${logId} \u2013 ${rec.filename || ''} (${rec.account_name || ''})`;
 
-        autoRecBtn.dataset.logId     = logId;
-        autoRecBtn.dataset.accountId = rec.account_id || '';
-
         linesSection.style.display = '';
         linesSection.scrollIntoView( { behavior: 'smooth', block: 'start' } );
 
@@ -270,30 +193,6 @@
         activeLogId  = null;
         activeLogRow = null;
     }
-
-    /* ── Auto-reconcile button ─────────────────────────────────────── */
-    autoRecBtn?.addEventListener( 'click', async function () {
-        if ( ! activeLogId ) return;
-        const origText  = this.textContent;
-        this.disabled   = true;
-        this.textContent = 'Bezig\u2026';
-        const r = await post( 'eme_accounting_auto_reconcile', {
-            log_id    : activeLogId,
-            account_id: this.dataset.accountId,
-        } );
-        if ( r.success ) {
-            this.textContent = `Auto-reconciliatie (${r.data.matched} gematcht)`;
-            linesTableInst?.load();
-            refreshLogCounters();
-        } else {
-            alert( r.data || 'Fout' );
-            this.textContent = origText;
-        }
-        this.disabled = false;
-    } );
-
-    /* ── Sluit button ──────────────────────────────────────────────── */
-    closeBtn?.addEventListener( 'click', closeLinesSection );
 
     /* ================================================================
      * MAIN LOGS TABLE
@@ -358,30 +257,107 @@
 
     logsTable.load();
 
-    /* Delegate "Bekijk" clicks on the logs table */
-    document.addEventListener( 'click', function ( e ) {
-        if ( ! e.target.classList.contains( 'btn-view-log' ) ) return;
-        e.preventDefault();
-        e.stopPropagation();
+    /* ================================================================
+     * All delegated click events in one place.
+     * ================================================================ */
+    document.addEventListener( 'click', async ( e ) => {
 
-        const logId  = e.target.dataset.log;
-        const logRow = e.target.closest( 'tr.ftable-data-row' );
-        if ( ! logRow ) return;
+        if ( e.target.classList.contains( 'btn-view-log' ) ) {
+            e.preventDefault();
+            const logId  = e.target.dataset.log;
+            const logRow = e.target.closest( 'tr.ftable-data-row' );
+            if ( ! logRow ) return;
+            if ( activeLogId === logId ) {
+                closeLinesSection();
+                return;
+            }
+            if ( activeLogRow ) {
+                const prev = activeLogRow.querySelector( '.btn-view-log' );
+                if ( prev ) prev.textContent = 'Bekijk';
+            }
+            e.target.textContent = '\u25b2 Sluit';
+            openLinesSection( logId, logRow );
+            return;
+        }
 
-        /* Toggle: clicking the same row closes the section */
-        if ( activeLogId === logId ) {
+        /* ── Auto-reconciliatie ──────────────────────────────────────── */
+        if ( e.target.id === 'btn-auto-reconcile' ) {
+            if ( ! activeLogId ) return;
+            const btn      = e.target;
+            const origText = btn.textContent;
+            btn.disabled   = true;
+            btn.textContent = 'Bezig\u2026';
+            const r = await post( 'eme_accounting_auto_reconcile', {
+                log_id    : activeLogId,
+                account_id: activeLogRow.recordData.account_id,
+            } );
+            if ( r.success ) {
+                btn.textContent = `Auto-reconciliatie (${r.data.matched} gematcht)`;
+                linesTableInst?.load();
+                refreshLogCounters();
+            } else {
+                alert( r.data || 'Fout' );
+                btn.textContent = origText;
+            }
+            btn.disabled = false;
+            return;
+        }
+
+        /* ── Sluit reconciliatie ─────────────────────────────────────── */
+        if ( e.target.id === 'btn-close-lines' ) {
             closeLinesSection();
             return;
         }
 
-        /* Reset label on previously active row if switching */
-        if ( activeLogRow ) {
-            const prev = activeLogRow.querySelector( '.btn-view-log' );
-            if ( prev ) prev.textContent = 'Bekijk';
+        /* ── Reconciliatie acties (lines table) ──────────────────────── */
+        const wrap = e.target.closest( '.eme-import-actions' );
+        const lineId = wrap?.dataset.line || null;
+        if ( wrap && e.target.classList.contains( 'btn-ignore-line' ) ) {
+            e.target.disabled = true;
+            const r = await post( 'eme_accounting_ignore_line', { line_id: lineId } );
+            if ( r.success ) {
+                linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                refreshLogCounters();
+                wrap.innerHTML = '';
+            } else {
+                alert( r.data || 'Fout' );
+                e.target.disabled = false;
+            }
+            return;
+        }
+        if ( wrap && e.target.classList.contains( 'btn-reconcile-manual' ) ) {
+            const jid = wrap.querySelector( '.journal-id-input' )?.value;
+            if ( ! jid ) { alert( 'Voer eerst een dagboek-ID in.' ); return; }
+            e.target.disabled = true;
+            const r = await post( 'eme_accounting_reconcile_line',
+                { line_id: lineId, journal_id: jid } );
+            if ( r.success ) {
+                linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                refreshLogCounters();
+                wrap.innerHTML = '';
+            } else {
+                alert( r.data || 'Fout' );
+                e.target.disabled = false;
+            }
+            return;
+        }
+        if ( wrap && e.target.classList.contains( 'btn-create-from-line' ) ) {
+            const coaId = wrap.querySelector( '.coa-select' )?.value;
+            if ( ! coaId ) { alert( 'Kies eerst een grootboekrekening.' ); return; }
+            e.target.disabled = true;
+            const r = await post( 'eme_accounting_create_entry_from_line',
+                { line_id: lineId, coa_id: coaId } );
+            if ( r.success ) {
+                linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                refreshLogCounters();
+                wrap.innerHTML = '';
+            } else {
+                alert( r.data || 'Fout' );
+                e.target.disabled = false;
+            }
+            return;
         }
 
-        e.target.textContent = '\u25b2 Sluit';
-        openLinesSection( logId, logRow );
     } );
 
     /* ================================================================
