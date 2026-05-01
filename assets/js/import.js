@@ -205,6 +205,10 @@
             listAction  : ajaxUrl + '?action=eme_accounting_list_import_logs&nonce='   + nonce,
             deleteAction: ajaxUrl + '?action=eme_accounting_delete_import_log&nonce='  + nonce,
         },
+        recordDeleted: function () {
+            // close import lines table if open
+            closeLinesSection();
+        },
         fields: {
             id: {
                 key: true, title: '#', list: true, create: false, edit: false,
