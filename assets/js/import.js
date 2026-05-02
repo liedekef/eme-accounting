@@ -348,7 +348,7 @@
             e.target.disabled = true;
             const r = await post( 'eme_accounting_ignore_line', { line_id: lineId } );
             if ( r.success ) {
-                linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                linesTableInst.updateFullRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
                 refreshLogCounters();
                 wrap.innerHTML = '';
             } else {
@@ -364,9 +364,8 @@
             const r = await post( 'eme_accounting_reconcile_line',
                 { line_id: lineId, journal_id: jid } );
             if ( r.success ) {
-                linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                linesTableInst.updateFullRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
                 refreshLogCounters();
-                wrap.innerHTML = '';
             } else {
                 linesTableInst.showError( r.data || 'Fout' );
                 e.target.disabled = false;
@@ -390,7 +389,6 @@
             if ( r.success ) {
                 linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
                 refreshLogCounters();
-                wrap.innerHTML = '';
             } else {
                 linesTableInst.showError( r.data || 'Fout' );
                 e.target.disabled = false;
