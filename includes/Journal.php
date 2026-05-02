@@ -410,7 +410,7 @@ class Journal {
             return new \WP_Error( 'year_closed', __( 'Kan boeking niet verwijderen: boekjaar is afgesloten.', 'eme-accounting' ) );
         }
 
-        $transfer_id = $wpdb->get_var( $wpdb->prepare( "SELECT transfer_id FROM `$table` WHERE id = %d AND direction='transfer'", $id ) );
+        $transfer_id = $wpdb->get_var( $wpdb->prepare( "SELECT transfer_id FROM `$table` WHERE id = %d", $id ) );
         if ( $transfer_id ) {
             $wpdb->delete( $table, [ 'id' => (int) $transfer_id ], [ '%d' ] );
             do_action( 'eme_accounting_journal_deleted', (int) $transfer_id );
@@ -546,6 +546,7 @@ class Journal {
                 'account_name'       => $entry->account_name ?? '',
                 'amount'             => $signed_amount,
                 'direction'          => $entry->direction,
+                'transfer_id'        => (int) $entry->transfer_id, // used to give a warning when transfers are deleted
                 'files'              => $entry->files,
                 'vat_code'           => $entry->vat_code ?? '',
                 'vat_amount'         => $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',

@@ -124,7 +124,7 @@
                 deleteAction: emeAccounting.ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + emeAccounting.nonce
             },
             deleteConfirmation: function(data) {
-                if (data.record.direction=='transfer') {
+                if (data.record.transfer_id) {
                     data.deleteConfirmMessage = "Weet u zeker dat u deze transfer van " + formatCurrency(data.record.amount) + " wil verwijderen? Dit zal beide entries van de transfer verwijderen."; 
                 } else {
                     data.deleteConfirmMessage = "Weet u zeker dat u deze boeking van " + formatCurrency(data.record.amount) + " wil verwijderen?"; 
