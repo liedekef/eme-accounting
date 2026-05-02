@@ -706,17 +706,17 @@ function initSnapSelectRemote(selector, options = {}) {
                 <table class="eme-acc-table">
                 <tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th class="amount">Bedrag</th><th>Rekening</th></tr>`;
             data.details.forEach(e => {
-                const sign = e.direction === 'in' ? '+' : '–';
                 html += `<tr>
                     <td>${esc(e.entry_date)}</td>
                     <td>${esc(e.description)}</td>
                     <td>${esc(e.coa_name)}</td>
-                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${sign} ${formatCurrency(e.amount)}</td>
+                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${formatCurrency(e.amount)}</td>
                     <td>${esc(e.account_name)}</td>
                 </tr>`;
             });
             const totalIn = data.details.filter(e => e.direction === 'in').reduce((s, e) => s + parseFloat(e.amount), 0);
-            const totalOut = data.details.filter(e => e.direction === 'out').reduce((s, e) => s + parseFloat(e.amount), 0);
+            let totalOut = data.details.filter(e => e.direction === 'out').reduce((s, e) => s + parseFloat(e.amount), 0);
+            if (totalOut>0) totalOut*=-1;
             html += `<tr style="font-weight:600"><td colspan="3">Totaal ontvangen</td>
                 <td class="amount in">${formatCurrency(totalIn)}</td><td></td></tr>
                 <tr style="font-weight:600"><td colspan="3">Totaal uitgegeven</td>
@@ -727,7 +727,7 @@ function initSnapSelectRemote(selector, options = {}) {
         }
 
         // Overview: summary list
-        let html = '<h2>Events Overzicht</h2><table class="eme-acc-table">'
+        let html = '<h2>Evenementen Overzicht</h2><table class="eme-acc-table">'
             + '<tr><th>Event</th><th>Event startdatum</th><th class="amount">Ontvangen</th><th class="amount">Uitgegeven</th><th class="amount">Saldo</th></tr>';
         
         const entries = Object.values(data.summary || {});

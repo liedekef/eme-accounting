@@ -525,9 +525,9 @@ class Journal {
         $entries = self::get_entries_for_ftable( $args, $orderby, $limit );
 
         foreach ( $entries as $entry ) {
-            $signed_amount = $entry->direction === 'in'
-                ? (float) $entry->amount
-                : -1 * (float) $entry->amount;
+            $signed_amount = $entry->direction === 'out' && $entry->amount>0
+                ? -1 * (float) $entry->amount
+                : (float) $entry->amount;
 
             $event_name = '';
             if ($entry->eme_event_id) {

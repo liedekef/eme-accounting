@@ -190,7 +190,14 @@ class Reports {
                 'orderby'     => 'entry_date',
                 'order'      => 'ASC',
             ] );
+            foreach ( $entries as &$entry ) {
+                $entry->amount = $entry->direction === 'out' && $entry->amount>0
+                    ? -1 * (float) $entry->amount
+                    : (float) $entry->amount;
+            }
+            unset($entry);
             $event = eme_get_event($event_id);
+            $event['event_name'] = eme_translate( $event['event_name'] );
             $event['event_start'] = eme_localized_datetime($event['event_start']);
             $event['event_end'] = eme_localized_datetime($event['event_end']);
             return [ 'info' => $event, 'details' => $entries ];
@@ -217,11 +224,11 @@ class Reports {
             $event = eme_get_event( (int) $row->eme_event_id );
             $summary[ (int) $row->eme_event_id ] = [
                 'event_id'    => (int) $row->eme_event_id,
-                'event_name'  => $event ? $event['event_name'] : __( '(onbekend event)', 'eme-accounting' ),
+                'event_name'  => $event ? eme_translate($event['event_name']) : __( '(onbekend event)', 'eme-accounting' ),
                 'event_start' => $event ? eme_localized_datetime($event['event_start']) : null,
                 'event_end'   => $event ? eme_localized_datetime($event['event_end']) : null,
                 'total_in'    => (float) $row->total_in,
-                'total_out'   => (float) $row->total_out,
+                'total_out'   => $row->total_out >0 ? -1 * (float) $row->total_out : (float) $row->total_out,
                 'real_start'  => $event ? $event['event_start'] : null
             ];
         }

@@ -21,7 +21,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
                 <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen (intern)', 'eme-accounting' ); ?></option>
                 <option value="diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
                 <option value="financial_year"><?php esc_html_e( 'Financieel Jaarverslag per rekening', 'eme-accounting' ); ?></option>
-                <option value="events"><?php esc_html_e( 'Events Overzicht', 'eme-accounting' ); ?></option>
+                <option value="events"><?php esc_html_e( 'Evenementen Overzicht', 'eme-accounting' ); ?></option>
             </optgroup>
         </select>
     </div>
