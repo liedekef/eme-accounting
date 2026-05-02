@@ -280,11 +280,6 @@ class Journal {
             );
         }
 
-        $allowed_directions = [ 'in', 'out', 'transfer' ];
-        $direction          = in_array( $data['direction'] ?? 'out', $allowed_directions, true )
-            ? $data['direction']
-            : null;
-
         $vat_liable = (bool) ( \EMEVzw\Config::get()->vat_liable ?? false );
 
         $row = [
@@ -313,17 +308,20 @@ class Journal {
 
         $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
 
-        // when editing, make sure to not change the direction (normally the field is not even passed along ...)
-        if ( !empty( $id) ) {
+        $allowed_directions = [ 'in', 'out', 'transfer' ];
+        $direction          = in_array( $data['direction'] ?? '', $allowed_directions, true )
+            ? $data['direction']
+            : null;
+
+        // when editing, make sure to not change the direction (normally the field is not even passed along, so we shouldn't get here)
+        if ( !empty( $id) && !empty($direction) ) {
             $orig_entry = self::get($id);
-            if (!empty($direction) && $orig_entry->direction != $direction) {
+            if ($orig_entry->direction != $direction) {
                 return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$orig_entry->direction,$direction) );
             }
         }
-
-        // if the direction is given, take it along
-        if (!empty($direction)) {
-            $row['direction'] = $direction;
+        if ( empty( $id) && empty($direction) ) {
+            return new \WP_Error( 'invalid_direction', __( 'Ongeldige betaalrichting.', 'eme-accounting' ) );
         }
 
         // Transfer requires both account_id and contra_account_id
@@ -391,6 +389,8 @@ class Journal {
             return $id;
         }
 
+        // for new rows, also note the direction
+        $row['direction'] = $direction;
         $wpdb->insert( $table, $row );
         $new_id = (int) $wpdb->insert_id;
         do_action( 'eme_accounting_journal_created', $new_id, $row );
