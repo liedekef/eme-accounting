@@ -734,14 +734,15 @@ function initSnapSelectRemote(selector, options = {}) {
         if (!entries.length) {
             html += '<tr><td colspan="4">Geen boekingen voor dit jaar.</td></tr>';
         } else {
+            // out-entries are signed negatives
             entries.forEach(ev => {
-                const isPositive = ev.total_in >= ev.total_out;
+                const isPositive = ev.total_in >= -1*ev.total_out;
                 html += `<tr style="cursor:pointer" onclick="loadEventDetails(${ev.event_id})">
                     <td>${esc(ev.event_name)}</td>
                     <td>${esc(ev.event_start)}</td>
                     <td class="amount in">${formatCurrency(ev.total_in)}</td>
                     <td class="amount out">${formatCurrency(ev.total_out)}</td>
-                    <td class="amount ${isPositive ? 'in' : 'out'}">${formatCurrency(Math.abs(ev.total_in - ev.total_out))}</td>
+                    <td class="amount ${isPositive ? 'in' : 'out'}">${formatCurrency(ev.total_in + ev.total_out)}</td>
                 </tr>`;
             });
             const totalIn = entries.reduce((s, e) => s + e.total_in, 0);
@@ -751,7 +752,7 @@ function initSnapSelectRemote(selector, options = {}) {
                 <td></td>
                 <td class="amount in">${formatCurrency(totalIn)}</td>
                 <td class="amount out">${formatCurrency(totalOut)}</td>
-                <td class="amount ${totalIn >= totalOut ? 'in' : 'out'}">${formatCurrency(Math.abs(totalIn - totalOut))}</td></tr>`;
+                <td class="amount ${totalIn >= -1*totalOut ? 'in' : 'out'}">${formatCurrency(totalIn + totalOut)}</td></tr>`;
         }
         container.innerHTML = html + '</table>';
     }
