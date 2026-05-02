@@ -565,7 +565,10 @@ function initSnapSelectRemote(selector, options = {}) {
         document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
         document.getElementById('btn-export-pdf').style.display   = (t === 'income_expenditure' || t === 'financial_year') ? '' : 'none';
         document.getElementById('btn-export-csv').style.display   = (t === 'events' || t === 'vat_report') ? 'none' : '';
+        document.getElementById('btn-load-report').click();
     });
+    // force initial click
+    document.getElementById('btn-load-report')?.click();
 
     function handleLoadReport() {
         const params = getReportParams();
