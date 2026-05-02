@@ -284,6 +284,9 @@ class Journal {
         $direction          = in_array( $data['direction'] ?? 'out', $allowed_directions, true )
             ? $data['direction']
             : null;
+        if ( empty( $direction ) ) {
+            return new \WP_Error( 'invalid_account', __( 'Ongeldige betalingsrichting.', 'eme-accounting' ) );
+        }
 
         $vat_liable = (bool) ( \EMEVzw\Config::get()->vat_liable ?? false );
 
@@ -309,6 +312,7 @@ class Journal {
             'is_closing_entry'   => (int) (bool) ( $data['is_closing_entry'] ?? 0 ),
             'notes'              => eme_sanitize_request( $data['notes'] ?? '' ),
             'created_by'         => get_current_user_id() ?: null,
+            'direction'          => $direction
         ];
 
         $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
@@ -319,11 +323,6 @@ class Journal {
             if (!empty($direction) && $orig_entry->direction != $direction) {
                 return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$orig_entry->direction,$direction) );
             }
-        }
-
-        // if the direction is given, take it along
-        if (!empty($direction)) {
-            $row['direction'] = $direction;
         }
 
         // Transfer requires both account_id and contra_account_id
@@ -383,6 +382,7 @@ class Journal {
             return $out_id;
         }
 
+        // regular case (no transfer): either update or new
         if ( $id > 0 ) {
             unset( $row['created_by'] );
             $row['updated_by'] = get_current_user_id() ?: null;
