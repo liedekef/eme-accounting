@@ -72,11 +72,12 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
         <table class="schema-table">
             <thead>
                 <tr>
-                    <th class="header-cell" style="width:12%">Tijd</th>
-                    <th class="header-cell" style="width:38%">Omschrijving</th>
-                    <th class="header-cell" style="width:25%">Rekening</th>
-                    <th class="header-cell" style="width:25%">Categorie</th>
-                    <th class="header-cell" style="width:10%; text-align:right">Bedrag</th>
+                    <th class="header-cell">Tijd</th>
+                    <th class="header-cell">Omschrijving</th>
+                    <th class="header-cell">Rekening</th>
+                    <th class="header-cell">Bank ref</th>
+                    <th class="header-cell">Categorie</th>
+                    <th class="header-cell" style="text-align:right;">Bedrag</th>
                 </tr>
             </thead>
             <tbody>
@@ -89,9 +90,10 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
                 $direction_class = $amount >= 0 ? 'direction-in' : 'direction-out';
             ?>
                 <tr>
-                    <td class="date-cell"><?= $i==0 ? esc_html( date_i18n( 'l d F Y', strtotime( $date ) ) ) : '' ?></td>
+                    <td class="date-cell"><?= $i==0 ? esc_html( $date ) : '' ?></td>
                     <td><?= esc_html( $entry->description ?? '' ) ?></td>
                     <td><?= esc_html( $entry->account_name ) ?></td>
+                    <td><?= esc_html( $entry->bank_statement_ref ) ?></td>
                     <td><?= esc_html( $entry->coa_name ) ?></td>
                     <td class="amount <?= $direction_class ?>">
                         <?= $formatter->formatCurrency( $amount, $currency ) ?>

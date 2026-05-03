@@ -747,12 +747,15 @@ function initSnapSelectRemote(selector, options = {}) {
             + '<th class="amount">Bedrag</th><th>Rekening</th><th>Vereff.</th></tr>';
         for (const [date, entries] of Object.entries(data)) {
             entries.forEach((e, i) => {
+                if (e.direction ==='out' && e.amount>0) {
+                    e.amount *= -1;
+                }
                 const sign = e.direction === 'in' ? '+' : '–';
                 html += `<tr>
                     <td>${i === 0 ? esc(date) : ''}</td>
                     <td>${esc(e.description)}</td><td>${esc(e.coa_name)}</td>
                     <td style="font-size:11px;color:#646970">${esc(e.bank_statement_ref)}</td>
-                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${sign} ${formatCurrency(e.amount)}</td>
+                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${formatCurrency(e.amount)}</td>
                     <td>${esc(e.account_name)}</td>
                     <td>${e.is_reconciled ? '<span class="eme-acc-tag eme-acc-reconciled">✓</span>' : ''}</td>
                 </tr>`;
