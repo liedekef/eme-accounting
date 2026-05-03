@@ -564,7 +564,7 @@ function initSnapSelectRemote(selector, options = {}) {
         const t = this.value;
         document.getElementById('report-date-wrap').style.display = t === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
-        document.getElementById('btn-export-pdf').style.display        = ['income_expenditure', 'financial_year', 'cashflow'].includes(t) ? '' : 'none';
+        document.getElementById('btn-export-pdf').style.display        = ['income_expenditure', 'financial_year', 'cashflow', 'financial_diary'].includes(t) ? '' : 'none';
         document.getElementById('btn-export-csv').style.display        = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
         document.getElementById('report-cashflow-options').style.display = t === 'cashflow' ? '' : 'none';
         document.getElementById('btn-load-report').click();
@@ -750,7 +750,7 @@ function initSnapSelectRemote(selector, options = {}) {
                 const sign = e.direction === 'in' ? '+' : '–';
                 html += `<tr>
                     <td>${i === 0 ? esc(date) : ''}</td>
-                    <td>${esc(e.description)}</td><td>${esc(e.category)}</td>
+                    <td>${esc(e.description)}</td><td>${esc(e.coa_name)}</td>
                     <td style="font-size:11px;color:#646970">${esc(e.bank_statement_ref)}</td>
                     <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${sign} ${formatCurrency(e.amount)}</td>
                     <td>${esc(e.account_name)}</td>

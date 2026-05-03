@@ -162,7 +162,7 @@ class Reports {
      *
      * @return array<string, object[]>  date => entries
      */
-    public static function diary_report( int $year ): array {
+    public static function financial_diary_report( int $year ): array {
         $entries = Journal::get_entries( [
                 'fiscal_year'  => $year,
                 'limit'       => 9999,
@@ -473,7 +473,7 @@ class Reports {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
 
-        $type              = eme_sanitize_request( $_GET['type'] ?? 'diary' );
+        $type              = eme_sanitize_request( $_GET['type'] ?? 'financial_diary' );
         $year              = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
         $event_id          = ( ! empty( $_GET['event_id'] ) ) ? (int) $_GET['event_id'] : null;
         $format            = eme_sanitize_request( $_GET['format'] ?? 'csv' );
@@ -486,7 +486,7 @@ class Reports {
             'financial_year'     => self::financial_year_report( $year ),
             'vat_report'         => self::vat_report( $year ),
             'cashflow'           => self::cashflow_report( $year, $exclude_transfers ),
-            default              => self::diary_report( $year ),
+            default              => self::financial_diary_report( $year ),
         };
 
         if ( $format === 'csv' ) {
@@ -497,8 +497,8 @@ class Reports {
             self::ajax_download_financial_year_pdf( $data, $year );
         } elseif ( $format === 'pdf' && $type === 'cashflow' ) {
             self::ajax_download_cashflow_pdf( $data, $year );
-        } elseif ( $format === 'pdf' && $type === 'diary' ) {
-            self::ajax_download_diary_pdf( $data, $year );
+        } elseif ( $format === 'pdf' && $type === 'financial_diary' ) {
+            self::ajax_download_financial_diary_pdf( $data, $year );
         } else {
             wp_send_json_success( $data );
         }
@@ -528,16 +528,17 @@ class Reports {
         }
     }
 
-    private static function generate_cashflow_pdf_html( array $data, int $year ): string {
+    private static function generate_pdf_html( string $template, array $data, int $year ): string {
+        $settings = get_option( 'eme_accounting_settings', [] );
         $config = \EMEVzw\Config::get();
         if ( ! $config ) return '';
         ob_start();
-        include EME_ACCOUNTING_DIR . 'templates/pdf/cashflow.php';
+        include EME_ACCOUNTING_DIR . 'templates/pdf/' . $template .'.php';
         return ob_get_clean();
     }
 
     public static function ajax_download_cashflow_pdf( array $data, int $year ): void {
-        $html = self::generate_cashflow_pdf_html( $data, $year );
+        $html = self::generate_pdf_html( 'cashflow', $data, $year );
         if ( empty( $html ) ) {
             wp_send_json_error();
         }
@@ -558,22 +559,12 @@ class Reports {
             . $html . '</body></html>' );
         $dompdf->setPaper( 'A4', 'landscape' );
         $dompdf->render();
-        $dompdf->stream( 'Cashflow' . $year . '.pdf', [ 'Attachment' => false ] );
+        $dompdf->stream( 'Cashflow-' . $year . '.pdf', [ 'Attachment' => false ] );
         exit;
     }
 
-    private static function generate_pdf_html( array $data, int $year ): string {
-        $settings = get_option( 'eme_accounting_settings', [] );
-        $config =  \EMEVzw\Config::get();
-        if ( ! $data || ! $config ) return '';
-
-        ob_start();
-        include EME_ACCOUNTING_DIR . 'templates/pdf/income_expenditure.php';
-        return ob_get_clean();
-    }
-
     public static function ajax_download_income_expenditure_pdf( array $data, int $year): void {
-        $html = self::generate_pdf_html( $data, $year );
+        $html = self::generate_pdf_html( 'income_expenditure', $data, $year );
 
         if ( empty( $html ) ) {
             wp_send_json_error();
@@ -595,12 +586,12 @@ class Reports {
             . $html . '</body></html>' );
         $dompdf->setPaper( 'A4', 'portrait' );
         $dompdf->render();
-        $dompdf->stream( 'StaatVanOntvangstenUitgaven' . $year . '.pdf', [ 'Attachment' => false ] );
+        $dompdf->stream( 'StaatVanOntvangstenUitgaven-' . $year . '.pdf', [ 'Attachment' => false ] );
         exit;
     }
 
     public static function ajax_download_financial_year_pdf( array $data, int $year ): void {
-        $html = self::generate_financial_year_pdf_html( $data, $year );
+        $html = self::generate_pdf_html( 'financial_year', $data, $year );
 
         if ( empty( $html ) ) {
             wp_send_json_error();
@@ -622,17 +613,35 @@ class Reports {
             . $html . '</body></html>' );
         $dompdf->setPaper( 'A4', 'portrait' );
         $dompdf->render();
-        $dompdf->stream( 'FinancieelJaarverslag' . $year . '.pdf', [ 'Attachment' => false ] );
+        $dompdf->stream( 'FinancieelJaarverslag-' . $year . '.pdf', [ 'Attachment' => false ] );
         exit;
     }
 
-    private static function generate_financial_year_pdf_html( array $data, int $year ): string {
-        $config = \EMEVzw\Config::get();
-        if ( ! $config ) return '';
+    public static function ajax_download_financial_diary_pdf( array $data, int $year ): void {
+        $html = self::generate_pdf_html( 'financial_diary', $data, $year );
 
-        ob_start();
-        include EME_ACCOUNTING_DIR . 'templates/pdf/financial_year.php';
-        return ob_get_clean();
+        if ( empty( $html ) ) {
+            wp_send_json_error();
+        }
+
+        $dompdf_autoload = WP_PLUGIN_DIR . '/events-made-easy/includes/dompdf/vendor/autoload.php';
+        if ( ! file_exists( $dompdf_autoload ) ) {
+            wp_send_json_error();
+        }
+        require_once $dompdf_autoload;
+
+        $options = new \Dompdf\Options();
+        $options->set( 'isHtml5ParserEnabled', true );
+        $options->set( 'isRemoteEnabled', false );
+        $options->set( 'defaultFont', 'helvetica' );
+
+        $dompdf = new \Dompdf\Dompdf( $options );
+        $dompdf->loadHtml( '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head><body>'
+            . $html . '</body></html>' );
+        $dompdf->setPaper( 'A4', 'portrait' );
+        $dompdf->render();
+        $dompdf->stream( 'FinancieelDagboek-' . $year . '.pdf', [ 'Attachment' => false ] );
+        exit;
     }
 
 }
