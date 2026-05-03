@@ -111,7 +111,7 @@
     const JournalTableContainer = document.querySelector('#JournalTableContainer');
     if (JournalTableContainer) {
         JournalTable = new FTable('#JournalTableContainer', {
-            title: '',
+            title: emeAccounting.i18n.journalentries || 'Dagboek entries',
             paging: true,
             sorting: true,
             sortingResetButton: true,
@@ -133,6 +133,23 @@
             recordDeleted: function(eventArgs) {
                 // since sometimes 2 lines are deleted in one go (linked transfers), we do a reload
                 JournalTable.reload();
+            },
+            toolbar: {
+                items: [
+                    {
+                        text: "Export CSV",
+                        click: function(e) {
+                            const link = document.createElement('a');
+                            link.href = emeAccounting.ajaxUrl + '?action=eme_accounting_journal_csv&nonce=' + emeAccounting.nonce;
+                            const today = new Date().toISOString().split('T')[0];
+                            link.download = `journal_${today}.csv`;
+                            link.style.display = 'none';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+                    }
+                ]
             },
             fields: {
                 id: {
@@ -178,8 +195,15 @@
                         return '<span style="font-size:11px;color:#646970" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
                     }
                 },
+                attachment_url : {
+                    title: emeAccounting.i18n.url || 'Url',
+                    visibility: 'hidden',
+                    sortable: false,
+                    searchable: false
+                },
                 files : {
-                    title: emeAccounting.i18n.files || 'Categorie',
+                    title: emeAccounting.i18n.files || 'Files',
+                    visibility: 'hidden',
                     sortable: false,
                     searchable: false
                 },

@@ -22,11 +22,12 @@ class Journal {
         add_action( 'wp_ajax_eme_accounting_save_entry',              [ __CLASS__, 'ajax_save' ] );
         add_action( 'wp_ajax_eme_accounting_delete_entry',            [ __CLASS__, 'ajax_delete' ] );
         add_action( 'wp_ajax_eme_accounting_journal_list',            [ __CLASS__, 'ajax_list' ] );
+        add_action( 'wp_ajax_eme_accounting_journal_csv',             [ __CLASS__, 'ajax_csv' ] );
         add_action( 'wp_ajax_eme_accounting_events_list',             [ __CLASS__, 'ajax_events_snapselect' ] );
         add_action( 'wp_ajax_eme_accounting_del_journal_attachment',  [ __CLASS__, 'ajax_delete_attachment' ] );
 
         // Auto-delete attachment files when a journal entry is removed.
-        add_action( 'eme_accounting_journal_deleted', [ __CLASS__, 'on_entry_deleted' ] );
+        add_action( 'eme_accounting_journal_deleted',                 [ __CLASS__, 'on_entry_deleted' ] );
 
         // Create EMEFileAttachments instance for journal entries.
         $upload = wp_upload_dir();
@@ -549,6 +550,7 @@ class Journal {
                 'amount'             => $signed_amount,
                 'direction'          => $entry->direction,
                 'transfer_id'        => (int) $entry->transfer_id, // used to give a warning when transfers are deleted
+                'attachment_url'     => $entry->attachment_url,
                 'files'              => $entry->files,
                 'vat_code'           => $entry->vat_code ?? '',
                 'vat_amount'         => $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',
@@ -562,6 +564,97 @@ class Journal {
         }
 
         print wp_json_encode( $result );
+        wp_die();
+    }
+
+    public static function fputcsv( $fh, $fields, $delimiter = ';', $enclosure = '"' ) : void {
+        $delimiter_esc = preg_quote( $delimiter, '/' );
+        $enclosure_esc = preg_quote( $enclosure, '/' );
+
+        // not an array, then return
+        if ( ! is_array( $fields ) ) {
+            return;
+        }
+
+        $output = [];
+        foreach ( $fields as $field ) {
+            if (is_null($field)) $field='';
+            $output[] = preg_match( "/(?:{$delimiter_esc}|{$enclosure_esc}|\s|\r|\t|\n)/", $field ) ? (
+                $enclosure . str_replace( $enclosure, $enclosure . $enclosure, $field ) . $enclosure
+            ) : $enclosure . $field . $enclosure;
+        }
+
+        fwrite( $fh, join( $delimiter, $output ) . "\r\n" );
+    }
+
+    public static function ajax_csv(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_view_ajax( 'journal' );
+
+        $formatter = new \NumberFormatter('nl_BE', \NumberFormatter::CURRENCY);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="journal_' . date('Y-m-d') . '.csv"');
+        $output = fopen('php://output', 'w');
+        // Add BOM for UTF-8
+        fwrite($output, "\xEF\xBB\xBF");
+
+        $args = [
+            'fiscal_year'  => isset( $_POST['fiscal_year'] ) ? (int) $_POST['fiscal_year'] : null,
+            'account_id'   => isset( $_POST['account_id'] ) && $_POST['account_id'] > 0 ? (int) $_POST['account_id'] : null,
+            'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
+            'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
+            'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
+	        'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ): null,
+            'search'            => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
+            'counterparty_name' => isset( $_POST['counterparty_name'] ) && $_POST['counterparty_name'] !== '' ? eme_sanitize_request( $_POST['counterparty_name'] ) : null,
+            'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
+        ];
+
+        $total = self::count_entries( $args );
+        $result['TotalRecordCount'] = $total;
+
+        $include_files = false;
+        $limit   = '';
+        $orderby = eme_get_datatables_orderby();
+        $entries = self::get_entries_for_ftable( $args, $orderby, $limit, $include_files );
+
+        self::fputcsv($output, [
+            'id', 'entry_date', 'description', 'coa_name', 'event', 'bank_statement_ref', 'account_name', 'amount',
+            'direction', 'vat_code', 'vat_amount', 'counterparty_vat_number', 'counterparty_name', 'is_reconciled'
+        ]);
+
+        foreach ( $entries as $entry ) {
+            $signed_amount = $entry->direction === 'out' && $entry->amount>0
+                ? -1 * (float) $entry->amount
+                : (float) $entry->amount;
+
+            $event_name = '';
+            if ($entry->eme_event_id) {
+                $event = eme_get_event($entry->eme_event_id);
+                if ($event)
+                    $event_name = trim( eme_translate( $event['event_name'] ) . ' (' . eme_localized_datetime( $event['event_start'] ) . ')' );
+            }
+            self::fputcsv($output, [
+                (int) $entry->id,
+                eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
+                $entry->description,
+                $entry->coa_name ?? '',
+                $event_name,
+                $entry->bank_statement_ref ?? '',
+                $entry->account_name ?? '',
+                $formatter->formatCurrency( $signed_amount, \EMEVzw\Config::get()->currency ),
+                $entry->direction,
+                $entry->vat_code ?? '',
+                $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',
+                $entry->counterparty_vat_number,
+                $entry->counterparty_name ?? '',
+                (int) $entry->is_reconciled,
+                $entry->is_reconciled && $entry->reconciled_at ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE ) : '',
+            ]);
+        }
+
+        fclose($output);
         wp_die();
     }
 
@@ -691,7 +784,7 @@ class Journal {
         );
     }
 
-    public static function get_entries_for_ftable( array $args = [], string $orderby = '', string $limit = '' ): array {
+    public static function get_entries_for_ftable( array $args = [], string $orderby = '', string $limit = '', bool $include_files = true ): array {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_journal';
 
@@ -718,10 +811,12 @@ class Journal {
         } else {
             $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) );
         }
-        foreach ($rows as &$row) {
-            $row->files = self::$attachments->get_links_html($row->id, 'journal');
+        if ($include_files) {
+            foreach ($rows as &$row) {
+                $row->files = self::$attachments->get_links_html($row->id, 'journal');
+            }
+            unset($row); // delete last row reference
         }
-        unset($row); // delete last row reference
         return $rows;
     }
 }
