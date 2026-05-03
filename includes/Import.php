@@ -28,6 +28,106 @@ class Import {
         add_action( 'wp_ajax_eme_accounting_list_import_lines',    [ __CLASS__, 'ajax_list_lines' ] );
         add_action( 'wp_ajax_eme_accounting_list_import_logs',     [ __CLASS__, 'ajax_list_logs' ] );
         add_action( 'wp_ajax_eme_accounting_get_logline_stats',    [ __CLASS__, 'ajax_get_logline_stats' ] );
+        add_action( 'wp_ajax_eme_accounting_bulk_action_lines',     [ __CLASS__, 'ajax_bulk_action_lines' ] );
+    }
+
+    /**
+     * Bulk action on import lines.
+     * POST params:
+     *   action_type  : 'ignore' | 'create'
+     *   line_ids     : comma-separated import line IDs
+     *   coa_id       : required for action_type 'create'
+     */
+    public static function ajax_bulk_action_lines(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'import' );
+        global $wpdb;
+
+        $action_type = eme_sanitize_request( $_POST['action_type'] ?? '' );
+        $coa_id      = (int) ( $_POST['coa_id'] ?? 0 );
+        $eme_event_id= (int) ( $_POST['eme_event_id'] ?? 0 );
+        $raw_ids     = eme_sanitize_request( $_POST['line_ids'] ?? '' );
+
+        if ( ! in_array( $action_type, [ 'ignore', 'create' ], true ) ) {
+            wp_send_json_error( 'Ongeldige actie.' );
+        }
+
+        // Parse and validate IDs (integers only)
+        $line_ids = array_filter(
+            array_map( 'intval', explode( ',', $raw_ids ) ),
+            fn( $id ) => $id > 0
+        );
+        if ( empty( $line_ids ) ) {
+            wp_send_json_error( 'Geen geldige regels opgegeven.' );
+        }
+        if ( $action_type === 'create' && ! $coa_id ) {
+            wp_send_json_error( 'Grootboekrekening vereist voor nieuwe boeking.' );
+        }
+
+        $records   = [];
+        $processed = 0;
+        $errors    = [];
+
+        foreach ( $line_ids as $line_id ) {
+            $line = $wpdb->get_row( $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_import_lines` WHERE id = %d AND status = 'pending'",
+                $line_id
+            ) );
+            if ( ! $line ) continue; // skip non-pending or not found
+
+            if ( $action_type === 'ignore' ) {
+                $wpdb->update(
+                    $wpdb->prefix . 'emeacc_import_lines',
+                    [ 'status' => 'ignored' ],
+                    [ 'id' => $line_id ],
+                    [ '%s' ], [ '%d' ]
+                );
+                $records[] = self::get_line( $line_id );
+                $processed++;
+
+            } elseif ( $action_type === 'create' ) {
+                $journal_id = Journal::save( [
+                    'entry_date'        => $line->transaction_date,
+                    'booking_date'      => $line->value_date,
+                    'description'       => $line->description,
+                    'amount'            => abs( (float) $line->amount ),
+                    'direction'         => (float) $line->amount >= 0 ? 'in' : 'out',
+                    'account_id'        => $line->account_id,
+                    'bank_statement_ref'=> $line->bank_ref ?: $line->structured_ref,
+                    'counterparty_name' => $line->counterparty_name ?? '',
+                    'eme_event_id'      => $eme_event_id,
+                    'import_line_id'    => $line->id,
+                    'is_reconciled'     => 1,
+                    'coa_id'            => $coa_id,
+                ] );
+                if ( is_wp_error( $journal_id ) ) {
+                    $errors[] = sprintf( 'Regel #%d: %s', $line_id, $journal_id->get_error_message() );
+                    continue;
+                }
+                $wpdb->update(
+                    $wpdb->prefix . 'emeacc_import_lines',
+                    [ 'status' => 'manual', 'journal_id' => $journal_id ],
+                    [ 'id' => $line_id ],
+                    [ '%s', '%d' ], [ '%d' ]
+                );
+                $records[] = self::get_line( $line_id );
+                $processed++;
+            }
+        }
+
+        $message = sprintf(
+            _n( '%d regel verwerkt.', '%d regels verwerkt.', $processed, 'eme-accounting' ),
+            $processed
+        );
+        if ( ! empty( $errors ) ) {
+            $message .= ' ' . implode( ' ', $errors );
+        }
+
+        wp_send_json_success( [
+            'processed' => $processed,
+            'records'   => $records,
+            'message'   => $message,
+        ] );
     }
 
     /**
@@ -122,7 +222,65 @@ class Import {
      * @param  string $format     csv|coda|bnp|kbc|ing|belfius|auto
      * @return object      Import log row or error.
      */
-    public static function process_upload( int $account_id, array $file, string $format = 'auto' ): object {
+    /**
+     * Check for potential duplicate imports before inserting.
+     *
+     * Returns an array of warning strings (empty = no duplicates found).
+     *  - Same filename + account → likely exact re-upload
+     *  - Overlapping transaction date range + same account → possible overlap
+     *
+     * @param  int    $account_id
+     * @param  string $filename    Sanitized filename
+     * @param  array  $lines       Parsed lines (with 'date' key)
+     * @return string[]
+     */
+    private static function check_duplicates( int $account_id, string $filename, array $lines ): array {
+        global $wpdb;
+        $warnings = [];
+
+        // 1. Same filename + same account
+        $existing = $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM `{$wpdb->prefix}emeacc_import_log`
+             WHERE account_id = %d AND filename = %s
+             LIMIT 1",
+            $account_id, $filename
+        ) );
+        if ( $existing ) {
+            $warnings[] = sprintf(
+                __( 'Bestand "%s" werd al eerder geïmporteerd voor deze rekening (import #%d).', 'eme-accounting' ),
+                $filename, $existing
+            );
+        }
+
+        // 2. Overlapping date range
+        if ( ! empty( $lines ) ) {
+            $dates    = array_filter( array_column( $lines, 'date' ) );
+            $date_min = min( $dates );
+            $date_max = max( $dates );
+
+            $overlap = $wpdb->get_row( $wpdb->prepare(
+                "SELECT il.id, il.filename, MIN(li.transaction_date) as d_min, MAX(li.transaction_date) as d_max
+                 FROM `{$wpdb->prefix}emeacc_import_log` il
+                 JOIN `{$wpdb->prefix}emeacc_import_lines` li ON li.import_log_id = il.id
+                 WHERE il.account_id = %d
+                 GROUP BY il.id
+                 HAVING d_min <= %s AND d_max >= %s
+                 LIMIT 1",
+                $account_id, $date_max, $date_min
+            ) );
+            if ( $overlap ) {
+                $warnings[] = sprintf(
+                    __( 'Import #%d ("%s") bevat al transacties in de periode %s – %s.', 'eme-accounting' ),
+                    $overlap->id, $overlap->filename,
+                    $overlap->d_min, $overlap->d_max
+                );
+            }
+        }
+
+        return $warnings;
+    }
+
+    public static function process_upload( int $account_id, array $file, string $format = 'auto', bool $force = false ): object {
         global $wpdb;
 
         if ( $file['error'] !== UPLOAD_ERR_OK ) {
@@ -153,6 +311,17 @@ class Import {
 
         if ( is_wp_error( $lines ) ) {
             return $lines;
+        }
+
+        // Duplicate check (skipped when $force = true)
+        if ( ! $force ) {
+            $filename = sanitize_file_name( $file['name'] );
+            $warnings = self::check_duplicates( $account_id, $filename, $lines );
+            if ( ! empty( $warnings ) ) {
+                return (object) [
+                    'duplicate_warnings' => $warnings,
+                ];
+            }
         }
 
         // Create import log entry
@@ -611,9 +780,15 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         $account_id = (int) ( $_POST['account_id'] ?? 0 );
         $format     = eme_sanitize_request( $_POST['format'] ?? 'auto' );
-        $result = self::process_upload( $account_id, $_FILES['import_file'], $format );
+        $force      = ! empty( $_POST['force'] );
+        $result = self::process_upload( $account_id, $_FILES['import_file'], $format, $force );
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
+        }
+        // Return warnings without importing — JS will ask for confirmation
+        if ( ! empty( $result->duplicate_warnings ) ) {
+            wp_send_json_success( (array) $result );
+            return;
         }
         wp_send_json_success( (array) $result );
     }

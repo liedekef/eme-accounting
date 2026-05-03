@@ -226,6 +226,7 @@
                 direction: document.querySelector('#eme-acc-direction-filter')?.value || '',
                 coa_id: document.querySelector('#eme-acc-coa-filter')?.value || '',
                 search: document.querySelector('#eme-acc-search-filter')?.value || '',
+                counterparty_name: document.querySelector('#eme-acc-counterparty-filter')?.value || '',
                 daterange: document.querySelector('[name=eme-daterange-filter]')?.value || '',
                 amount: parseBE(document.querySelector('#eme-acc-amount-filter')?.value || ''),
                 eme_event_id: document.querySelector('#eme-acc-event-filter')?.value || ''

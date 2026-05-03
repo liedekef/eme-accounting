@@ -1,6 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+$coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
 ?>
 <div class="wrap eme-acc-wrap">
@@ -50,6 +51,38 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
         <button id="btn-auto-reconcile" class="button"><?php esc_html_e( 'Auto-reconciliatie uitvoeren', 'eme-accounting' ); ?></button>
         <button id="btn-close-lines" class="button"><?php esc_html_e( '↑ Sluit', 'eme-accounting' ); ?></button>
     </p>
+    
+    <!-- Bulk actions bar (shown when rows are selected) -->
+    <div id="eme-import-bulk-actions" style="display:none;margin-bottom:8px;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="eme-bulk-action-select">
+            <option value=""><?php esc_html_e( '&mdash; Bulk actie &mdash;', 'eme-accounting' ); ?></option>
+            <option value="ignore"><?php esc_html_e( 'Negeer geselecteerde', 'eme-accounting' ); ?></option>
+            <option value="create"><?php esc_html_e( 'Nieuwe boeking voor geselecteerde', 'eme-accounting' ); ?></option>
+        </select>
+        <span id="eme-bulk-coa-wrap" style="display:none;gap:4px;align-items:center">
+            <select id="eme-bulk-coa-select" style="min-width:200px" class="eme_snapselect" data-live-search="true">
+                <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
+                <?php foreach ( $coa_accounts as $id => $acc ):
+                      if ( $acc && $acc->direction === 'in' ):
+                ?>
+                <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> ><?= esc_html( $acc->code . ' - ' . $acc->name ) ?></option>
+                <?php endif; endforeach; ?>
+                </optgroup>
+                <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
+                <?php foreach ( $coa_accounts as $id => $acc ):
+                      if ( $acc && $acc->direction === 'out' ):
+                ?>
+                <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> ><?= esc_html( $acc->code . ' - ' . $acc->name ) ?></option>
+                <?php endif; endforeach; ?>
+                </optgroup>
+            </select>
+            <select id="eme-bulk-event-select" class="eme_snapselect_events_class"></select>
+        </span>
+        <button id="eme-bulk-apply" class="button button-primary"><?php esc_html_e( 'Toepassen', 'eme-accounting' ); ?></button>
+        <span id="eme-bulk-selected-count" style="color:#646970;font-size:13px"></span>
+    </div>
+
     <div id="eme-import-lines-table"></div>
 </div>
 <h2><?php esc_html_e( 'Eerdere imports', 'eme-accounting' ); ?></h2>

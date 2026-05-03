@@ -69,9 +69,13 @@
      * LINES TABLE (reconciliation) – created once, reused per log
      * ================================================================ */
     let linesTableInst = new FTable( '#eme-import-lines-table', {
-        forcePost: true,
-        paging   : false,
-        sorting  : false,
+        forcePost : true,
+        paging    : false,
+        sorting   : false,
+        selecting : true,
+        multiselect: true,
+        selectingCheckboxes: true,
+        selectionChanged  : function () { updateBulkBar(); },
         actions: {
             listAction  : ajaxUrl + '?action=eme_accounting_list_import_lines&nonce='   + nonce,
         },
@@ -156,6 +160,7 @@
         }, // end fields
         recordsLoaded: function () {
             // Re-init snapselects after every load (ftable rebuilds the tbody)
+            updateBulkBar();
             initSnapSelect('select.eme_snapselect');
             initSnapSelectRemote('select.eme_snapselect_events_class', {
                 placeholder: 'Selecteer event',
@@ -212,6 +217,119 @@
         activeLogId  = null;
         activeLogRow = null;
     }
+
+    /* ================================================================
+     * BULK ACTIONS
+     * ================================================================ */
+
+    const bulkBar       = document.getElementById( 'eme-import-bulk-actions' );
+    const bulkSelect    = document.getElementById( 'eme-bulk-action-select' );
+    const bulkCoaWrap   = document.getElementById( 'eme-bulk-coa-wrap' );
+    const bulkCoaSel    = document.getElementById( 'eme-bulk-coa-select' );
+    const bulkEventSel  = document.getElementById( 'eme-bulk-event-select' );
+    const bulkApplyBtn  = document.getElementById( 'eme-bulk-apply' );
+    const bulkCountSpan = document.getElementById( 'eme-bulk-selected-count' );
+
+    /* Populate COA options from emeAccountingImport (same as per-line selects) */
+    /*function populateBulkCoa() {
+        if ( bulkCoaSel.options.length > 1 ) return; // already filled
+        const allOpts = [ ...emeAccountingImport.coaOptionsIn, ...emeAccountingImport.coaOptionsOut ];
+        allOpts.forEach( o => {
+            const opt = document.createElement( 'option' );
+            opt.value       = o.Value;
+            opt.textContent = o.DisplayText;
+            bulkCoaSel.appendChild( opt );
+        } );
+    }*/
+
+    /* Show/hide bulk bar based on selection; update counter */
+    function updateBulkBar() {
+        if ( ! bulkBar ) return;
+        const selected = linesTableInst?.getSelectedRows?.() || [];
+        const count    = selected.length;
+        bulkBar.style.display   = count > 0 ? 'flex' : 'none';
+        bulkCountSpan.textContent = count > 0
+            ? `${count} rij${count === 1 ? '' : 'en'} geselecteerd`
+            : '';
+    }
+
+    /* selectionChanged is wired as a FTable callback option (see linesTableInst definition) */
+
+    /* Show/hide extra controls based on chosen action */
+    bulkSelect?.addEventListener( 'change', function () {
+        const action = this.value;
+        if ( action === 'create' ) {
+            //populateBulkCoa();
+            bulkCoaWrap.style.display = 'flex';
+        } else {
+            bulkCoaWrap.style.display = 'none';
+        }
+    } );
+
+    /* Apply bulk action */
+    bulkApplyBtn?.addEventListener( 'click', async function () {
+        const action = bulkSelect.value;
+        if ( ! action ) { linesTableInst.showInfo( 'Kies eerst een bulk actie.' ); return; }
+
+        const selectedRows = linesTableInst.getSelectedRows();
+        if ( ! selectedRows.length ) { linesTableInst.showInfo( 'Selecteer eerst rijen.' ); return; }
+
+        // Only process pending rows
+        const pendingRows = selectedRows.filter( row => row.recordData?.status === 'pending' );
+        if ( ! pendingRows.length ) {
+            linesTableInst.showInfo( 'Geen openstaande regels geselecteerd.' );
+            return;
+        }
+
+        const ids = pendingRows.map( row => row.dataset.recordKey );
+
+        if ( action === 'ignore' ) {
+            const ok = await ftConfirm(
+                'Negeer geselecteerde regels',
+                `<p>Ben je zeker dat je <strong>${ids.length}</strong> regel${ids.length === 1 ? '' : 's'} wil negeren?</p>`
+            );
+            if ( ! ok ) return;
+        }
+
+        if ( action === 'create' ) {
+            if ( ! bulkCoaSel.value ) { linesTableInst.showInfo( 'Kies eerst een grootboekrekening.' ); return; }
+
+            // Warn if any line contains "transfer"
+            const hasTransfer = pendingRows.some( row =>
+                /transfer/i.test( row.recordData?.description || '' )
+            );
+            if ( hasTransfer ) {
+                const ok = await ftConfirm(
+                    'Transfer gedetecteerd',
+                    '<p>Eén of meer geselecteerde regels bevatten "transfer" in de omschrijving. Toch nieuwe boekingen aanmaken?</p>'
+                );
+                if ( ! ok ) return;
+            }
+        }
+
+        const origText = bulkApplyBtn.textContent;
+        bulkApplyBtn.disabled    = true;
+        bulkApplyBtn.textContent = i18n.processing;
+
+        const r = await post( 'eme_accounting_bulk_action_lines', {
+            action_type : action,
+            line_ids    : ids.join( ',' ),
+            coa_id      : action === 'create' ? bulkCoaSel.value : '',
+            eme_event_id: action === 'create' ? bulkEventSel.value : '',
+        } );
+
+        bulkApplyBtn.disabled    = false;
+        bulkApplyBtn.textContent = origText
+
+        linesTableInst.reload();
+        if ( r.success ) {
+            refreshLogCounters();
+            linesTableInst.showInfo( r.data.message || 'Klaar.' );
+            updateBulkBar();
+        } else {
+            linesTableInst.showError( r.data || 'Fout bij bulk actie.' );
+        }
+    } );
 
     /* ================================================================
      * MAIN LOGS TABLE
@@ -309,7 +427,7 @@
             const btn      = e.target;
             const origText = btn.textContent;
             btn.disabled   = true;
-            btn.textContent = 'Bezig\u2026';
+            btn.textContent = i18n.processing;
             const r = await post( 'eme_accounting_auto_reconcile', {
                 log_id    : activeLogId,
                 account_id: activeLogRow.recordData.account_id,
@@ -399,39 +517,65 @@
      * ================================================================ */
     document.getElementById( 'eme-acc-import-form' )?.addEventListener( 'submit', function ( e ) {
         e.preventDefault();
-        const btn = this.querySelector( '.submit-btn' );
-        const fd  = new FormData( this );
+        doUpload( this, false );
+    } );
+
+    async function doUpload( form, force ) {
+        const btn = form.querySelector( '.submit-btn' );
+        const fd  = new FormData( form );
         fd.append( 'action', 'eme_accounting_import_upload' );
         fd.append( 'nonce',  nonce );
+        if ( force ) fd.append( 'force', '1' );
         btn.textContent = 'Importeren\u2026';
         btn.disabled    = true;
-        fetch( ajaxUrl, { method: 'POST', body: fd } )
-            .then( r => r.json() )
-            .then( r => {
-                btn.textContent = 'Importeren';
-                btn.disabled    = false;
-                if ( ! r.success ) { alert( r.data || 'Importfout' ); return; }
-                const d = r.data;
-                const resultDiv = document.querySelector('#import-result');
-                if (resultDiv) {
-                    resultDiv.innerHTML = `<div class="notice notice-success"><p>
-                        Import klaar: <strong>${d.total}</strong> regels —
-                        <strong>${d.matched}</strong> gematcht —
-                        <strong>${d.unmatched}</strong> nog te verifiëren.
-                    </p></div>`;
-                    resultDiv.style.display = 'block';
-                    document.getElementById( 'eme-acc-import-form' ).reset();
-                    setTimeout(() => {
-                        resultDiv.style.display = 'none';
-                    }, 5000);
-                }
-                logsTable.reload();
-            } )
-            .catch( () => {
-                btn.textContent = 'Importeren';
-                btn.disabled    = false;
-                alert( 'Verbindingsfout met server.' );
-            } );
-    } );
+
+        let r;
+        try {
+            r = await fetch( ajaxUrl, { method: 'POST', body: fd } ).then( res => res.json() );
+        } catch {
+            btn.textContent = 'Importeren';
+            btn.disabled    = false;
+            logsTable.showError( 'Verbindingsfout met server.' );
+            return;
+        }
+
+        btn.textContent = 'Importeren';
+        btn.disabled    = false;
+
+        if ( ! r.success ) {
+            logsTable.showError( r.data || 'Importfout' );
+            return;
+        }
+
+        const d = r.data;
+
+        // Duplicate warnings: ask for confirmation before forcing the import
+        if ( d.duplicate_warnings?.length ) {
+            const msg = d.duplicate_warnings.join( '\n' ) +
+                '\n\nToch importeren?';
+            const ok = await ftConfirm(
+                'Mogelijke duplicaten gedetecteerd',
+                d.duplicate_warnings.map( w => `<p>⚠️ ${esc(w)}</p>` ).join( '' ) +
+                '<p><strong>Toch importeren?</strong></p>'
+            );
+            if ( ! ok ) return;
+            doUpload( form, true );
+            return;
+        }
+
+        // Success
+        const resultDiv = document.querySelector( '#import-result' );
+        if ( resultDiv ) {
+            resultDiv.innerHTML = `<div class="notice notice-success"><p>
+                Import klaar: <strong>${d.total}</strong> regels —
+                <strong>${d.matched}</strong> gematcht —
+                <strong>${d.unmatched}</strong> nog te verifiëren.
+            </p></div>`;
+            resultDiv.style.display = 'block';
+            form.reset();
+            setTimeout( () => { resultDiv.style.display = 'none'; }, 5000 );
+        }
+        logsTable.reload();
+    }
 
 })();

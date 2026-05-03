@@ -57,7 +57,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <?php if ( $edit_entry ): ?>
             <input type="hidden" name="id" value="<?= (int) $edit_entry->id ?>">
             <?php endif; ?>
-            <div class="eme-acc-row">
+            <div class="eme-acc-row-3">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Datum', 'eme-accounting' ); ?> *</label>
                     <input type="date" name="entry_date" id="entry_date" required
@@ -75,8 +75,8 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 </div>
             </div>
 
-            <div class="eme-acc-row">
-                <div class="eme-acc-field" style="flex:2">
+            <div class="eme-acc-row-3">
+                <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?> *</label>
                     <input type="text" name="description" required maxlength="255"
                            value="<?= esc_attr( $edit_entry->description ?? '' ) ?>">
@@ -115,7 +115,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 </div>
             </div>
 
-            <div class="eme-acc-row-4">
+            <div class="eme-acc-row-3">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bedrag (€)', 'eme-accounting' ); ?> *</label>
                     <input type="text" name="amount" required
@@ -123,24 +123,6 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                            oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                            value="<?= esc_attr( $edit_entry && $edit_entry->amount > 0 ? number_format( (float) $edit_entry->amount, 2, ',', '.' ) : '' ) ?>"
                            placeholder="0,00">
-                </div>
-                <div class="eme-acc-field">
-                    <label><?php esc_html_e( 'Event', 'eme-accounting' ); ?></label>
-                    <?php
-                    $event_id  = 0;
-                    $myevents  = [];
-                    if ( ! empty( $edit_entry->eme_event_id ) ) {
-                        $event_id = $edit_entry->eme_event_id;
-                        $event = eme_get_event(  $event_id);
-                        if ( $event ) {
-                            $myevents[ $event_id ] = eme_translate($event['event_name']) . ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
-                        } else {
-                            $myevents[ $event_id ] = __('onbekend event','eme-accounting');
-                        }
-                    }
-                    echo eme_ui_select( $event_id, 'eme_event_id', $myevents, '', 0, 'eme_snapselect_events_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
-                    ?>
-                    <span><input id="eventsearch_all" name='eventsearch_all' value='1' type='checkbox'> <?php esc_html_e( 'Vink dit aan om alle evenementen te doorzoeken en niet enkel de scope ingesteld in de settings.', 'events-made-easy' ); ?></span>
                 </div>
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
@@ -173,11 +155,14 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                         <?php endforeach; ?>
                     </select>
                     <?php endif; ?>
+                    <span class="description">
+                        <?php esc_html_e( 'Enkel geldig voor transfers tussen rekeningen.', 'eme-accounting' ); ?>
+                    </span>
                 </div>
             </div>
 
             <?php if ( $vat_liable ): ?>
-            <div class="eme-acc-row" id="vat-row">
+            <div class="eme-acc-row-3" id="vat-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'BTW-tarief', 'eme-accounting' ); ?></label>
                     <select name="vat_code" id="vat_code">
@@ -207,8 +192,26 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <?php endif; ?>
 
             <!-- Bank statement info -->
-            <div class="eme-acc-row">
-                <div class="eme-acc-field" style="flex:2">
+            <div class="eme-acc-row-4">
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'Event', 'eme-accounting' ); ?></label>
+                    <?php
+                    $event_id  = 0;
+                    $myevents  = [];
+                    if ( ! empty( $edit_entry->eme_event_id ) ) {
+                        $event_id = $edit_entry->eme_event_id;
+                        $event = eme_get_event(  $event_id);
+                        if ( $event ) {
+                            $myevents[ $event_id ] = eme_translate($event['event_name']) . ' (' . eme_localized_date( $event['event_start'], EME_TIMEZONE, 1 ) . ')';
+                        } else {
+                            $myevents[ $event_id ] = __('onbekend event','eme-accounting');
+                        }
+                    }
+                    echo eme_ui_select( $event_id, 'eme_event_id', $myevents, '', 0, 'eme_snapselect_events_class' ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from eme_ui_select()
+                    ?>
+                    <span><input id="eventsearch_all" name='eventsearch_all' value='1' type='checkbox'> <?php esc_html_e( 'Vink dit aan om alle evenementen te doorzoeken en niet enkel de scope ingesteld in de settings.', 'events-made-easy' ); ?></span>
+                </div>
+                <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bankafschrift referentie', 'eme-accounting' ); ?></label>
                     <input type="text" name="bank_statement_ref" maxlength="100"
                            placeholder="bv. BE68 5390 0754 7034 / 2024-001 of +++123/4567/89012+++"
@@ -234,10 +237,29 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                         <option value="mollie"    <?= selected( $edit_entry->payment_method ?? '', 'mollie',    false ) ?>><?php esc_html_e( 'Mollie / Online', 'eme-accounting' ); ?></option>
                     </select>
                 </div>
+            </div>
+
+            <div class="eme-acc-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Bijlage URL', 'eme-accounting' ); ?></label>
                     <input type="url" name="attachment_url"
                            value="<?= esc_attr( $edit_entry->attachment_url ?? '' ) ?>">
+                </div>
+                <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'Bijlagen', 'eme-accounting' ); ?></label>
+                    <?php if ( $edit_entry ):
+                        $existing_files = EMEAccounting\Journal::get_attachments()->get_delete_links_html( (int) $edit_entry->id, 'journal' );
+                        if ( $existing_files ):
+                    ?>
+                    <div id="eme-acc-journal-attachments" class="eme-acc-attachments">
+                        <?= $existing_files // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from EMEFileAttachments ?>
+                    </div>
+                    <?php endif; endif; ?>
+                    <?php if ( ! $form_disabled ): ?>
+                    <input type="file" name="files[]" id="journal-files" multiple
+                           accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt">
+                    <span class="description"><?php esc_html_e( 'Optioneel: één of meerdere bestanden (PDF, afbeelding, …)', 'eme-accounting' ); ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -257,25 +279,6 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <?php else: ?>
                     <input type="hidden" name="is_reconciled" value="1">
                 <?php endif; ?>
-            </div>
-
-            <div class="eme-acc-row">
-                <div class="eme-acc-field">
-                    <label><?php esc_html_e( 'Bijlagen', 'eme-accounting' ); ?></label>
-                    <?php if ( $edit_entry ):
-                        $existing_files = EMEAccounting\Journal::get_attachments()->get_delete_links_html( (int) $edit_entry->id, 'journal' );
-                        if ( $existing_files ):
-                    ?>
-                    <div id="eme-acc-journal-attachments" class="eme-acc-attachments">
-                        <?= $existing_files // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted HTML from EMEFileAttachments ?>
-                    </div>
-                    <?php endif; endif; ?>
-                    <?php if ( ! $form_disabled ): ?>
-                    <input type="file" name="files[]" id="journal-files" multiple
-                           accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt">
-                    <span class="description"><?php esc_html_e( 'Optioneel: één of meerdere bestanden (PDF, afbeelding, …)', 'eme-accounting' ); ?></span>
-                    <?php endif; ?>
-                </div>
             </div>
 
             <p>
@@ -306,7 +309,8 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <?php endforeach; ?>
             </select>
             <input type='text' id='eme-daterange-filter' name='eme-daterange-filter' placeholder='<?php esc_html_e( 'Filter op daterange', 'eme-accounting' ); ?>' data-autoclose='false' data-range='true' data-multiple-separator=' -- ' data-date='' style='width: 22ch;' class='eme_formfield_fdate'>
-            <input type="search" placeholder="Filter op omschrijving" size="17" name="eme-acc-search-filter" id="eme-acc-search-filter">
+            <input type="search" placeholder="Filter op omschrijving / bankref" size="22" name="eme-acc-search-filter" id="eme-acc-search-filter">
+            <input type="search" placeholder="Filter op tegenpartij" size="18" name="eme-acc-counterparty-filter" id="eme-acc-counterparty-filter">
             <input type="search" placeholder="Bedrag" name="eme-acc-amount-filter" id="eme-acc-amount-filter" size="8">
             <select name="account_id" id="eme-acc-account-filter">
                 <option value="0"><?php esc_html_e( 'Alle rekeningen', 'eme-accounting' ); ?></option>
