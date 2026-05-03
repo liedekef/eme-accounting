@@ -390,6 +390,73 @@ class Reports {
         ];
     }
 
+    /**
+     * Cashflow rapport: maandelijkse in/out/saldo per rekening voor een boekjaar.
+     *
+     * @return array{fiscal_year: int, accounts: array, months: array, totals: array}
+     */
+    public static function cashflow( int $year ): array {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.account_id,
+                        a.name                              AS account_name,
+                        MONTH(j.entry_date)                 AS month,
+                        SUM(CASE WHEN j.direction = 'in'  THEN j.amount ELSE 0 END) AS total_in,
+                        SUM(CASE WHEN j.direction = 'out' THEN j.amount ELSE 0 END) AS total_out
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = j.account_id
+                 WHERE j.fiscal_year = %d
+                   AND j.transfer_id IS NULL
+                   AND j.is_closing_entry = 0
+                 GROUP BY j.account_id, MONTH(j.entry_date)
+                 ORDER BY j.account_id, month",
+                $year
+            )
+        );
+
+        // Pre-seed structure: all 12 months × all accounts
+        $accounts = [];
+        $data     = [];
+        foreach ( $rows as $row ) {
+            $aid = (int) $row->account_id;
+            if ( ! isset( $accounts[ $aid ] ) ) {
+                $accounts[ $aid ] = $row->account_name;
+                for ( $m = 1; $m <= 12; $m++ ) {
+                    $data[ $aid ][ $m ] = [ 'in' => 0.0, 'out' => 0.0, 'net' => 0.0 ];
+                }
+            }
+            $m   = (int) $row->month;
+            $in  = (float) $row->total_in;
+            $out = (float) $row->total_out;
+            $data[ $aid ][ $m ] = [ 'in' => $in, 'out' => $out, 'net' => $in - $out ];
+        }
+
+        // Grand totals per month (across all accounts)
+        $month_totals = [];
+        for ( $m = 1; $m <= 12; $m++ ) {
+            $t_in = $t_out = 0.0;
+            foreach ( $data as $aid => $months ) {
+                $t_in  += $months[ $m ]['in'];
+                $t_out += $months[ $m ]['out'];
+            }
+            $month_totals[ $m ] = [ 'in' => $t_in, 'out' => $t_out, 'net' => $t_in - $t_out ];
+        }
+
+        return [
+            'fiscal_year'  => $year,
+            'accounts'     => $accounts,
+            'data'         => $data,
+            'month_totals' => $month_totals,
+            'totals'       => [
+                'in'  => array_sum( array_column( $month_totals, 'in' ) ),
+                'out' => array_sum( array_column( $month_totals, 'out' ) ),
+                'net' => array_sum( array_column( $month_totals, 'net' ) ),
+            ],
+        ];
+    }
+
     public static function ajax_export(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
@@ -403,17 +470,20 @@ class Reports {
             'income_expenditure' => self::income_expenditure( $year ),
             'patrimony'          => self::patrimony( $_GET['date'] ?? '' ),
             'events'             => self::events_report( $year, $event_id ),
-            'financial_year'    => self::financial_year_report( $year ),
+            'financial_year'     => self::financial_year_report( $year ),
             'vat_report'         => self::vat_report( $year ),
+            'cashflow'           => self::cashflow( $year ),
             default              => self::diary( [ 'fiscal_year' => $year ] ),
         };
 
         if ( $format === 'csv' ) {
             self::output_csv( $data, $type . '_' . $year );
-        } elseif ( $format === 'pdf' && $type=='income_expenditure' ) {
+        } elseif ( $format === 'pdf' && $type === 'income_expenditure' ) {
             self::ajax_download_income_expenditure_pdf( $data, $year );
-        } elseif ( $format === 'pdf' && $type=='financial_year' ) {
+        } elseif ( $format === 'pdf' && $type === 'financial_year' ) {
             self::ajax_download_financial_year_pdf( $data, $year );
+        } elseif ( $format === 'pdf' && $type === 'cashflow' ) {
+            self::ajax_download_cashflow_pdf( $data, $year );
         } else {
             wp_send_json_success( $data );
         }
@@ -441,6 +511,40 @@ class Reports {
                 fputcsv( $handle, [ $key, $value ], ';' );
             }
         }
+    }
+
+    private static function generate_cashflow_pdf_html( array $data, int $year ): string {
+        $config = \EMEVzw\Config::get();
+        if ( ! $config ) return '';
+        ob_start();
+        include EME_ACCOUNTING_DIR . 'templates/pdf/cashflow.php';
+        return ob_get_clean();
+    }
+
+    public static function ajax_download_cashflow_pdf( array $data, int $year ): void {
+        $html = self::generate_cashflow_pdf_html( $data, $year );
+        if ( empty( $html ) ) {
+            wp_send_json_error();
+        }
+
+        $dompdf_autoload = WP_PLUGIN_DIR . '/events-made-easy/includes/dompdf/vendor/autoload.php';
+        if ( ! file_exists( $dompdf_autoload ) ) {
+            wp_send_json_error();
+        }
+        require_once $dompdf_autoload;
+
+        $options = new \Dompdf\Options();
+        $options->set( 'isHtml5ParserEnabled', true );
+        $options->set( 'isRemoteEnabled', false );
+        $options->set( 'defaultFont', 'helvetica' );
+
+        $dompdf = new \Dompdf\Dompdf( $options );
+        $dompdf->loadHtml( '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"></head><body>'
+            . $html . '</body></html>' );
+        $dompdf->setPaper( 'A4', 'landscape' );
+        $dompdf->render();
+        $dompdf->stream( 'Cashflow' . $year . '.pdf', [ 'Attachment' => false ] );
+        exit;
     }
 
     private static function generate_pdf_html( array $data, int $year ): string {

@@ -242,7 +242,25 @@
                         }
                         return '<span class="eme-acc-tag eme-acc-pending">' + esc(emeAccounting.i18n.pending || 'Openstaand') + '</span>';
                     }
-                }
+                },
+                ...(emeAccounting.i18n.vat_liable ? {
+                    vat_code: {
+                        title: emeAccounting.i18n.vat_code || 'BTW-code',
+                        sortable: false,
+                        searchable: false,
+                        display: function(data) {
+                            return data.value ? '<span class="eme-acc-tag">' + esc(data.value) + '</span>' : '';
+                        }
+                    },
+                    vat_amount: {
+                        title: emeAccounting.i18n.vat_amount || 'BTW-bedrag',
+                        sortable: false,
+                        searchable: false,
+                        display: function(data) {
+                            return data.value ? '<span style="font-size:11px;color:#646970">' + esc(data.value) + '</span>' : '';
+                        }
+                    }
+                } : {})
             },
             listQueryParams: () => ({
                 fiscal_year: document.querySelector('#eme-acc-year-filter')?.value || '',

@@ -77,6 +77,10 @@ class Assets {
                 'confirmDelete'   => __( 'Boekjaar %s verwijderen?', 'eme-accounting' ),
                 'translate_fdateformat'        => get_option( 'date_format' ),
                 'translate_fdatetimeformat'    => get_option( 'date_format' ) . ' ' . get_option( 'time_format' ),
+                'vat_liable'                   => (bool) ( $config->vat_liable ?? false ),
+                'counterparty_name'            => __( 'Tegenpartij', 'eme-accounting' ),
+                'vat_code'                     => __( 'BTW-code', 'eme-accounting' ),
+                'vat_amount'                   => __( 'BTW-bedrag', 'eme-accounting' ),
             ],
         ] );
         if ( $plugin_page === 'emeaccounting-journal' ) {

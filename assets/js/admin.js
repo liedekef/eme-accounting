@@ -563,8 +563,8 @@ function initSnapSelectRemote(selector, options = {}) {
         const t = this.value;
         document.getElementById('report-date-wrap').style.display = t === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
-        document.getElementById('btn-export-pdf').style.display   = (t === 'income_expenditure' || t === 'financial_year') ? '' : 'none';
-        document.getElementById('btn-export-csv').style.display   = (t === 'events' || t === 'vat_report') ? 'none' : '';
+        document.getElementById('btn-export-pdf').style.display   = ['income_expenditure', 'financial_year', 'cashflow'].includes(t) ? '' : 'none';
+        document.getElementById('btn-export-csv').style.display   = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
         document.getElementById('btn-load-report').click();
     });
     // force initial click
@@ -626,12 +626,72 @@ function initSnapSelectRemote(selector, options = {}) {
     }
 
     function renderReport(type, data, container) {
-        if (type === 'income_expenditure') renderIncomeExpenditure(data, container);
-        else if (type === 'patrimony')     renderPatrimony(data, container);
-        else if (type === 'events')        renderEventsReport(data, container);
+        if (type === 'income_expenditure')  renderIncomeExpenditure(data, container);
+        else if (type === 'patrimony')      renderPatrimony(data, container);
+        else if (type === 'events')         renderEventsReport(data, container);
         else if (type === 'financial_year') renderFinancialYearReport(data, container);
         else if (type === 'vat_report')     renderVatReport(data, container);
-        else                               renderDiary(data, container);
+        else if (type === 'cashflow')       renderCashflow(data, container);
+        else                                renderDiary(data, container);
+    }
+
+    function renderCashflow(data, container) {
+        const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+        const fmt = (n) => formatCurrency(n);
+        const colorNet = (n) => n >= 0
+            ? `<span style="color:green;font-weight:bold">${fmt(n)}</span>`
+            : `<span style="color:red;font-weight:bold">${fmt(n)}</span>`;
+
+        let html = `<h2>Cashflow per maand – ${esc(String(data.fiscal_year))}</h2>`;
+        html += `<div style="overflow-x:auto">`;
+        html += `<table class="widefat striped" style="min-width:900px;font-size:13px">`;
+
+        // Header row
+        html += `<thead><tr><th>Rekening</th>`;
+        for (let m = 1; m <= 12; m++) html += `<th style="text-align:right">${months[m-1]}</th>`;
+        html += `<th style="text-align:right">Totaal</th></tr></thead><tbody>`;
+
+        const accountIds = Object.keys(data.data || {});
+
+        for (const aid of accountIds) {
+            const name    = esc(data.accounts[aid] || aid);
+            const months_ = data.data[aid];
+            let accIn = 0, accOut = 0;
+
+            // In-row
+            html += `<tr><td rowspan="3"><strong>${name}</strong></td>`;
+            for (let m = 1; m <= 12; m++) {
+                accIn += months_[m].in;
+                html += `<td style="text-align:right;color:green">${months_[m].in > 0 ? fmt(months_[m].in) : ''}</td>`;
+            }
+            html += `<td style="text-align:right;color:green">${fmt(accIn)}</td></tr>`;
+
+            // Out-row
+            html += `<tr>`;
+            for (let m = 1; m <= 12; m++) {
+                accOut += months_[m].out;
+                html += `<td style="text-align:right;color:red">${months_[m].out > 0 ? '-' + fmt(months_[m].out) : ''}</td>`;
+            }
+            html += `<td style="text-align:right;color:red">-${fmt(accOut)}</td></tr>`;
+
+            // Net-row
+            html += `<tr style="border-bottom:2px solid #ccc">`;
+            for (let m = 1; m <= 12; m++) {
+                html += `<td style="text-align:right">${colorNet(months_[m].net)}</td>`;
+            }
+            html += `<td style="text-align:right">${colorNet(accIn - accOut)}</td></tr>`;
+        }
+
+        // Grand total row
+        const t = data.month_totals || {};
+        html += `<tr style="background:#f0f0f1;font-weight:bold"><td>Totaal netto</td>`;
+        for (let m = 1; m <= 12; m++) {
+            html += `<td style="text-align:right">${colorNet((t[m] || {}).net || 0)}</td>`;
+        }
+        html += `<td style="text-align:right">${colorNet(data.totals?.net || 0)}</td></tr>`;
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
     }
 
     function renderIncomeExpenditure(data, container) {

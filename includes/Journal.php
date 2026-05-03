@@ -619,13 +619,21 @@ class Journal {
         $orderby = eme_get_datatables_orderby();
         $entries = self::get_entries_for_ftable( $args, $orderby, $limit, $include_files );
 
-        self::fputcsv($output, [
-            'id', 'entry_date', 'description', 'coa_name', 'event', 'bank_statement_ref', 'account_name', 'amount',
-            'direction', 'vat_code', 'vat_amount', 'counterparty_vat_number', 'counterparty_name', 'is_reconciled'
-        ]);
+        $vat_liable = (bool) ( \EMEVzw\Config::get()->vat_liable ?? false );
+        $currency   = \EMEVzw\Config::get()->currency;
+
+        $headers = ['id', 'entry_date', 'description', 'coa_name', 'event', 'bank_statement_ref',
+                    'counterparty_name', 'account_name', 'amount', 'direction'];
+        if ( $vat_liable ) {
+            $headers[] = 'vat_code';
+            $headers[] = 'vat_amount';
+            $headers[] = 'counterparty_vat_number';
+        }
+        $headers[] = 'is_reconciled';
+        self::fputcsv($output, $headers);
 
         foreach ( $entries as $entry ) {
-            $signed_amount = $entry->direction === 'out' && $entry->amount>0
+            $signed_amount = $entry->direction === 'out' && $entry->amount > 0
                 ? -1 * (float) $entry->amount
                 : (float) $entry->amount;
 
@@ -635,23 +643,28 @@ class Journal {
                 if ($event)
                     $event_name = trim( eme_translate( $event['event_name'] ) . ' (' . eme_localized_datetime( $event['event_start'] ) . ')' );
             }
-            self::fputcsv($output, [
+
+            $row = [
                 (int) $entry->id,
                 eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
                 $entry->description,
                 $entry->coa_name ?? '',
                 $event_name,
                 $entry->bank_statement_ref ?? '',
-                $entry->account_name ?? '',
-                $formatter->formatCurrency( $signed_amount, \EMEVzw\Config::get()->currency ),
-                $entry->direction,
-                $entry->vat_code ?? '',
-                $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',
-                $entry->counterparty_vat_number,
                 $entry->counterparty_name ?? '',
-                (int) $entry->is_reconciled,
-                $entry->is_reconciled && $entry->reconciled_at ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE ) : '',
-            ]);
+                $entry->account_name ?? '',
+                $formatter->formatCurrency( $signed_amount, $currency ),
+                $entry->direction,
+            ];
+            if ( $vat_liable ) {
+                $row[] = $entry->vat_code ?? '';
+                $row[] = $entry->vat_amount > 0
+                    ? $formatter->formatCurrency( (float) $entry->vat_amount, $currency )
+                    : '';
+                $row[] = $entry->counterparty_vat_number ?? '';
+            }
+            $row[] = (int) $entry->is_reconciled;
+            self::fputcsv($output, $row);
         }
 
         fclose($output);
