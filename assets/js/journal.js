@@ -169,6 +169,15 @@
                         return '<span style="font-size:11px;color:#646970;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
                     }
                 },
+                counterparty_name: {
+                    title: emeAccounting.i18n.counterparty_name || 'Tegenpartij',
+                    sortable: false,
+                    searchable: false,
+                    display: function(data) {
+                        if (!data.value) return '';
+                        return '<span style="font-size:11px;color:#646970" title="' + esc(data.value) + '">' + esc(data.value) + '</span>';
+                    }
+                },
                 files : {
                     title: emeAccounting.i18n.files || 'Categorie',
                     sortable: false,

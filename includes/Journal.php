@@ -295,6 +295,7 @@ class Journal {
             'vat_code'           => $vat_liable ? eme_sanitize_request( $data['vat_code'] ?? '' ) : '',
             'vat_amount'         => $vat_liable ? round( (float) str_replace( ',', '.', $data['vat_amount'] ?? '0' ), 2 ) : 0.00,
             'counterparty_vat_number' => eme_sanitize_request( $data['counterparty_vat_number'] ?? '' ),
+            'counterparty_name'       => eme_sanitize_request( $data['counterparty_name'] ?? '' ),
             'eme_payment_id'     => ! empty( $data['eme_payment_id'] ) ? (int) $data['eme_payment_id'] : null,
             'eme_event_id'       => ! empty( $data['eme_event_id'] ) ? (int) $data['eme_event_id'] : null,
             'attachment_url'     => esc_url_raw( $data['attachment_url'] ?? '' ),
@@ -551,6 +552,7 @@ class Journal {
                 'vat_code'           => $entry->vat_code ?? '',
                 'vat_amount'         => $entry->vat_amount > 0 ? $formatter->formatCurrency( (float) $entry->vat_amount, \EMEVzw\Config::get()->currency ) : '',
                 'counterparty_vat_number' => $entry->counterparty_vat_number,
+                'counterparty_name'       => $entry->counterparty_name ?? '',
                 'is_reconciled'      => (bool) $entry->is_reconciled,
                 'reconciled_at'      => $entry->is_reconciled && $entry->reconciled_at
                                             ? eme_localized_date( $entry->reconciled_at, EME_TIMEZONE )

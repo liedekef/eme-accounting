@@ -175,18 +175,14 @@
     /* Recalculate counter badges on the active log row in the logs table */
     function refreshLogCounters() {
         if ( ! activeLogId || ! activeLogRow ) return;
-        post( 'eme_accounting_list_import_lines', { import_log_id: activeLogId } )
+        post( 'eme_accounting_get_logline_stats', { import_log_id: activeLogId } )
             .then( r => {
-                if ( r.Result !== 'OK' ) return;
-                const cnt = { matched: 0, manual: 0, pending: 0, ignored: 0 };
-                ( r.Records || [] ).forEach( l => {
-                    if ( Object.prototype.hasOwnProperty.call( cnt, l.status ) ) cnt[ l.status ]++;
-                } );
+                if ( ! r.success ) return;
                 logsTable.updateRowData( activeLogRow, {
-                    cnt_matched: cnt.matched,
-                    cnt_manual : cnt.manual,
-                    cnt_pending: cnt.pending,
-                    cnt_ignored: cnt.ignored,
+                    cnt_matched: r.data.matched  || 0,
+                    cnt_manual : r.data.manual   || 0,
+                    cnt_pending: r.data.pending  || 0,
+                    cnt_ignored: r.data.ignored  || 0,
                 } );
             } );
     }
@@ -387,7 +383,7 @@
             const r = await post( 'eme_accounting_create_entry_from_line',
                 { line_id: lineId, coa_id: coaId } );
             if ( r.success ) {
-                linesTableInst.updateRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                linesTableInst.updateFullRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
                 refreshLogCounters();
             } else {
                 linesTableInst.showError( r.data || 'Fout' );

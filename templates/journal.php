@@ -218,6 +218,12 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                     </span>
                 </div>
                 <div class="eme-acc-field">
+                    <label><?php esc_html_e( 'Naam tegenpartij', 'eme-accounting' ); ?></label>
+                    <input type="text" name="counterparty_name" maxlength="150"
+                           placeholder="<?php esc_attr_e( 'Naam van de tegenpartij', 'eme-accounting' ); ?>"
+                           value="<?= esc_attr( $edit_entry->counterparty_name ?? '' ) ?>">
+                </div>
+                <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Betaalmethode', 'eme-accounting' ); ?></label>
                     <select name="payment_method">
                         <option value=""><?php esc_html_e( '—', 'eme-accounting' ); ?></option>

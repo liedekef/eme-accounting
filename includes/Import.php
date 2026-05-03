@@ -27,6 +27,27 @@ class Import {
         add_action( 'wp_ajax_eme_accounting_delete_import_log',    [ __CLASS__, 'ajax_delete_log' ] );
         add_action( 'wp_ajax_eme_accounting_list_import_lines',    [ __CLASS__, 'ajax_list_lines' ] );
         add_action( 'wp_ajax_eme_accounting_list_import_logs',     [ __CLASS__, 'ajax_list_logs' ] );
+        add_action( 'wp_ajax_eme_accounting_get_logline_stats',    [ __CLASS__, 'ajax_get_logline_stats' ] );
+    }
+
+    /**
+     * Lightweight status counters for a single import log.
+     * Used by refreshLogCounters() in import.js after each reconciliation action.
+     */
+    public static function ajax_get_logline_stats(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'import' );
+        $log_id = (int) ( $_POST['import_log_id'] ?? 0 );
+        if ( ! $log_id ) {
+            wp_send_json_error( 'Missing import_log_id' );
+        }
+        $c = self::get_status_counters( $log_id );
+        wp_send_json_success( [
+            'matched' => (int) ( $c->matched ?? 0 ),
+            'manual'  => (int) ( $c->manual  ?? 0 ),
+            'pending' => (int) ( $c->pending  ?? 0 ),
+            'ignored' => (int) ( $c->ignored  ?? 0 ),
+        ] );
     }
 
     /**
