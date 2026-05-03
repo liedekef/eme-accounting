@@ -21,7 +21,7 @@ class Reports {
      *
      * @return array{fiscal_year: int, income: array, expenses: array, totals: array}
      */
-    public static function income_expenditure( int $year ): array {
+    public static function income_expenditure_report( int $year ): array {
         global $wpdb;
         $coa_table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
@@ -100,7 +100,7 @@ class Reports {
      *
      * @return array{date: string, assets: array, liabilities: array, equity: float}
      */
-    public static function patrimony( string $date = '' ): array {
+    public static function patrimony_report( string $date = '' ): array {
         global $wpdb;
         if ( ! $date ) $date = current_time( 'Y-m-d' );
 
@@ -162,10 +162,18 @@ class Reports {
      *
      * @return array<string, object[]>  date => entries
      */
-    public static function diary( array $args = [] ): array {
-        $entries = Journal::get_entries( array_merge( $args, [ 'limit' => 9999, 'orderby' => 'entry_date', 'order' => 'ASC' ] ) );
+    public static function diary_report( int $year ): array {
+        $entries = Journal::get_entries( [
+                'fiscal_year'  => $year,
+                'limit'       => 9999,
+                'orderby'     => 'entry_date',
+                'order'      => 'ASC',
+            ] );
         $grouped = [];
         foreach ( $entries as $entry ) {
+            $entry->amount = $entry->direction === 'out' && $entry->amount>0
+                ? -1 * (float) $entry->amount
+                : (float) $entry->amount;
             $grouped[ $entry->entry_date ][] = $entry;
         }
         return $grouped;
@@ -395,7 +403,7 @@ class Reports {
      *
      * @return array{fiscal_year: int, accounts: array, months: array, totals: array}
      */
-    public static function cashflow( int $year, bool $exclude_transfers = false ): array {
+    public static function cashflow_report( int $year, bool $exclude_transfers = false ): array {
         global $wpdb;
 
         $extra = $exclude_transfers ? 'AND j.transfer_id IS NULL' : '';
@@ -472,13 +480,13 @@ class Reports {
         $exclude_transfers = ! empty( $_GET['exclude_transfers'] ) && $_GET['exclude_transfers'] === '1';
 
         $data = match ( $type ) {
-            'income_expenditure' => self::income_expenditure( $year ),
-            'patrimony'          => self::patrimony( $_GET['date'] ?? '' ),
+            'income_expenditure' => self::income_expenditure_report( $year ),
+            'patrimony'          => self::patrimony_report( $_GET['date'] ?? '' ),
             'events'             => self::events_report( $year, $event_id ),
             'financial_year'     => self::financial_year_report( $year ),
             'vat_report'         => self::vat_report( $year ),
-            'cashflow'           => self::cashflow( $year, $exclude_transfers ),
-            default              => self::diary( [ 'fiscal_year' => $year ] ),
+            'cashflow'           => self::cashflow_report( $year, $exclude_transfers ),
+            default              => self::diary_report( $year ),
         };
 
         if ( $format === 'csv' ) {
@@ -489,6 +497,8 @@ class Reports {
             self::ajax_download_financial_year_pdf( $data, $year );
         } elseif ( $format === 'pdf' && $type === 'cashflow' ) {
             self::ajax_download_cashflow_pdf( $data, $year );
+        } elseif ( $format === 'pdf' && $type === 'diary' ) {
+            self::ajax_download_diary_pdf( $data, $year );
         } else {
             wp_send_json_success( $data );
         }

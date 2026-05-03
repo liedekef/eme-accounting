@@ -672,9 +672,9 @@ function initSnapSelectRemote(selector, options = {}) {
             html += `<tr>`;
             for (let m = 1; m <= 12; m++) {
                 accOut += months_[m].out;
-                html += `<td style="text-align:right;color:red">${months_[m].out > 0 ? '-' + fmt(months_[m].out) : ''}</td>`;
+                html += `<td style="text-align:right;color:red">${months_[m].out > 0 ? fmt(-1*months_[m].out) : ''}</td>`;
             }
-            html += `<td style="text-align:right;color:red">-${fmt(accOut)}</td></tr>`;
+            html += `<td style="text-align:right;color:red">${fmt(-1*accOut)}</td></tr>`;
 
             // Net-row
             html += `<tr style="border-bottom:2px solid #ccc">`;
