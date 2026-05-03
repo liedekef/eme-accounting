@@ -7,8 +7,8 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
 <fieldset>
 <h1><?php esc_html_e( 'Financiële Rapporten', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
-<div class="eme-acc-row" style="align-items:flex-end">
-    <div class="eme-acc-field">
+<div class="eme-acc-row" "align-items:flex-end">
+    <div>
         <label><?php esc_html_e( 'Rapporttype', 'eme-accounting' ); ?></label>
         <select id="report_type">
             <optgroup label="Extern">
@@ -26,7 +26,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
             </optgroup>
         </select>
     </div>
-    <div class="eme-acc-field" id="report_year_div">
+    <div id="report_year_div">
         <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
         <select id="report_year">
             <?php foreach ( $fiscal_years as $f ): ?>
@@ -38,9 +38,15 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="eme-acc-field" id="report-date-wrap" style="display:none">
+    <div id="report-date-wrap" style="display:none">
         <label><?php esc_html_e( 'Peildatum (Staat van Vermogen)', 'eme-accounting' ); ?></label>
         <input type="date" id="report_date" value="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>">
+    </div>
+    <div id="report-cashflow-options" style="display:none">
+        <label>
+            <input type="checkbox" id="cashflow_exclude_transfers" value="1">
+            <?php esc_html_e( 'Transfers uitsluiten', 'eme-accounting' ); ?>
+        </label>
     </div>
     <div>
         <button id="btn-load-report" class="button button-primary"><?php esc_html_e( 'Rapport laden', 'eme-accounting' ); ?></button>

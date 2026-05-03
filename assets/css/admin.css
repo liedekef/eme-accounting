@@ -108,26 +108,27 @@
     font-size: 15px;
 }
 .eme-acc-row {
-  display: grid;
-  grid-template-columns: auto auto auto;
-  grid-gap: 16px;
-  margin-bottom: 12px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
 }
 .eme-acc-row-3{
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-gap: 16px;
-  margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-gap: 16px;
+    margin-bottom: 12px;
 }
 .eme-acc-row-4{
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  grid-gap: 16px;
-  margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-gap: 16px;
+    margin-bottom: 12px;
 }
 .eme-acc-field {
     display: flex;
     flex-direction: column;
+    flex: 1;
     gap: 4px;
 }
 .eme-acc-field label {

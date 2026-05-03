@@ -395,23 +395,27 @@ class Reports {
      *
      * @return array{fiscal_year: int, accounts: array, months: array, totals: array}
      */
-    public static function cashflow( int $year ): array {
+    public static function cashflow( int $year, bool $exclude_transfers = false ): array {
         global $wpdb;
+
+        $extra = $exclude_transfers ? 'AND j.transfer_id IS NULL' : '';
 
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT j.account_id,
-                        a.name                              AS account_name,
+                "SELECT a.id        AS account_id,
+                        a.name      AS account_name,
                         MONTH(j.entry_date)                 AS month,
                         SUM(CASE WHEN j.direction = 'in'  THEN j.amount ELSE 0 END) AS total_in,
                         SUM(CASE WHEN j.direction = 'out' THEN j.amount ELSE 0 END) AS total_out
-                 FROM `{$wpdb->prefix}emeacc_journal` j
-                 LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = j.account_id
-                 WHERE j.fiscal_year = %d
-                   AND j.transfer_id IS NULL
-                   AND j.is_closing_entry = 0
-                 GROUP BY j.account_id, MONTH(j.entry_date)
-                 ORDER BY j.account_id, month",
+                 FROM `{$wpdb->prefix}emeacc_accounts` a
+                 LEFT JOIN `{$wpdb->prefix}emeacc_journal` j
+                        ON j.account_id = a.id
+                       AND j.fiscal_year = %d
+                       AND j.is_closing_entry = 0
+                       {$extra}
+                 WHERE a.is_active = 1
+                 GROUP BY a.id, MONTH(j.entry_date)
+                 ORDER BY a.id, month",
                 $year
             )
         );
@@ -461,10 +465,11 @@ class Reports {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
 
-        $type   = eme_sanitize_request( $_GET['type'] ?? 'diary' );
-        $year   = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
-        $event_id = (!empty($_GET['event_id'])) ? (int) ($_GET['event_id']) : null;
-        $format = eme_sanitize_request( $_GET['format'] ?? 'csv' );
+        $type              = eme_sanitize_request( $_GET['type'] ?? 'diary' );
+        $year              = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
+        $event_id          = ( ! empty( $_GET['event_id'] ) ) ? (int) $_GET['event_id'] : null;
+        $format            = eme_sanitize_request( $_GET['format'] ?? 'csv' );
+        $exclude_transfers = ! empty( $_GET['exclude_transfers'] ) && $_GET['exclude_transfers'] === '1';
 
         $data = match ( $type ) {
             'income_expenditure' => self::income_expenditure( $year ),
@@ -472,7 +477,7 @@ class Reports {
             'events'             => self::events_report( $year, $event_id ),
             'financial_year'     => self::financial_year_report( $year ),
             'vat_report'         => self::vat_report( $year ),
-            'cashflow'           => self::cashflow( $year ),
+            'cashflow'           => self::cashflow( $year, $exclude_transfers ),
             default              => self::diary( [ 'fiscal_year' => $year ] ),
         };
 

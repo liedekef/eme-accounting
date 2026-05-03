@@ -553,9 +553,10 @@ function initSnapSelectRemote(selector, options = {}) {
      * ═══════════════════════════════════════════════════════════════════ */
     function getReportParams() {
         return {
-            type: document.querySelector('#report_type')?.value ?? '',
-            year: document.querySelector('#report_year')?.value ?? '',
-            date: document.querySelector('#report_date')?.value ?? ''
+            type:              document.querySelector('#report_type')?.value ?? '',
+            year:              document.querySelector('#report_year')?.value ?? '',
+            date:              document.querySelector('#report_date')?.value ?? '',
+            exclude_transfers: document.querySelector('#cashflow_exclude_transfers')?.checked ? '1' : '0',
         };
     }
 
@@ -563,8 +564,9 @@ function initSnapSelectRemote(selector, options = {}) {
         const t = this.value;
         document.getElementById('report-date-wrap').style.display = t === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
-        document.getElementById('btn-export-pdf').style.display   = ['income_expenditure', 'financial_year', 'cashflow'].includes(t) ? '' : 'none';
-        document.getElementById('btn-export-csv').style.display   = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
+        document.getElementById('btn-export-pdf').style.display        = ['income_expenditure', 'financial_year', 'cashflow'].includes(t) ? '' : 'none';
+        document.getElementById('btn-export-csv').style.display        = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
+        document.getElementById('report-cashflow-options').style.display = t === 'cashflow' ? '' : 'none';
         document.getElementById('btn-load-report').click();
     });
     // force initial click
@@ -574,7 +576,7 @@ function initSnapSelectRemote(selector, options = {}) {
         const params = getReportParams();
         const output = document.querySelector('#report-output');
         if (output) output.innerHTML = '<p>Laden…</p>';
-        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&format=json`;
+        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=json`;
         fetch(`${ajaxUrl}?${query}`)
             .then(r => r.json())
             .then(r => {
@@ -586,7 +588,7 @@ function initSnapSelectRemote(selector, options = {}) {
 
     function handleExportCsv() {
         const params = getReportParams();
-        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&format=csv`;
+        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=csv`;
         const url = `${ajaxUrl}?${query}`;
         fetch(url)
         .then(response => response.blob())
@@ -607,7 +609,7 @@ function initSnapSelectRemote(selector, options = {}) {
 
     function handleExportPDF() {
         const params = getReportParams();
-        const url = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&format=pdf`;
+        const url = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=pdf`;
         fetch(url)
         .then(response => response.blob())
         .then(blob => {
