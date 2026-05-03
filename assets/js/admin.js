@@ -565,7 +565,7 @@ function initSnapSelectRemote(selector, options = {}) {
         document.getElementById('report-date-wrap').style.display = t === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
         document.getElementById('btn-export-pdf').style.display        = ['income_expenditure', 'financial_year', 'cashflow', 'financial_diary'].includes(t) ? '' : 'none';
-        document.getElementById('btn-export-csv').style.display        = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
+        document.getElementById('btn-export-csv').style.display        = ['events', 'vat_report', 'cashflow', 'financial_diary'].includes(t) ? 'none' : '';
         document.getElementById('report-cashflow-options').style.display = t === 'cashflow' ? '' : 'none';
         document.getElementById('btn-load-report').click();
     });
