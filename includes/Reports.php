@@ -490,7 +490,7 @@ class Reports {
         };
 
         if ( $format === 'csv' ) {
-            self::output_csv( $data, $type . '_' . $year );
+            self::output_csv( $data, $type . '-' . $year );
         } elseif ( $format === 'pdf' && $type === 'income_expenditure' ) {
             self::ajax_download_income_expenditure_pdf( $data, $year );
         } elseif ( $format === 'pdf' && $type === 'financial_year' ) {
