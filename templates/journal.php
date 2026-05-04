@@ -303,7 +303,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <?php foreach ( $fiscal_years as $f ): ?>
                     <option value="<?= (int) $f->year ?>">
                             <?php echo (int) $f->year;
-                                  if ( $f->status === 'closed' ) esc_html_e( 'gesloten', 'eme-accounting' );
+                                  if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
                             ?>
                     </option>
                 <?php endforeach; ?>

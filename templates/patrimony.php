@@ -28,7 +28,7 @@ if (!$p->id)
         <?php foreach ( $fiscal_years as $f ): ?>
         <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
             <?php echo (int) $f->year;
-                  if ( $f->status === 'closed' ) esc_html_e( 'gesloten', 'eme-accounting' );
+                  if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
             ?>
         </option>
         <?php endforeach; ?>

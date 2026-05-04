@@ -36,7 +36,7 @@ foreach ( $fiscal_years as $f ) {
         <?php foreach ( $fiscal_years as $f ): ?>
         <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
             <?php echo (int) $f->year;
-                  if ( $f->status === 'closed' ) esc_html_e( 'gesloten', 'eme-accounting' );
+                  if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
             ?>
         </option>
         <?php endforeach; ?>
@@ -48,9 +48,9 @@ foreach ( $fiscal_years as $f ) {
         <option value="">— <?php esc_html_e( 'Kies jaar', 'eme-accounting' ); ?> —</option>
         <?php foreach ( $prev_years as $y ): ?>
         <option value="<?= $y->year ?>"><?= $y->year ?>
-            <?php if ( $y->status === 'closed' ): ?>
-                (<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)
-            <?php endif; ?>
+            <?php
+                if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
+            ?>
         </option>
         <?php endforeach; ?>
     </select>
