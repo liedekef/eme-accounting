@@ -57,10 +57,7 @@ foreach ( $fiscal_years as $f ) {
     <span id="copy-status" style="margin-left:8px;color:#646970"></span>
     </label>
 
-    <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_budget&year=' . $year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
-       class="button button-primary" target="_blank">
-        📄 <?php esc_html_e( 'Download PDF', 'eme-accounting' ); ?>
-    </a>
+    <button type="button" class="button button-primary btn-budget-export-pdf" data-year="<?= $year ?>"><?php esc_html_e( 'Download PDF', 'eme-accounting' ); ?></button>
 </div>
 
 <?php // Group by direction: IN first, then OUT ?>
@@ -173,8 +170,7 @@ if ( $all_budget_years ):
         <td>
             <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-budget&year=' . (int) $row->fiscal_year ) ) ?>"
                class="button button-small"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></a>
-            <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_budget&year=' . (int) $row->fiscal_year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
-               class="button button-small" target="_blank">PDF</a>
+            <button type="button" class="button button-small btn-budget-export-pdf" data-year="<?= (int) $row->fiscal_year ?>"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
             <button type="button" class="button button-small eme-acc-delete-budget" data-year="<?= (int) $row->fiscal_year ?>">✕</button>
         </td>
     </tr>

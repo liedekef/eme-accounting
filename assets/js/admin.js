@@ -195,18 +195,20 @@ function initSnapSelectRemote(selector, options = {}) {
         'eme-acc-delete-coa':     handleCoaDelete,
         'eme-acc-coa-cancel':     handleCoaCancel,
         'btn-load-report':        handleLoadReport,
-        'btn-export-csv':         handleExportCsv,
-        'btn-export-pdf':         handleExportPDF,
+        'btn-report-export-csv':  handleReportExportCSV,
+        'btn-report-export-pdf':  handleReportExportPDF,
         'eme-acc-edit-row':       handleToggleEditRow,
         // Stock
-        'eme-acc-edit-stock':    handleStockEdit,
-        'eme-acc-delete-stock': handleStockDelete,
+        'eme-acc-edit-stock':     handleStockEdit,
+        'eme-acc-delete-stock':   handleStockDelete,
         // Depreciation / Assets
-        'eme-acc-edit-asset':   handleAssetEdit,
-        'eme-acc-delete-asset': handleAssetDelete,
+        'eme-acc-edit-asset':     handleAssetEdit,
+        'eme-acc-delete-asset':   handleAssetDelete,
         // Patrimony
+        'btn-patrimony-export-pdf': handlePatrimonyExportPDF,
         'eme-acc-delete-patrimony': handleDeletePatrimony,
         // Budget
+        'btn-budget-export-pdf': handleBudgetExportPDF,
         'eme-acc-delete-budget': handleDeleteBudget,
     };
 
@@ -564,8 +566,8 @@ function initSnapSelectRemote(selector, options = {}) {
         const t = this.value;
         document.getElementById('report-date-wrap').style.display = t === 'patrimony' ? '' : 'none';
         document.getElementById('report_year_div').style.display  = t === 'patrimony' ? 'none' : '';
-        document.getElementById('btn-export-pdf').style.display        = ['income_expenditure', 'financial_year', 'cashflow', 'financial_diary'].includes(t) ? '' : 'none';
-        document.getElementById('btn-export-csv').style.display        = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
+        document.getElementById('btn-report-export-pdf').style.display   = ['income_expenditure', 'financial_year', 'cashflow', 'financial_diary'].includes(t) ? '' : 'none';
+        document.getElementById('btn-report-export-csv').style.display   = ['events', 'vat_report', 'cashflow'].includes(t) ? 'none' : '';
         document.getElementById('report-cashflow-options').style.display = t === 'cashflow' ? '' : 'none';
         document.getElementById('btn-load-report').click();
     });
@@ -586,37 +588,49 @@ function initSnapSelectRemote(selector, options = {}) {
             });
     }
 
-    function handleExportCsv() {
-        const params = getReportParams();
-        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=csv`;
-        const url = `${ajaxUrl}?${query}`;
-        fetch(url)
-        .then(response => response.blob())
-        .then(blob => {
-            const blobUrl = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = `Reports-${params.type}-${params.year}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(blobUrl);
-        })
-        .catch(error => {
-            console.error('Download failed:', error);
-        });
+    function handlePatrimonyExportPDF(btn, e) {
+        const year = btn.dataset.year;
+        const query = `action=eme_accounting_download_patrimony&nonce=${nonce}&year=${year}`;
+        window.location.href = `${ajaxUrl}?${query}`;
     }
 
-    function handleExportPDF() {
+    function handleBudgetExportPDF(btn, e) {
+        const year = btn.dataset.year;
+        const query = `action=eme_accounting_download_budget&nonce=${nonce}&year=${year}`;
+        window.location.href = `${ajaxUrl}?${query}`;
+    }
+
+    function handleReportExportCSV() {
         const params = getReportParams();
+        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=csv`;
+        window.location.href = `${ajaxUrl}?${query}`;
+    }
+
+    function handleReportExportPDF() {
+        const params = getReportParams();
+        // but: for window.location.href in dompdf attachment needs to be true, for blob it needs to be false
+        const query = `action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=pdf`;
+        window.location.href = `${ajaxUrl}?${query}`;
+        return;
+        //
+        // old code, kept just in case we ever need it
         const url = `${ajaxUrl}?action=eme_accounting_export_report&nonce=${nonce}&type=${params.type}&year=${params.year}&date=${params.date}&exclude_transfers=${params.exclude_transfers}&format=pdf`;
         fetch(url)
-        .then(response => response.blob())
-        .then(blob => {
+        .then(response => {
+            const contentDisposition = response.headers.get('Content-Disposition'); // Now response is defined
+            return response.blob().then(blob => ({ blob, contentDisposition }));
+        })
+        .then(({ blob, contentDisposition }) => {
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = `Reports-${params.type}-${params.year}.pdf`;
+            let filename = `report-${params.year}.pdf`;
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?(.+)"?/);
+                if (match) filename = match[1];
+            }
+
+            link.download = filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);

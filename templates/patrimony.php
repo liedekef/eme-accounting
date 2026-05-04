@@ -35,10 +35,7 @@ if (!$p->id)
     </select>
     </label>
     <?php if ( $p ): ?>
-    <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_patrimony&year=' . $year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
-       class="button button-primary" target="_blank">
-        📄 <?php esc_html_e( 'Download PDF', 'eme-accounting' ); ?>
-    </a>
+    <button type="button" class="button button-primary btn-patrimony-export-pdf" data-year="<?= $year ?>"><?php esc_html_e( 'Download PDF', 'eme-accounting' ); ?></button>
     <span class="status-badge status-<?= esc_attr( $p->status ?? 'draft' ) ?>">
         <?= $p->status === 'final' ? esc_html__( 'Definitief', 'eme-accounting' ) : esc_html__( 'Concept', 'eme-accounting' ) ?>
     </span>
@@ -307,8 +304,7 @@ if (!$p->id)
         <td>
             <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-patrimony&year=' . (int) $rec->fiscal_year ) ) ?>"
                class="button button-small"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></a>
-            <a href="<?= esc_url( admin_url( 'admin-ajax.php?action=eme_accounting_download_patrimony&year=' . (int) $rec->fiscal_year . '&nonce=' . wp_create_nonce( 'eme_accounting_nonce' ) ) ) ?>"
-               class="button button-small" target="_blank">PDF</a>
+            <button type="button" class="button button-small btn-patrimony-export-pdf" data-year="<?= (int) $rec->fiscal_year ?>"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
             <button type="button" class="button button-small eme-acc-delete-patrimony" data-id="<?= (int) $rec->id ?>">✕</button>
         </td>
     </tr>

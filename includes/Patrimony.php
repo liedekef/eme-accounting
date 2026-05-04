@@ -252,7 +252,7 @@ class Patrimony {
             . $html . '</body></html>' );
         $dompdf->setPaper( 'A4', 'landscape' );
         $dompdf->render();
-        $dompdf->stream( 'StaatVanHetVermogen_' . $year . '.pdf', [ 'Attachment' => false ] );
+        $dompdf->stream( 'StaatVanHetVermogen_' . $year . '.pdf', [ 'Attachment' => true ] );
         exit;
     }
 }

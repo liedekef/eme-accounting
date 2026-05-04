@@ -284,7 +284,7 @@ class Budget {
         $dompdf->load_html( $html );
         $dompdf->render();
 
-        $dompdf->stream( 'Begroting_' . $year . '.pdf', [ 'Attachment' => false ] );
+        $dompdf->stream( 'Begroting_' . $year . '.pdf', [ 'Attachment' => true ] );
         exit;
     }
 }

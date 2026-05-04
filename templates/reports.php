@@ -50,8 +50,8 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
     </div>
     <div>
         <button id="btn-load-report" class="button button-primary"><?php esc_html_e( 'Rapport laden', 'eme-accounting' ); ?></button>
-        <button id="btn-export-csv" class="button"><?php esc_html_e( 'Exporteren CSV', 'eme-accounting' ); ?></button>
-        <button id="btn-export-pdf" class="button"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
+        <button id="btn-report-export-csv" class="button"><?php esc_html_e( 'Exporteren CSV', 'eme-accounting' ); ?></button>
+        <button id="btn-report-export-pdf" class="button"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
     </div>
 </div>
 </div>
