@@ -162,25 +162,18 @@ class Reports {
      *
      * @return array<string, object[]>  date => entries
      */
-    public static function financial_diary_report( int $year, $format ): array {
+    public static function financial_diary_report( int $year ): array {
         $entries = Journal::get_entries( [
-                'fiscal_year'  => $year,
-                'limit'       => 9999,
-                'orderby'     => 'entry_date',
-                'order'      => 'ASC',
-            ] );
+            'fiscal_year' => $year,
+            'limit'       => 9999,
+            'orderby'     => 'entry_date',
+            'order'       => 'ASC',
+        ] );
         $grouped = [];
         foreach ( $entries as $entry ) {
-            $entry->amount = $entry->direction === 'out' && $entry->amount>0
+            $entry->amount = $entry->direction === 'out' && $entry->amount > 0
                 ? -1 * (float) $entry->amount
                 : (float) $entry->amount;
-            if ( $format === 'csv' ) {
-                foreach ( $entry as $key => $value ) {
-                    if ( substr($key, -3) === '_id' ) {
-                        unset($entry->$key);
-                    }
-                }
-            }
             $grouped[ $entry->entry_date ][] = $entry;
         }
         return $grouped;
@@ -493,7 +486,7 @@ class Reports {
             'financial_year'     => self::financial_year_report( $year ),
             'vat_report'         => self::vat_report( $year ),
             'cashflow'           => self::cashflow_report( $year, $exclude_transfers ),
-            default              => self::financial_diary_report( $year, $format ),
+            default              => self::financial_diary_report( $year ),
         };
 
         if ( $format === 'csv' ) {
@@ -506,31 +499,46 @@ class Reports {
     }
 
     private static function output_csv( string $type, array $data, int $year ): void {
-        $name        = "report";
-        switch ( $type ) {
-            case 'income_expenditure':
-                $name = 'StaatVanOntvangstenUitgaven';
-                break;
-            case 'financial_diary':
-                $name = 'FinancieelDagboek';
-                break;
-            case 'financial_year':
-                $name = 'FinancieelJaarverslag';
-                break;
-            case 'cashflow':
-                $name = 'Cashflow';
-                break;
-            default:
-                $name = ucfirst($type);
-        }
+        $name = match ( $type ) {
+            'income_expenditure' => 'StaatVanOntvangstenUitgaven',
+            'financial_diary'    => 'FinancieelDagboek',
+            'financial_year'     => 'FinancieelJaarverslag',
+            'cashflow'           => 'Cashflow',
+            default              => ucfirst( $type ),
+        };
         header( 'Content-Type: text/csv; charset=UTF-8' );
         header( 'Content-Disposition: attachment; filename="' . $name . '-' . $year . '.csv"' );
         echo "\xEF\xBB\xBF"; // BOM for Excel
         $out = fopen( 'php://output', 'w' );
-        // Flatten nested data
-        self::array_to_csv( $out, $data );
+        if ( $type === 'financial_diary' ) {
+            self::array_to_csv_diary( $out, $data );
+        } else {
+            self::array_to_csv( $out, $data );
+        }
         fclose( $out );
         exit;
+    }
+
+    /**
+     * Dedicated CSV export for the financial diary:
+     * one row per entry with explicit column headers, no _id fields.
+     */
+    private static function array_to_csv_diary( $handle, array $data ): void {
+        fputcsv( $handle, [ 'datum', 'omschrijving', 'rekening', 'bankref', 'tegenpartij', 'categorie', 'richting', 'bedrag' ], ';' );
+        foreach ( $data as $date => $entries ) {
+            foreach ( $entries as $entry ) {
+                fputcsv( $handle, [
+                    $date,
+                    $entry->description       ?? '',
+                    $entry->account_name      ?? '',
+                    $entry->bank_statement_ref ?? '',
+                    $entry->counterparty_name  ?? '',
+                    $entry->coa_name           ?? '',
+                    $entry->direction          ?? '',
+                    number_format( (float) $entry->amount, 2, ',', '' ),
+                ], ';' );
+            }
+        }
     }
 
     private static function array_to_csv( $handle, array $data, int $depth = 0 ): void {

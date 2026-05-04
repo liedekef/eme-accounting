@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '18';
+    const DB_VERSION        = '19';
 
     public static function activate(): void {
         self::create_tables();
@@ -61,6 +61,12 @@ class Installer {
         }
         if ( (int) $current_version < 18 ) {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS counterparty_name VARCHAR(150) NOT NULL DEFAULT '' AFTER counterparty_vat_number" );
+        }
+        if ( (int) $current_version < 19 ) {
+            // Composite index for reconciliation status queries on import lines
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_import_lines ADD INDEX IF NOT EXISTS idx_status_log (status, import_log_id)" );
+            // Composite index for cashflow and totals queries on journal
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_account (fiscal_year, account_id)" );
         }
     }
 
@@ -191,7 +197,8 @@ class Installer {
             KEY idx_reconciled (is_reconciled),
             KEY idx_eme_payment (eme_payment_id),
             KEY idx_bank_ref (bank_statement_ref),
-            KEY idx_transfer (transfer_id)
+            KEY idx_transfer (transfer_id),
+            KEY idx_fiscal_account (fiscal_year, account_id)
         ) $charset;" );
 
         // ── Stock items ─────────────────────────────────────────────────
@@ -362,7 +369,8 @@ class Installer {
             KEY idx_import (import_log_id),
             KEY idx_account (account_id),
             KEY idx_status (status),
-            KEY idx_date (transaction_date)
+            KEY idx_date (transaction_date),
+            KEY idx_status_log (status, import_log_id)
         ) $charset;" );
     }
 

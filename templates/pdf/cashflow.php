@@ -14,9 +14,7 @@ $vzw_form   = esc_html( $config->vzw_legal_form ?? 'VZW' );
 $month_names = [ '', 'Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec' ];
 
-function cf_fmt( $formatter, float $n, string $currency ): string {
-    return $formatter->formatCurrency( abs( $n ), $currency );
-}
+$cf_fmt = fn( float $n ) => $formatter->formatCurrency( abs( $n ), $currency );
 ?>
 <style>
   * { box-sizing: border-box; }
@@ -82,17 +80,17 @@ function cf_fmt( $formatter, float $n, string $currency ): string {
         <td class="account-name" rowspan="3"><?= esc_html( $account_name ) ?></td>
         <td class="label">Ontvangsten</td>
         <?php for ( $m = 1; $m <= 12; $m++ ): ?>
-        <td class="amount"><?= $months[$m]['in'] > 0 ? cf_fmt( $formatter, $months[$m]['in'], $currency ) : '' ?></td>
+        <td class="amount"><?= $months[$m]['in'] > 0 ? $cf_fmt( $months[$m]['in'] ) : '' ?></td>
         <?php endfor; ?>
-        <td class="amount"><?= $acc_in > 0 ? cf_fmt( $formatter, $acc_in, $currency ) : '' ?></td>
+        <td class="amount"><?= $acc_in > 0 ? $cf_fmt( $acc_in ) : '' ?></td>
       </tr>
       <!-- Out row -->
       <tr class="row-out">
         <td class="label">Uitgaven</td>
         <?php for ( $m = 1; $m <= 12; $m++ ): ?>
-        <td class="amount"><?= $months[$m]['out'] > 0 ? cf_fmt( $formatter, $months[$m]['out'], $currency ) : '' ?></td>
+        <td class="amount"><?= $months[$m]['out'] > 0 ? $cf_fmt( $months[$m]['out'] ) : '' ?></td>
         <?php endfor; ?>
-        <td class="amount"><?= $acc_out > 0 ? cf_fmt( $formatter, $acc_out, $currency ) : '' ?></td>
+        <td class="amount"><?= $acc_out > 0 ? $cf_fmt( $acc_out ) : '' ?></td>
       </tr>
       <!-- Net row -->
       <tr class="row-net">
@@ -101,9 +99,9 @@ function cf_fmt( $formatter, float $n, string $currency ): string {
             $net = $months[$m]['net'];
             $cls = $net >= 0 ? 'positive' : 'negative';
         ?>
-        <td class="amount <?= $cls ?>"><?= $net != 0 ? cf_fmt( $formatter, $net, $currency ) : '' ?></td>
+        <td class="amount <?= $cls ?>"><?= $net != 0 ? $cf_fmt( $net ) : '' ?></td>
         <?php endfor; ?>
-        <td class="amount <?= $acc_net >= 0 ? 'positive' : 'negative' ?>"><?= cf_fmt( $formatter, $acc_net, $currency ) ?></td>
+        <td class="amount <?= $acc_net >= 0 ? 'positive' : 'negative' ?>"><?= $cf_fmt( $acc_net ) ?></td>
       </tr>
     <?php endforeach; ?>
 
@@ -118,9 +116,9 @@ function cf_fmt( $formatter, float $n, string $currency ): string {
           $net = $t[$m]['net'];
           $cls = $net >= 0 ? 'positive' : 'negative';
       ?>
-      <td class="amount <?= $cls ?>"><?= $net != 0 ? cf_fmt( $formatter, $net, $currency ) : '' ?></td>
+      <td class="amount <?= $cls ?>"><?= $net != 0 ? $cf_fmt( $net ) : '' ?></td>
       <?php endfor; ?>
-      <td class="amount <?= $grand['net'] >= 0 ? 'positive' : 'negative' ?>"><?= cf_fmt( $formatter, $grand['net'], $currency ) ?></td>
+      <td class="amount <?= $grand['net'] >= 0 ? 'positive' : 'negative' ?>"><?= $cf_fmt( $grand['net'] ) ?></td>
     </tr>
     </tbody>
   </table>
