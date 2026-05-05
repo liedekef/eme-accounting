@@ -18,6 +18,10 @@ foreach ( $fiscal_years as $f ) {
         $prev_years[] = $f;
     }
 }
+$total_budget_in = 0;
+$total_actual_in = 0;
+$total_budget_out = 0;
+$total_actual_out = 0;
 ?>
 <div class="wrap eme-acc-wrap">
 <fieldset <?= $form_disabled ?>>
@@ -126,6 +130,26 @@ foreach ( $fiscal_years as $f ) {
     </td>
 </tr>
 <?php endforeach; ?>
+
+<?php if ($dir === 'in') : ?>
+<tr class="total-row">
+    <td>Totaal Ontvangsten</td>
+    <td class="amount"><?= $formatter->formatCurrency( $total_budget_in, $currency ) ?></td>
+    <td class="amount"><?= $formatter->formatCurrency( $total_actual_in, $currency ) ?></td>
+    <td class="amount <?= ( $total_actual_in - $total_budget_in ) >= 0 ? 'balance-positive' : 'balance-negative' ?>">
+    <?= $formatter->formatCurrency( $total_actual_in - $total_budget_in, $currency ) ?>
+    </td>
+</tr>
+<?php else: ?>
+<tr class="total-row">
+    <td>Totaal Uitgaven</td>
+    <td class="amount"><?= $formatter->formatCurrency( $total_budget_out, $currency ) ?></td>
+    <td class="amount"><?= $formatter->formatCurrency( $total_actual_out, $currency ) ?></td>
+    <td class="amount <?= ( $total_budget_out - $total_actual_out ) >= 0 ? 'balance-positive' : 'balance-negative' ?>">
+    <?= $fmt->formatCurrency( $total_budget_out - $total_actual_out, $currency ) ?>
+    </td>
+</tr>
+<?php endif; ?>
 </tbody>
 </table>
 </div>

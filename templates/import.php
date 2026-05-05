@@ -61,7 +61,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
         </select>
         <span id="eme-bulk-coa-wrap" style="display:none;gap:4px;align-items:center">
             <select id="eme-bulk-coa-select" style="min-width:200px" class="eme_snapselect" data-live-search="true">
-                <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                <option value=""><?php esc_html_e( '— Kies categorie —', 'eme-accounting' ); ?></option>
                 <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                 <?php foreach ( $coa_accounts as $id => $acc ):
                       if ( $acc && $acc->direction === 'in' ):

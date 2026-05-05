@@ -92,7 +92,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></label>
                     <select name="coa_id" id="category_coa_id" required class="eme_snapselect" data-live-search="true" data-open-on-focus-if-empty="true">
-                        <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                        <option value=""><?php esc_html_e( '— Kies rcategorie —', 'eme-accounting' ); ?></option>
                         <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                         <?php foreach ( $coa_accounts as $id => $acc ): 
                             if ( $acc && $acc->direction === 'in' ):
@@ -325,7 +325,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <option value="transfer" <?= selected( 'transfer', $direction, false ) ?>><?php esc_html_e( 'Transfers', 'eme-accounting' ); ?></option>
             </select>
             <select name="coa_id" id="eme-acc-coa-filter" class="eme_snapselect" data-live-search="true">
-                <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                <option value=""><?php esc_html_e( '— Kies categorie —', 'eme-accounting' ); ?></option>
                 <optgroup label="<?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                 <?php foreach ( $coa_accounts as $id => $acc ): 
                     if ( $acc && $acc->direction === 'in' ):

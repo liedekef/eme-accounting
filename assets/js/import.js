@@ -148,7 +148,7 @@
   </div>
   <div style="display:flex;gap:4px;flex-wrap:wrap">
     <select class="coa-select eme_snapselect" style="min-width:180px" data-live-search="true">
-      <option value="">\u2014 Kies rekening \u2014</option>
+      <option value="">\u2014 Kies categorie \u2014</option>
       ${opts}
     </select>
     <select name="eme_event_id" class="eme_snapselect_events_class"></select>

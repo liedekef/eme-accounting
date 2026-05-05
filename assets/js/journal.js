@@ -347,7 +347,7 @@
             // Add empty option at the beginning
             const emptyOption = document.createElement('option');
             emptyOption.value = '';
-            emptyOption.textContent = '— Kies rekening —';
+            emptyOption.textContent = '— Kies categorie —';
             coaSelect.insertBefore(emptyOption, coaSelect.firstChild);
 
             // Reset selected value
