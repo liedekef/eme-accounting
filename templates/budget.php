@@ -141,7 +141,6 @@ $saldo_diff = $totals['net_actual'] - $totals['net_budget'];
     <td class="amount <?= $totals['net_budget'] >= 0 ? 'green' : 'red' ?>"><?= $fmt( $totals['net_budget'] ) ?></td>
     <td class="amount <?= $totals['net_actual'] >= 0 ? 'green' : 'red' ?>"><?= $fmt( $totals['net_actual'] ) ?></td>
     <td class="amount <?= $saldo_diff >= 0 ? 'green' : 'red' ?>"><?= $fmt( $saldo_diff ) ?></td>
-    <td></td>
 </tr>
 </tbody>
 </table>
