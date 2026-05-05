@@ -125,19 +125,22 @@ $total_var    = $dir === 'in' ? $total_actual - $total_budget : $total_budget - 
 
 <!-- Netto saldo -->
 <?php
-$net_cls = $totals['net_actual'] >= 0 ? 'green' : 'red';
+$saldo_diff = $totals['net_actual'] - $totals['net_budget'];
 ?>
 <div class="eme-acc-form-box" style="padding:12px 16px">
 <table class="eme-acc-table" style="margin:0">
+<thead><tr>
+    <th></th>
+    <th class="amount"><?php esc_html_e( 'Begroot saldo', 'eme-accounting' ); ?></th>
+    <th class="amount"><?php esc_html_e( 'Werkelijk saldo', 'eme-accounting' ); ?></th>
+    <th class="amount"><?php esc_html_e( 'Verschil', 'eme-accounting' ); ?></th>
+</tr></thead>
 <tbody>
 <tr style="font-weight:bold">
-    <td><?php esc_html_e( 'Begroot saldo', 'eme-accounting' ); ?></td>
+    <td><?php esc_html_e( 'Totalen', 'eme-accounting' ); ?></td>
     <td class="amount <?= $totals['net_budget'] >= 0 ? 'green' : 'red' ?>"><?= $fmt( $totals['net_budget'] ) ?></td>
-    <td style="width:40%"></td>
-</tr>
-<tr style="font-weight:bold">
-    <td><?php esc_html_e( 'Werkelijk saldo', 'eme-accounting' ); ?></td>
-    <td class="amount <?= $net_cls ?>"><?= $fmt( $totals['net_actual'] ) ?></td>
+    <td class="amount <?= $totals['net_actual'] >= 0 ? 'green' : 'red' ?>"><?= $fmt( $totals['net_actual'] ) ?></td>
+    <td class="amount <?= $saldo_diff >= 0 ? 'green' : 'red' ?>"><?= $fmt( $saldo_diff ) ?></td>
     <td></td>
 </tr>
 </tbody>

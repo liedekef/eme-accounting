@@ -164,20 +164,28 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
     </table>
     </div>
 
-    <table class="schema-table" style="margin-top:8pt;">
-        <tbody>
-            <?php
-            <tr style="font-weight:bold; background:<?= $net_actual >= 0 ? '#eef3ff' : '#fff0f0' ?>;">
-                <td style="width:50%; border:1.5px solid <?= $net_actual >= 0 ? '#3a5fc8' : '#d63638' ?>;">
-                    <?= $net_actual >= 0 ? 'Saldo (positief)' : 'Saldo (negatief)' ?>
-                </td>
-                <td style="width:25%; text-align:right; border:1.5px solid <?= $net_actual >= 0 ? '#3a5fc8' : '#d63638' ?>; border-left:none;">
-                    <?= $fmt->formatCurrency( $net_actual, $currency ) ?>
-                </td>
-                <td style="width:25%; border:none;"></td>
-            </tr>
-        </tbody>
-    </table>
+<table class="schema-table" style="margin-top:8pt;">
+<thead><tr>
+    <th style="width:50%;text-align:right;"></th>
+    <th style="width:15%;text-align:right;"><?php esc_html_e( 'Begroot saldo', 'eme-accounting' ); ?></th>
+    <th style="width:15%;text-align:right;"><?php esc_html_e( 'Werkelijk saldo', 'eme-accounting' ); ?></th>
+    <th style="width:20%;text-align:right;"><?php esc_html_e( 'Verschil', 'eme-accounting' ); ?></th>
+</tr></thead>
+<tbody>
+<tr class="total-row">
+    <td><?php esc_html_e( 'Totalen', 'eme-accounting' ); ?></td>
+    <td class="amount <?= $net_budget >= 0 ? 'balance-positive' : 'balance-negative' ?>">
+          <?= $fmt->formatCurrency( $net_budget, $currency ) ?>
+    </td>
+    <td class="amount <?= $net_actual >= 0 ? 'balance-positive' : 'balance-negative' ?>">
+          <?= $fmt->formatCurrency( $net_actual, $currency ) ?>
+    </td>
+    <td class="amount <?= $net_actual-$net_budget >= 0 ? 'balance-positive' : 'balance-negative' ?>">
+          <?= $fmt->formatCurrency( $net_actual-$net_budget, $currency ) ?>
+    </td>
+</tr>
+</tbody>
+</table>
 
     <!-- HANDTEKENINGEN -->
     <div class="signature-block">
