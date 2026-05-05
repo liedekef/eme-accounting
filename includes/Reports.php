@@ -524,7 +524,7 @@ class Reports {
      * one row per entry with explicit column headers, no _id fields.
      */
     private static function array_to_csv_diary( $handle, array $data ): void {
-        fputcsv( $handle, [ 'datum', 'omschrijving', 'rekening', 'bankref', 'tegenpartij', 'categorie', 'richting', 'bedrag' ], ';' );
+        fputcsv( $handle, [ 'datum', 'omschrijving', 'rekening', 'bankref', 'tegenpartij', 'categorie', 'richting', 'bedrag' ], ';', escape: "" );
         foreach ( $data as $date => $entries ) {
             foreach ( $entries as $entry ) {
                 fputcsv( $handle, [
@@ -536,7 +536,7 @@ class Reports {
                     $entry->coa_name           ?? '',
                     $entry->direction          ?? '',
                     number_format( (float) $entry->amount, 2, ',', '' ),
-                ], ';' );
+                ], ';', escape: "" );
             }
         }
     }
@@ -544,12 +544,12 @@ class Reports {
     private static function array_to_csv( $handle, array $data, int $depth = 0 ): void {
         foreach ( $data as $key => $value ) {
             if ( is_array( $value ) ) {
-                fputcsv( $handle, [ $key ], ';' );
+                fputcsv( $handle, [ $key ], ';', escape: "" );
                 self::array_to_csv( $handle, $value, $depth + 1 );
             } elseif ( is_object( $value ) ) {
-                fputcsv( $handle, (array) $value, ';' );
+                fputcsv( $handle, (array) $value, ';', escape: "" );
             } else {
-                fputcsv( $handle, [ $key, $value ], ';' );
+                fputcsv( $handle, [ $key, $value ], ';', escape: "" );
             }
         }
     }

@@ -767,8 +767,7 @@ class Journal {
         }
         if ( ! empty( $args['search'] ) ) {
             $like      = '%' . $wpdb->esc_like( $args['search'] ) . '%';
-            $where[]   = "({$p}description LIKE %s OR {$p}bank_statement_ref LIKE %s OR {$p}counterparty_name LIKE %s)";
-            $prepare[] = $like;
+            $where[]   = "({$p}description LIKE %s OR {$p}bank_statement_ref LIKE %s)";
             $prepare[] = $like;
             $prepare[] = $like;
         }
