@@ -85,13 +85,15 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
     </div>
 
     <?php
-    $total_budget_in = 0;
-    $total_actual_in = 0;
-    $total_budget_out = 0;
-    $total_actual_out = 0;
-
-    $income_rows = $data['income'] ?? [];
-    $expense_rows = $data['expenses'] ?? [];
+    $income_rows  = $data['income']    ?? [];
+    $expense_rows = $data['expenses']  ?? [];
+    $totals       = $data['totals']    ?? [];
+    $total_budget_in  = $totals['budget_in']  ?? 0;
+    $total_actual_in  = $totals['actual_in']  ?? 0;
+    $total_budget_out = $totals['budget_out'] ?? 0;
+    $total_actual_out = $totals['actual_out'] ?? 0;
+    $net_budget = $totals['net_budget'] ?? 0;
+    $net_actual = $totals['net_actual'] ?? 0;
     ?>
 
     <div class="doc-section">
@@ -106,10 +108,7 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
             </tr>
         </thead>
         <tbody>
-        <?php foreach ( $income_rows as $row ):
-            $total_budget_in += $row['budget'];
-            $total_actual_in += $row['actual'];
-        ?>
+        <?php foreach ( $income_rows as $row ): ?>
             <tr>
                 <td><?= esc_html( $row['code'] . ' - ' . $row['name'] ) ?></td>
                 <td class="amount"><?= $row['budget'] > 0 ? $fmt->formatCurrency( $row['budget'], $currency ) : '' ?></td>
@@ -143,10 +142,7 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
             </tr>
         </thead>
         <tbody>
-        <?php foreach ( $expense_rows as $row ):
-            $total_budget_out += $row['budget'];
-            $total_actual_out += $row['actual'];
-        ?>
+        <?php foreach ( $expense_rows as $row ): ?>
             <tr>
                 <td><?= esc_html( $row['code'] . ' - ' . $row['name'] ) ?></td>
                 <td class="amount"><?= $row['budget'] > 0 ? $fmt->formatCurrency( $row['budget'], $currency ) : '' ?></td>
@@ -171,9 +167,6 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
     <table class="schema-table" style="margin-top:8pt;">
         <tbody>
             <?php
-            $net_budget = $total_budget_in - $total_budget_out;
-            $net_actual = $total_actual_in - $total_actual_out;
-            ?>
             <tr style="font-weight:bold; background:<?= $net_actual >= 0 ? '#eef3ff' : '#fff0f0' ?>;">
                 <td style="width:50%; border:1.5px solid <?= $net_actual >= 0 ? '#3a5fc8' : '#d63638' ?>;">
                     <?= $net_actual >= 0 ? 'Saldo (positief)' : 'Saldo (negatief)' ?>

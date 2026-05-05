@@ -215,13 +215,17 @@ class Budget {
      * PDF GENERATIE
      * ------------------------------------------------------------------ */
 
-    public static function generate_pdf_html( int $year ): string {
-        $coa = ChartOfAccounts::get_all();
+    /**
+     * Build structured budget data (income/expense rows + totals) for a given year.
+     * Used by both the HTML template and the PDF template.
+     *
+     * @return array{income: array, expenses: array, totals: array}
+     */
+    public static function get_budget_data( int $year ): array {
+        $coa        = ChartOfAccounts::get_all();
         $budget_map = self::get_year_map( $year );
-        $config = \EMEVzw\Config::get();
-        $currency = $config->currency;
 
-        $income_rows = [];
+        $income_rows  = [];
         $expense_rows = [];
 
         foreach ( $coa as $c ) {
@@ -229,15 +233,16 @@ class Budget {
             if ( empty( $c->is_active ) ) continue;
             if ( ! $c->parent_id ) continue;
 
-            $budget = $budget_map[ $c->id ] ?? 0;
-            $actual = self::get_actual_for_coa( $year, $c->id );
+            $budget   = (float) ( $budget_map[ $c->id ] ?? 0 );
+            $actual   = self::get_actual_for_coa( $year, $c->id );
             $variance = $c->direction === 'out' ? $budget - $actual : $actual - $budget;
 
             $row = [
-                'code'    => $c->code,
-                'name'   => $c->name,
-                'budget' => $budget,
-                'actual' => $actual,
+                'coa_id'   => (int) $c->id,
+                'code'     => $c->code,
+                'name'     => $c->name,
+                'budget'   => $budget,
+                'actual'   => $actual,
                 'variance' => $variance,
             ];
 
@@ -248,10 +253,28 @@ class Budget {
             }
         }
 
-        $data = [
+        $total_budget_in  = array_sum( array_column( $income_rows,  'budget' ) );
+        $total_actual_in  = array_sum( array_column( $income_rows,  'actual' ) );
+        $total_budget_out = array_sum( array_column( $expense_rows, 'budget' ) );
+        $total_actual_out = array_sum( array_column( $expense_rows, 'actual' ) );
+
+        return [
             'income'   => $income_rows,
             'expenses' => $expense_rows,
+            'totals'   => [
+                'budget_in'  => $total_budget_in,
+                'actual_in'  => $total_actual_in,
+                'budget_out' => $total_budget_out,
+                'actual_out' => $total_actual_out,
+                'net_budget' => $total_budget_in  - $total_budget_out,
+                'net_actual' => $total_actual_in  - $total_actual_out,
+            ],
         ];
+    }
+
+    public static function generate_pdf_html( int $year ): string {
+        $data   = self::get_budget_data( $year );
+        $config = \EMEVzw\Config::get();
 
         ob_start();
         include EME_ACCOUNTING_DIR . 'templates/pdf/budget.php';
