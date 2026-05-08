@@ -361,8 +361,12 @@
             },
             filename: {
                 title: 'Bestand', list: true, create: false, edit: false,
-                display: ( { record } ) =>
-                    `${esc(record.filename)} <span class="eme-acc-tag">${esc(record.format)}</span>`,
+                display: ( { record } ) => {
+                    const completeBadge = record.is_complete
+                        ? ' <span class="eme-acc-tag eme-acc-reconciled" title="Alle regels verwerkt">✓ Afgerond</span>'
+                        : ' <span class="eme-acc-tag eme-acc-pending" title="Nog openstaande regels">Open</span>';
+                    return `${esc(record.filename)} <span class="eme-acc-tag">${esc(record.format)}</span>${completeBadge}`;
+                },
             },
             total_lines: {
                 title: 'Totaal', list: true, create: false, edit: false,
@@ -517,6 +521,37 @@
     /* ================================================================
      * UPLOAD FORM – reload ftable after upload, no page reload
      * ================================================================ */
+    /* ================================================================
+     * FORMAT SELECTOR – show expected columns hint
+     * ================================================================ */
+    const formatSelect   = document.querySelector( '#eme-acc-import-form select[name="format"]' );
+    const colHintEl      = document.getElementById( 'eme-acc-col-hint' );
+    const schema         = emeAccountingImport.columnSchema || {};
+
+    function renderColHint( format ) {
+        if ( ! colHintEl ) return;
+        const s = schema[ format ];
+        if ( ! s ) { colHintEl.innerHTML = ''; return; }
+        const req = s.required ? Object.values( s.required ) : [];
+        const opt = s.optional ? Object.values( s.optional ) : [];
+        if ( ! req.length && ! opt.length ) { colHintEl.innerHTML = ''; return; }
+        let html = '';
+        if ( req.length ) {
+            html += `<span class="eme-col-required">${i18n.col_required || 'Vereist'}: <strong>${esc( req.join( ', ' ) )}</strong></span>`;
+        }
+        if ( opt.length ) {
+            if ( html ) html += ' &nbsp;|&nbsp; ';
+            html += `<span class="eme-col-optional">${i18n.col_optional || 'Optioneel'}: ${esc( opt.join( ', ' ) )}</span>`;
+        }
+        colHintEl.innerHTML = html;
+    }
+
+    formatSelect?.addEventListener( 'change', function () {
+        renderColHint( this.value );
+    } );
+    // Render on page load for the default selected value
+    if ( formatSelect ) renderColHint( formatSelect.value );
+
     document.getElementById( 'eme-acc-import-form' )?.addEventListener( 'submit', function ( e ) {
         e.preventDefault();
         doUpload( this, false );

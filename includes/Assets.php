@@ -82,6 +82,8 @@ class Assets {
                 'vat_code'                     => __( 'BTW-code', 'eme-accounting' ),
                 'vat_amount'                   => __( 'BTW-bedrag', 'eme-accounting' ),
             ],
+                    'col_required'     => __( 'Vereist', 'eme-accounting' ),
+            'col_optional'     => __( 'Optioneel', 'eme-accounting' ),
         ] );
         if ( $plugin_page === 'emeaccounting-journal' ) {
             wp_enqueue_script( 'emeaccounting-journal', EME_ACCOUNTING_URL . 'assets/js/journal.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
@@ -109,7 +111,8 @@ class Assets {
             wp_enqueue_script( 'emeaccounting-import', EME_ACCOUNTING_URL . 'assets/js/import.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
             wp_localize_script( 'emeaccounting-import', 'emeAccountingImport', [
                 'coaSelectIn'  => $coa_in_select,
-                'coaSelectOut' => $coa_out_select
+                'coaSelectOut' => $coa_out_select,
+                'columnSchema' => \EMEAccounting\Import::get_column_schema(),
             ] );
         }
 

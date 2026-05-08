@@ -33,6 +33,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
             <option value="coda">CODA v2</option>
             <option value="csv"><?php esc_html_e( 'Generiek CSV', 'eme-accounting' ); ?></option>
         </select>
+        <div id="eme-acc-col-hint" style="margin-top:4px;font-size:12px;color:#646970"></div>
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Bestand', 'eme-accounting' ); ?> *</label>

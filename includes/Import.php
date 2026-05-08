@@ -159,7 +159,6 @@ class Import {
         global $wpdb;
 
         $limit  = eme_get_datatables_limit() ?: 'LIMIT 50';
-
         $rows = $wpdb->get_results(
             "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
@@ -172,6 +171,8 @@ class Import {
             $row->cnt_manual   = (int) ( $c->manual   ?? 0 );
             $row->cnt_pending  = (int) ( $c->pending  ?? 0 );
             $row->cnt_ignored  = (int) ( $c->ignored  ?? 0 );
+            // Convenience flag: no pending lines left → fully processed.
+            $row->is_complete  = ( $row->cnt_pending === 0 ) ? 1 : 0;
         }
 
         wp_send_json( [ 'Result' => 'OK', 'Records' => $rows, 'TotalRecordCount' => count( $rows ) ] );
@@ -316,9 +317,11 @@ class Import {
             return $lines;
         }
 
+        // Sanitize filename once, reused for duplicate check and DB insert.
+        $filename = sanitize_file_name( $file['name'] );
+
         // Duplicate check (skipped when $force = true)
         if ( ! $force ) {
-            $filename = sanitize_file_name( $file['name'] );
             $warnings = self::check_duplicates( $account_id, $filename, $lines );
             if ( ! empty( $warnings ) ) {
                 return (object) [
@@ -330,7 +333,7 @@ class Import {
         // Create import log entry
         $wpdb->insert( $wpdb->prefix . 'emeacc_import_log', [
             'account_id'  => $account_id,
-            'filename'    => sanitize_file_name( $file['name'] ),
+            'filename'    => $filename,
             'format'      => $format,
             'total_lines' => count( $lines ),
             'imported_by' => get_current_user_id(),
@@ -384,15 +387,17 @@ class Import {
         foreach ( $lines as $line ) {
             $journal_id = self::find_match( $line, $account_id );
             if ( $journal_id ) {
-                $wpdb->update(
+                $res = $wpdb->update(
                     $wpdb->prefix . 'emeacc_import_lines',
                     [ 'status' => 'matched', 'journal_id' => $journal_id ],
-                    [ 'id' => $line->id ],
+                    [ 'id' => $line_id, 'status' => 'pending' ],
                     [ '%s', '%d' ],
                     [ '%d' ]
                 );
-                Journal::mark_reconciled( $journal_id );
-                $matched++;
+                if ($res {
+                    Journal::mark_reconciled( $journal_id );
+                    $matched++;
+                }
             }
         }
         return $matched;
@@ -467,49 +472,24 @@ class Import {
      * @return array<int,array>|\WP_Error
      */
     private static function parse_bnp_csv( string $content ): array|\WP_Error {
-        return self::parse_csv_generic( $content, ';', [
-            'date'             => 'Datum',
-            'amount'           => 'Bedrag',
-            'description'      => 'Naam van de rekening van de tegenpartij',
-            'counterparty_iban'=> 'Rekening van de tegenpartij',
-            'structured_ref'   => 'Gestructureerde mededeling',
-            'bank_ref'         => 'Referentie',
-        ] );
+        $s = self::get_column_schema()['bnp'];
+        return self::parse_csv_generic( $content, ';', $s['required'], $s['optional'] );
     }
 
     private static function parse_kbc_csv( string $content ): array|\WP_Error {
-        return self::parse_csv_generic( $content, ';', [
-            'date'             => 'Datum',
-            'amount'           => 'Bedrag',
-            'description'      => 'Omschrijving',
-            'counterparty_iban'=> 'Tegenrekening',
-            'counterparty_name'=> 'Naam tegenpartij',
-            'bank_ref'         => 'Referentie',
-        ] );
+        $s = self::get_column_schema()['kbc'];
+        return self::parse_csv_generic( $content, ';', $s['required'], $s['optional'] );
     }
 
     private static function parse_ing_csv( string $content ): array|\WP_Error {
-        return self::parse_csv_generic( $content, ';', [
-            'date'             => 'Boekingsdatum',
-            'value_date'       => 'Valutadatum',
-            'amount'           => 'Bedrag',
-            'description'      => 'Omschrijving',
-            'counterparty_iban'=> 'Tegenrekening',
-            'counterparty_name'=> 'Naam tegenpartij',
-        ] );
+        $s = self::get_column_schema()['ing'];
+        return self::parse_csv_generic( $content, ';', $s['required'], $s['optional'] );
     }
 
     private static function parse_belfius_csv( string $content ): array|\WP_Error {
         // belfius has the reference in the Transaction column
-        $rows = self::parse_csv_generic( $content, ';', [
-            'date'             => 'Boekingsdatum',
-            'value_date'       => 'Valutadatum',
-            'amount'           => 'Bedrag',
-            'description'      => 'Mededelingen',
-            'counterparty_name'=> 'Naam tegenpartij bevat',
-            'counterparty_iban'=> 'Rekening tegenpartij',
-            'transaction'      => 'Transactie',
-        ] );
+        $s    = self::get_column_schema()['belfius'];
+        $rows = self::parse_csv_generic( $content, ';', $s['required'], $s['optional'] );
 
         if ( is_wp_error( $rows ) ) {
             return $rows;
@@ -530,33 +510,118 @@ class Import {
         return $rows;
     }
 
+    /**
+     * Column schema per format.
+     *
+     * 'required' keys MUST be present in the CSV header for parsing to succeed.
+     * 'optional' keys are mapped when found but silently skipped when absent.
+     *
+     * Used by:
+     *  - parse_generic_csv()  — to build the col_map passed to parse_csv_generic()
+     *  - ajax_upload (JS)     — to show the user which columns are expected
+     *
+     * @return array<string, array{required: array<string,string>, optional: array<string,string>}>
+     */
+    public static function get_column_schema(): array {
+        return [
+            'csv' => [
+                'required' => [
+                    'date'   => 'Datum',
+                    'amount' => 'Bedrag',
+                ],
+                'optional' => [
+                    'description'       => 'Omschrijving',
+                    'counterparty_name' => 'Naam',
+                    'counterparty_iban' => 'Rekening',
+                    'value_date'        => 'Valutadatum',
+                    'structured_ref'    => 'Gestructureerde mededeling',
+                    'bank_ref'          => 'Referentie',
+                ],
+            ],
+            'bnp' => [
+                'required' => [
+                    'date'             => 'Datum',
+                    'amount'           => 'Bedrag',
+                    'description'      => 'Naam van de rekening van de tegenpartij',
+                    'counterparty_iban'=> 'Rekening van de tegenpartij',
+                ],
+                'optional' => [
+                    'structured_ref'   => 'Gestructureerde mededeling',
+                    'bank_ref'         => 'Referentie',
+                ],
+            ],
+            'kbc' => [
+                'required' => [
+                    'date'             => 'Datum',
+                    'amount'           => 'Bedrag',
+                    'description'      => 'Omschrijving',
+                ],
+                'optional' => [
+                    'counterparty_iban'=> 'Tegenrekening',
+                    'counterparty_name'=> 'Naam tegenpartij',
+                    'bank_ref'         => 'Referentie',
+                ],
+            ],
+            'ing' => [
+                'required' => [
+                    'date'             => 'Boekingsdatum',
+                    'amount'           => 'Bedrag',
+                    'description'      => 'Omschrijving',
+                ],
+                'optional' => [
+                    'value_date'       => 'Valutadatum',
+                    'counterparty_iban'=> 'Tegenrekening',
+                    'counterparty_name'=> 'Naam tegenpartij',
+                ],
+            ],
+            'belfius' => [
+                'required' => [
+                    'date'             => 'Boekingsdatum',
+                    'amount'           => 'Bedrag',
+                    'description'      => 'Mededelingen',
+                ],
+                'optional' => [
+                    'value_date'       => 'Valutadatum',
+                    'counterparty_name'=> 'Naam tegenpartij bevat',
+                    'counterparty_iban'=> 'Rekening tegenpartij',
+                    'transaction'      => 'Transactie',
+                ],
+            ],
+            'coda' => [
+                'required' => [],  // binary format, no CSV columns
+                'optional' => [],
+            ],
+        ];
+    }
+
     private static function parse_generic_csv( string $content ): array|\WP_Error {
-        // Auto-detect delimiter by counting which character appears the most
+        // Auto-detect delimiter by counting occurrences in the full file.
         $delimiters = [ ';', ',', "\t", '|' ];
         $counts     = [];
         foreach ( $delimiters as $d ) {
-            // we take the whole file, not just the first line
-            //$counts[ $d ] = substr_count( strtok( $content, "\n" ), $d );
             $counts[ $d ] = substr_count( $content, $d );
         }
         arsort( $counts );
         $delimiter = array_key_first( $counts );
 
-        return self::parse_csv_generic( $content, $delimiter, [
-                'date'             => 'Datum',
-                'amount'           => 'Bedrag',
-                'counterparty_name'=> 'Naam',
-                'description'      => 'Omschrijving'
-        ] );
+        $schema = self::get_column_schema()['csv'];
+        // Required + optional merged: parse_csv_generic will only error on missing required ones.
+        return self::parse_csv_generic(
+            $content,
+            $delimiter,
+            $schema['required'],
+            $schema['optional']
+        );
     }
 
     /**
      * Core CSV parser with column mapping.
      *
-     * @param  array<string,string> $col_map  normalised_key => csv_header
+     * @param  array<string,string> $required_map  normalised_key => csv_header (ALL must be present)
+     * @param  array<string,string> $optional_map  normalised_key => csv_header (mapped when found)
      * @return array<int,array>|\WP_Error
      */
-    private static function parse_csv_generic( string $content, string $delimiter, array $col_map ): array|\WP_Error {
+    private static function parse_csv_generic( string $content, string $delimiter, array $required_map, array $optional_map = [] ): array|\WP_Error {
         // Strip BOM
         $content = ltrim( $content, "\xEF\xBB\xBF" );
         $lines   = array_filter( array_map( 'trim', explode( "\n", $content ) ) );
@@ -565,34 +630,42 @@ class Import {
             return new \WP_Error( 'empty_file', __( 'Bestand bevat geen transacties.', 'eme-accounting' ) );
         }
 
-        // Scan lines until we find one that contains all required col_map columns.
+        // Scan lines until we find one that contains all required columns.
         $header  = null;
         $reverse = [];
         foreach ( $lines as $key => $line ) {
             $candidate = array_map( 'trim', str_getcsv( $line, $delimiter, '"', '\\' ) );
             $found = [];
-            foreach ( $col_map as $norm => $csv ) {
+            // Required columns: all must be present.
+            foreach ( $required_map as $norm => $csv ) {
                 $idx = array_search( $csv, $candidate, true );
                 if ( $idx !== false ) {
                     $found[ $idx ] = $norm;
                 }
             }
-            // Only accept this line as header if ALL col_map columns are present.
-            if ( count( $found ) === count( $col_map ) ) {
-                $header  = $candidate;
-                $reverse = $found;
-                // Remove all lines up to and including the header.
-                $lines = array_slice( $lines, $key + 1 );
-                break;
+            if ( count( $found ) !== count( $required_map ) ) {
+                continue;
             }
+            // Optional columns: add when present.
+            foreach ( $optional_map as $norm => $csv ) {
+                $idx = array_search( $csv, $candidate, true );
+                if ( $idx !== false ) {
+                    $found[ $idx ] = $norm;
+                }
+            }
+            $header  = $candidate;
+            $reverse = $found;
+            // Remove all lines up to and including the header.
+            $lines = array_slice( $lines, $key + 1 );
+            break;
         }
 
         if ( $header === null ) {
             return new \WP_Error(
                 'no_header',
                 sprintf(
-                    __( 'Kolomhoofden niet gevonden in bestand. Verwachte kolommen: %s.', 'eme-accounting' ),
-                    implode( ', ', array_values( $col_map ) )
+                    __( 'Kolomhoofden niet gevonden in bestand. Vereiste kolommen: %s.', 'eme-accounting' ),
+                    implode( ', ', array_values( $required_map ) )
                 )
             );
         }
@@ -805,7 +878,7 @@ class Import {
         $res = $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'matched', 'journal_id' => $journal_id ],
-            [ 'id' => $line_id ],
+            [ 'id' => $line_id, 'status' => 'pending' ],
             [ '%s', '%d' ],
             [ '%d' ]
         );
@@ -825,7 +898,7 @@ class Import {
         $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'ignored' ],
-            [ 'id' => $line_id ],
+            [ 'id' => $line_id, 'status' => 'pending' ],
             [ '%s' ],
             [ '%d' ]
         );
@@ -876,7 +949,7 @@ class Import {
         $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'manual', 'journal_id' => $journal_id ],
-            [ 'id' => $line_id ],
+            [ 'id' => $line_id, 'status' => 'pending' ],
             [ '%s', '%d' ],
             [ '%d' ]
         );
