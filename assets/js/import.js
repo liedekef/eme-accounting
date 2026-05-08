@@ -336,7 +336,7 @@
      * ================================================================ */
     const logsTable = new FTable( '#eme-import-logs-table', {
         forcePost: true,
-        paging   : false,
+        paging   : true,
         sorting  : false,
         actions: {
             listAction  : ajaxUrl + '?action=eme_accounting_list_import_logs&nonce='   + nonce,

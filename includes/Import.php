@@ -158,10 +158,12 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
 
+        $limit  = eme_get_datatables_limit() ?: 'LIMIT 50';
+
         $rows = $wpdb->get_results(
             "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
-             ORDER BY il.import_date DESC LIMIT 50"
+             ORDER BY il.import_date DESC $limit"
         );
 
         foreach ( $rows as $row ) {
@@ -802,7 +804,7 @@ class Import {
         $res = $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'matched', 'journal_id' => $journal_id ],
-            [ 'id' => $line_id, 'is_reconciled' => 0 ],
+            [ 'id' => $line_id ],
             [ '%s', '%d' ],
             [ '%d' ]
         );
