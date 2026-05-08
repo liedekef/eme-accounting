@@ -70,7 +70,8 @@
      * ================================================================ */
     let linesTableInst = new FTable( '#eme-import-lines-table', {
         forcePost : true,
-        paging    : false,
+        paging    : true,
+        pageSizes : [50, 100, 250, 500, 'all'],
         sorting   : false,
         selecting : true,
         multiselect: true,

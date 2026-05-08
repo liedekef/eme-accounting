@@ -188,7 +188,8 @@ class Import {
         if ( ! $log_id ) {
             wp_send_json( [ 'Result' => 'ERROR', 'Message' => 'Missing import_log_id' ] );
         }
-        $lines = self::get_all_lines( $log_id );
+        $limit  = eme_get_datatables_limit() ?: 'LIMIT 50';
+        $lines = self::get_all_lines( $log_id, $limit );
         wp_send_json( [ 'Result' => 'OK', 'Records' => $lines, 'TotalRecordCount' => count( $lines ) ] );
     }
 
@@ -759,7 +760,7 @@ class Import {
     /**
      * @return object[]
      */
-    public static function get_all_lines( int $log_id ): array {
+    public static function get_all_lines( int $log_id, string $limit = '' ): array {
         global $wpdb;
         return $wpdb->get_results(
             $wpdb->prepare(
@@ -767,7 +768,7 @@ class Import {
                  FROM `{$wpdb->prefix}emeacc_import_lines` il
                  LEFT JOIN `{$wpdb->prefix}emeacc_journal` j ON j.id = il.journal_id
                  WHERE il.import_log_id = %d
-                 ORDER BY il.transaction_date",
+                 ORDER BY il.transaction_date $limit",
                 $log_id
             )
         );
