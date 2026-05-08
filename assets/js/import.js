@@ -488,6 +488,7 @@
         }
         if ( wrap && e.target.classList.contains( 'btn-create-from-line' ) ) {
             const coaId = wrap.querySelector( '.coa-select' )?.value;
+            const eventId = wrap.querySelector( '[name=eme_event_id]' )?.value;
             if ( ! coaId ) { linesTableInst.showInfo( 'Kies eerst een grootboekrekening.' ); return; }
             const description = wrap.closest( 'tr' )?.recordData?.description || '';
             if ( /transfer/i.test( description ) ) {
@@ -499,7 +500,7 @@
             }
             e.target.disabled = true;
             const r = await post( 'eme_accounting_create_entry_from_line',
-                { line_id: lineId, coa_id: coaId } );
+                { line_id: lineId, coa_id: coaId, eme_event_id: eventId } );
             if ( r.success ) {
                 linesTableInst.updateFullRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
                 refreshLogCounters();
