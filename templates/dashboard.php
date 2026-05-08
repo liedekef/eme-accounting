@@ -115,7 +115,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
     </table>
 
     <p style="margin-top:12px">
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal&year=' . $year ) ); ?>">
+        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>">
             <?php esc_html_e( '→ Alle boekingen bekijken', 'eme-accounting' ); ?>
         </a>
         &nbsp;|&nbsp;
