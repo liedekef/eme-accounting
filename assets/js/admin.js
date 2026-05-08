@@ -787,23 +787,63 @@ function initSnapSelectRemote(selector, options = {}) {
                 <p><a href="#" onclick="loadEventsReport(${year});return false">← Terug naar overzicht</a></p>
                 <table class="eme-acc-table">
                 <tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th class="amount">Bedrag</th><th>Rekening</th></tr>`;
-            data.details.forEach(e => {
+
+            // Separate in and out transactions
+            const inTransactions = data.details.filter(e => e.direction === 'in');
+            const outTransactions = data.details.filter(e => e.direction === 'out');
+
+            // Show all 'in' lines first
+            html += `<tr style="font-weight:600"><td colspan="5">Ontvangsten</td></tr>`;
+            inTransactions.forEach(e => {
                 html += `<tr>
-                    <td>${esc(e.entry_date)}</td>
-                    <td>${esc(e.description)}</td>
-                    <td>${esc(e.coa_name)}</td>
-                    <td class="amount ${e.direction === 'in' ? 'in' : 'out'}">${formatCurrency(e.amount)}</td>
-                    <td>${esc(e.account_name)}</td>
-                </tr>`;
+                         <td>${esc(e.entry_date)}</td>
+                         <td>${esc(e.description)}</td>
+                         <td>${esc(e.coa_name)}</td>
+                         <td class="amount in">${formatCurrency(e.amount)}</td>
+                         <td>${esc(e.account_name)}</td>
+                         </tr>`;
             });
-            const totalIn = data.details.filter(e => e.direction === 'in').reduce((s, e) => s + parseFloat(e.amount), 0);
-            let totalOut = data.details.filter(e => e.direction === 'out').reduce((s, e) => s + parseFloat(e.amount), 0);
-            if (totalOut>0) totalOut*=-1;
-            html += `<tr style="font-weight:600"><td colspan="3">Totaal ontvangen</td>
-                <td class="amount in">${formatCurrency(totalIn)}</td><td></td></tr>
-                <tr style="font-weight:600"><td colspan="3">Totaal uitgegeven</td>
-                <td class="amount out">${formatCurrency(totalOut)}</td><td></td></tr>
-                </table>`;
+
+            // Show in-total
+            const totalIn = inTransactions.reduce((s, e) => s + parseFloat(e.amount), 0);
+            html += `<tr style="font-weight:600">
+                     <td colspan="3">Totaal ontvangen</td>
+                     <td class="amount in">${formatCurrency(totalIn)}</td>
+                     <td></td>
+                     </tr>`;
+
+            // Then show all 'out' lines
+            html += `<tr style="font-weight:600; border-top: 3px solid #ddd;"><td colspan="5">Uitgaven</td></tr>`;
+            outTransactions.forEach(e => {
+                html += `<tr>
+                         <td>${esc(e.entry_date)}</td>
+                         <td>${esc(e.description)}</td>
+                         <td>${esc(e.coa_name)}</td>
+                         <td class="amount out">${formatCurrency(e.amount)}</td>
+                         <td>${esc(e.account_name)}</td>
+                         </tr>`;
+            });
+
+            // Show out-total
+            let totalOut = outTransactions.reduce((s, e) => s + parseFloat(e.amount), 0);
+            if (totalOut > 0) totalOut *= -1;
+            const totalOutClass = totalOut < 0 ? 'out' : 'in';
+            html += `<tr style="font-weight:600">
+                     <td colspan="3">Totaal uitgegeven</td>
+                     <td class="amount ${totalOutClass}">${formatCurrency(totalOut)}</td>
+                     <td></td>
+                     </tr>`;
+
+            // Show the difference between in and out totals
+            const difference = totalIn + totalOut; // totalOut is already negative
+            const differenceClass = difference >= 0 ? 'in' : 'out';
+            const differenceText = difference >= 0 ? 'Verschil (ontvangen - uitgegeven)' : 'Verschil (ontvangen - uitgegeven)';
+            html += `<tr style="font-weight:600; border-top: 3px solid #ddd;">
+                     <td colspan="3">Saldo</td>
+                     <td class="amount ${differenceClass}">${formatCurrency(difference)}</td>
+                     <td></td>
+                     </tr>`;
+            html += `</table>`;
             container.innerHTML = html;
             return;
         }

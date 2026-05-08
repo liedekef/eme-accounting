@@ -8,7 +8,7 @@ $currency  = $config->currency;
 $year       = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $totals     = EMEAccounting\Journal::get_totals( [ 'fiscal_year' => $year ] );
 $accounts   = EMEAccounting\Accounts::get_all();
-$recent     = EMEAccounting\Journal::get_entries( [ 'fiscal_year' => $year, 'limit' => 10 ] );
+$recent     = EMEAccounting\Journal::get_entries( [ 'fiscal_year' => $year ], '', 'LIMIT 10' );
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 ?>
 <div class="wrap eme-acc-wrap">

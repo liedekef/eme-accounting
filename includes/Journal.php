@@ -40,116 +40,6 @@ class Journal {
     /* ------------------------------------------------------------------
      * READ
      * ------------------------------------------------------------------ */
-
-    /**
-     * Query journal entries with filters.
-     *
-     * @param  array<string,mixed> $args
-     * @return array<int,object>
-     */
-    public static function get_entries( array $args = [] ): array {
-        global $wpdb;
-        $table = $wpdb->prefix . 'emeacc_journal';
-
-        $defaults = [
-            'fiscal_year'    => null,
-            'account_id'     => null,
-            'direction'      => null,
-            'date_from'      => null,
-            'date_to'        => null,
-            'is_reconciled'  => null,
-            'search'         => null,
-            'orderby'        => 'entry_date',
-            'order'          => 'DESC',
-            'limit'          => 100,
-            'offset'         => 0,
-            'coa_id'         => 0,
-            'amount'         => 0,
-            'eme_event_id'   => null,
-        ];
-
-        $args = wp_parse_args( $args, $defaults );
-
-        $where   = [];
-        $prepare = [];
-
-        if ( $args['fiscal_year'] !== null ) {
-            $where[]   = 'fiscal_year = %d';
-            $prepare[] = (int) $args['fiscal_year'];
-        }
-        if ( $args['account_id'] !== null ) {
-            $where[]   = '(account_id = %d OR contra_account_id = %d)';
-            $prepare[] = (int) $args['account_id'];
-            $prepare[] = (int) $args['account_id'];
-        }
-        if ( $args['direction'] !== null ) {
-            if ($args['direction'] == 'transfer') {
-                $where[]   = 'transfer_id IS NOT NULL';
-            } else {
-                $where[]   = 'direction = %s AND transfer_id IS NULL';
-                $prepare[] = $args['direction'];
-            }
-        }
-        if ( $args['amount'] > 0 ) {
-            $where[]   = 'amount = %f';
-            $prepare[] = $args['amount'];
-        }
-        if ( $args['coa_id'] > 0 ) {
-            $where[]   = 'coa_id = %d';
-            $prepare[] = $args['coa_id'];
-        }
-        if ( $args['date_from'] !== null ) {
-            $where[]   = 'entry_date >= %s';
-            $prepare[] = $args['date_from'];
-        }
-        if ( $args['date_to'] !== null ) {
-            $where[]   = 'entry_date <= %s';
-            $prepare[] = $args['date_to'];
-        }
-        if ( $args['is_reconciled'] !== null ) {
-            $where[]   = 'is_reconciled = %d';
-            $prepare[] = (int) $args['is_reconciled'];
-        }
-        if ( ! empty( $args['search'] ) ) {
-            $like      = '%' . $wpdb->esc_like( $args['search'] ) . '%';
-            $where[]   = '(description LIKE %s OR bank_statement_ref LIKE %s)';
-            $prepare[] = $like;
-            $prepare[] = $like;
-        }
-        if ( ! empty( $args['eme_event_id'] ) ) {
-            $where[]   = 'j.eme_event_id = %d';
-            $prepare[] = (int) $args['eme_event_id'];
-        }
-
-        $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
-
-        $allowed_order = [ 'entry_date', 'id', 'amount', 'description', 'created_at' ];
-        $orderby       = in_array( $args['orderby'], $allowed_order, true ) ? $args['orderby'] : 'entry_date';
-        $order         = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
-
-        // Always order by date + id DESC for same-date consistency
-        $order_clause = $orderby === 'id'
-            ? "id {$order}"
-            : "entry_date {$order}, id {$order}";
-
-        $prepare[] = (int) $args['limit'];
-        $prepare[] = (int) $args['offset'];
-
-        $sql = $wpdb->prepare(
-            "SELECT j.*, a.name as account_name, ca.name as contra_account_name, coa.name as coa_name
-             FROM `{$table}` j
-             LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a  ON a.id = j.account_id
-             LEFT JOIN `{$wpdb->prefix}emeacc_accounts` ca ON ca.id = j.contra_account_id
-             LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa ON coa.id = j.coa_id
-             {$where_sql}
-             ORDER BY {$order_clause}
-             LIMIT %d OFFSET %d",
-            ...$prepare
-        );
-
-        return $wpdb->get_results( $sql );
-    }
-
     public static function get( int $id ): ?object {
         global $wpdb;
         return $wpdb->get_row(
@@ -525,7 +415,7 @@ class Journal {
 
         $limit  = eme_get_ftable_limit();
         $orderby = eme_get_ftable_orderby();
-        $entries = self::get_entries_for_ftable( $where_args, $orderby, $limit );
+        $entries = self::get_entries( $where_args, $orderby, $limit );
 
         foreach ( $entries as $entry ) {
             $signed_amount = $entry->direction === 'out' && $entry->amount>0
@@ -617,7 +507,7 @@ class Journal {
         $include_files = false;
         $limit   = '';
         $orderby = eme_get_ftable_orderby();
-        $entries = self::get_entries_for_ftable( $where_args, $orderby, $limit, $include_files );
+        $entries = self::get_entries( $where_args, $orderby, $limit, $include_files );
 
         $vat_liable = (bool) ( \EMEVzw\Config::get()->vat_liable ?? false );
         $currency   = \EMEVzw\Config::get()->currency;
@@ -714,9 +604,9 @@ class Journal {
 
     /**
      * Build a WHERE clause and prepare-values array from the shared filter args
-     * used by count_entries() and get_entries_for_ftable().
+     * used by count_entries() and get_entries().
      *
-     * Pass $alias = 'j' when the query uses a table alias (get_entries_for_ftable),
+     * Pass $alias = 'j' when the query uses a table alias (get_entries),
      * leave empty for unaliased queries (count_entries).
      *
      * @param  array<string,mixed> $args
@@ -796,14 +686,14 @@ class Journal {
         );
     }
 
-    public static function get_entries_for_ftable( array $where_args = [], string $orderby = '', string $limit = '', bool $include_files = true ): array {
+    public static function get_entries( array $where_args = [], string $orderby = '', string $limit = '', bool $include_files = true ): array {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_journal';
 
         [ $where_sql, $prepare ] = self::build_filter_where( $where_args, 'j' );
 
         $order_clause = $orderby ?: 'j.entry_date DESC, j.id DESC';
-        if ( stripos( $order_clause, 'ORDER BY' ) !== 0 ) {
+        if ( stripos( $order_clause, 'ORDER BY ' ) !== 0 ) {
             $order_clause = 'ORDER BY ' . $order_clause;
         }
 

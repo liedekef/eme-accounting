@@ -163,12 +163,7 @@ class Reports {
      * @return array<string, object[]>  date => entries
      */
     public static function financial_diary_report( int $year ): array {
-        $entries = Journal::get_entries( [
-            'fiscal_year' => $year,
-            'limit'       => 9999,
-            'orderby'     => 'entry_date',
-            'order'       => 'ASC',
-        ] );
+        $entries = Journal::get_entries( [ 'fiscal_year' => $year ], "entry_date, id");
         $grouped = [];
         foreach ( $entries as $entry ) {
             $entry->amount = $entry->direction === 'out' && $entry->amount > 0
@@ -191,13 +186,7 @@ class Reports {
 
         // Drilldown: get all entries for a specific event
         if ( $event_id ) {
-            $entries = Journal::get_entries( [
-                'fiscal_year'  => $year,
-                'eme_event_id' => $event_id,
-                'limit'       => 9999,
-                'orderby'     => 'entry_date',
-                'order'      => 'ASC',
-            ] );
+            $entries = Journal::get_entries( [ 'fiscal_year' => $year, 'eme_event_id' => $event_id ], "entry_date, id");
             foreach ( $entries as &$entry ) {
                 $entry->amount = $entry->direction === 'out' && $entry->amount>0
                     ? -1 * (float) $entry->amount
