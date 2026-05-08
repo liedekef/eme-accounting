@@ -394,7 +394,7 @@ class Import {
                     [ '%s', '%d' ],
                     [ '%d' ]
                 );
-                if ($res {
+                if ($res) {
                     Journal::mark_reconciled( $journal_id );
                     $matched++;
                 }
