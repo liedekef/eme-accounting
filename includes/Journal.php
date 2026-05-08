@@ -508,7 +508,7 @@ class Journal {
             'TotalRecordCount' => 0,
         ];
 
-        $args = [
+        $where_args = [
             'fiscal_year'  => isset( $_POST['fiscal_year'] ) ? (int) $_POST['fiscal_year'] : null,
             'account_id'   => isset( $_POST['account_id'] ) && $_POST['account_id'] > 0 ? (int) $_POST['account_id'] : null,
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
@@ -520,12 +520,12 @@ class Journal {
             'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
         ];
 
-        $total = self::count_entries( $args );
+        $total = self::count_entries( $where_args );
         $result['TotalRecordCount'] = $total;
 
-        $limit  = eme_get_datatables_limit();
-        $orderby = eme_get_datatables_orderby();
-        $entries = self::get_entries_for_ftable( $args, $orderby, $limit );
+        $limit  = eme_get_ftable_limit();
+        $orderby = eme_get_ftable_orderby();
+        $entries = self::get_entries_for_ftable( $where_args, $orderby, $limit );
 
         foreach ( $entries as $entry ) {
             $signed_amount = $entry->direction === 'out' && $entry->amount>0
@@ -599,7 +599,7 @@ class Journal {
         // Add BOM for UTF-8
         fwrite($output, "\xEF\xBB\xBF");
 
-        $args = [
+        $where_args = [
             'fiscal_year'  => isset( $_POST['fiscal_year'] ) ? (int) $_POST['fiscal_year'] : null,
             'account_id'   => isset( $_POST['account_id'] ) && $_POST['account_id'] > 0 ? (int) $_POST['account_id'] : null,
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
@@ -611,13 +611,13 @@ class Journal {
             'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
         ];
 
-        $total = self::count_entries( $args );
+        $total = self::count_entries( $where_args );
         $result['TotalRecordCount'] = $total;
 
         $include_files = false;
         $limit   = '';
-        $orderby = eme_get_datatables_orderby();
-        $entries = self::get_entries_for_ftable( $args, $orderby, $limit, $include_files );
+        $orderby = eme_get_ftable_orderby();
+        $entries = self::get_entries_for_ftable( $where_args, $orderby, $limit, $include_files );
 
         $vat_liable = (bool) ( \EMEVzw\Config::get()->vat_liable ?? false );
         $currency   = \EMEVzw\Config::get()->currency;
@@ -781,11 +781,11 @@ class Journal {
         return [ $where_sql, $prepare ];
     }
 
-    public static function count_entries( array $args = [] ): int {
+    public static function count_entries( array $where_args = [] ): int {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_journal';
 
-        [ $where_sql, $prepare ] = self::build_filter_where( $args );
+        [ $where_sql, $prepare ] = self::build_filter_where( $where_args );
 
         if ( empty( $prepare ) ) {
             return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} $where_sql" );
@@ -796,18 +796,18 @@ class Journal {
         );
     }
 
-    public static function get_entries_for_ftable( array $args = [], string $orderby = '', string $limit = '', bool $include_files = true ): array {
+    public static function get_entries_for_ftable( array $where_args = [], string $orderby = '', string $limit = '', bool $include_files = true ): array {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_journal';
 
-        [ $where_sql, $prepare ] = self::build_filter_where( $args, 'j' );
+        [ $where_sql, $prepare ] = self::build_filter_where( $where_args, 'j' );
 
         $order_clause = $orderby ?: 'j.entry_date DESC, j.id DESC';
         if ( stripos( $order_clause, 'ORDER BY' ) !== 0 ) {
             $order_clause = 'ORDER BY ' . $order_clause;
         }
 
-        // $order_clause and $limit come from eme_get_datatables_orderby / eme_get_datatables_limit
+        // $order_clause and $limit come from eme_get_ftable_orderby / eme_get_ftable_limit
         // and are guaranteed safe by the EME framework.
         $sql = "SELECT j.*, a.name as account_name, ca.name as contra_account_name, coa.name as coa_name
                 FROM `{$table}` j

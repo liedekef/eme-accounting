@@ -158,7 +158,7 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
 
-        $limit  = eme_get_datatables_limit() ?: 'LIMIT 50';
+        $limit  = eme_get_ftable_limit() ?: 'LIMIT 50';
         $rows = $wpdb->get_results(
             "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
@@ -189,7 +189,7 @@ class Import {
         if ( ! $log_id ) {
             wp_send_json( [ 'Result' => 'ERROR', 'Message' => 'Missing import_log_id' ] );
         }
-        $limit  = eme_get_datatables_limit() ?: 'LIMIT 50';
+        $limit  = eme_get_ftable_limit() ?: 'LIMIT 50';
         $lines = self::get_all_lines( $log_id, $limit );
         wp_send_json( [ 'Result' => 'OK', 'Records' => $lines, 'TotalRecordCount' => count( $lines ) ] );
     }
