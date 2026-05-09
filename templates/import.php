@@ -54,7 +54,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
     </p>
     
     <!-- Bulk actions bar (shown when rows are selected) -->
-    <div id="eme-import-bulk-actions" style="display:none;margin-bottom:8px;gap:8px;align-items:center;flex-wrap:wrap">
+    <div id="eme-import-bulk-actions" style="margin-bottom:8px;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="eme-bulk-action-select">
             <option value=""><?php esc_html_e( '&mdash; Bulk actie &mdash;', 'eme-accounting' ); ?></option>
             <option value="ignore"><?php esc_html_e( 'Negeer geselecteerde', 'eme-accounting' ); ?></option>

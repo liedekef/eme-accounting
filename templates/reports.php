@@ -18,7 +18,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
                 <?php endif; ?>
             </optgroup>
             <optgroup label="Intern">
-                <option value="patrimony"><?php esc_html_e( 'Staat van Vermogen (intern)', 'eme-accounting' ); ?></option>
+                <option value="patrimony"><?php esc_html_e( 'Financiële status vermogen', 'eme-accounting' ); ?></option>
                 <option value="cashflow"><?php esc_html_e( 'Cashflow per maand', 'eme-accounting' ); ?></option>
                 <option value="financial_diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
                 <option value="financial_year"><?php esc_html_e( 'Financieel Jaarverslag per rekening', 'eme-accounting' ); ?></option>
@@ -39,7 +39,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
         </select>
     </div>
     <div id="report-date-wrap" style="display:none">
-        <label><?php esc_html_e( 'Peildatum (Staat van Vermogen)', 'eme-accounting' ); ?></label>
+        <label><?php esc_html_e( 'Status op datum', 'eme-accounting' ); ?></label>
         <input type="date" id="report_date" value="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>">
     </div>
     <div id="report-cashflow-options" style="display:none">

@@ -734,7 +734,7 @@ function initSnapSelectRemote(selector, options = {}) {
     }
 
     function renderPatrimony(data, container) {
-        let html = `<h2>Staat van Vermogen per ${esc(data.date)}</h2>
+        let html = `<h2>Fianciële Status van Vermogen op ${esc(data.date)}</h2>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">`;
 
         html += '<div><h3>Activa</h3><table class="eme-acc-table">';

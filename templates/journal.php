@@ -5,14 +5,14 @@ $config =  \EMEVzw\Config::get();
 $currency  = $config->currency;
 $vat_liable = (bool) ( $config->vat_liable ?? false );
 
-$year        = isset( $_GET['year'] )       ? (int) $_GET['year']                : (int) gmdate( 'Y' );
-$account_id  = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']          : 0;
-$direction   = isset( $_GET['direction'] )  ? sanitize_key( $_GET['direction'] ) : '';
-$edit_id     = isset( $_GET['edit'] )       ? (int) $_GET['edit']                : 0;
+//$filter_year        = isset( $_GET['year'] )       ? (int) $_GET['year']                : (int) gmdate( 'Y' );
+$filter_year        = isset( $_GET['year'] )       ? (int) $_GET['year']                : '';
+$filter_account_id  = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']          : 0;
+$filter_direction   = isset( $_GET['direction'] )  ? sanitize_key( $_GET['direction'] ) : '';
+$edit_entry         = !empty( $_GET['edit'] )      ? EMEAccounting\Journal::get( (int) $_GET['edit'] ) : null;
 
 $accounts    = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
-$edit_entry  = $edit_id ? EMEAccounting\Journal::get( $edit_id ) : null;
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 
 // $form_disabled may already be set by Menu.php (read-only access profile).
@@ -301,7 +301,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <select name="year" id="eme-acc-year-filter">
                 <option value=""><?php esc_html_e( 'Filter op boekjaar', 'eme-accounting' ); ?></option>
                 <?php foreach ( $fiscal_years as $f ): ?>
-                    <option value="<?= (int) $f->year ?>">
+                    <option value="<?= (int) $f->year ?>" <?= selected( (int) $f->year,  $filter_year, false ) ?>>
                             <?php echo (int) $f->year;
                                   if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
                             ?>
@@ -311,18 +311,18 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <input type='text' id='eme-daterange-filter' name='eme-daterange-filter' placeholder='<?php esc_html_e( 'Filter op daterange', 'eme-accounting' ); ?>' data-autoclose='false' data-range='true' data-multiple-separator=' -- ' data-date='' style='width: 22ch;' class='eme_formfield_fdate'>
             <input type="search" placeholder="Filter op omschrijving / bankref" size="25" name="eme-acc-search-filter" id="eme-acc-search-filter">
             <input type="search" placeholder="Filter op tegenpartij" size="18" name="eme-acc-counterparty-filter" id="eme-acc-counterparty-filter">
-            <input type="search" placeholder="Bedrag" name="eme-acc-amount-filter" id="eme-acc-amount-filter" size="8">
+            <select name="direction" id="eme-acc-direction-filter" >
+                <option value=""><?php esc_html_e( 'Alle richtingen', 'eme-accounting' ); ?></option>
+                <option value="in"  <?= selected( 'in',  $filter_direction, false ) ?>><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?></option>
+                <option value="out" <?= selected( 'out', $filter_direction, false ) ?>><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></option>
+                <option value="transfer" <?= selected( 'transfer', $filter_direction, false ) ?>><?php esc_html_e( 'Transfers', 'eme-accounting' ); ?></option>
+            </select>
+            <input type="search" pattern="[0-9,]*" placeholder="Bedrag" title="Filter op positief bedrag, kies de richting (in/uit) hiernaast" name="eme-acc-amount-filter" id="eme-acc-amount-filter" size="8">
             <select name="account_id" id="eme-acc-account-filter">
                 <option value="0"><?php esc_html_e( 'Alle rekeningen', 'eme-accounting' ); ?></option>
                 <?php foreach ( $accounts as $aid => $aname ): ?>
-                <option value="<?= $aid ?>" <?= selected( $aid, $account_id, false ) ?>><?= esc_html( $aname ) ?></option>
+                <option value="<?= $aid ?>" <?= selected( $aid, $filter_account_id, false ) ?>><?= esc_html( $aname ) ?></option>
                 <?php endforeach; ?>
-            </select>
-            <select name="direction" id="eme-acc-direction-filter" >
-                <option value=""><?php esc_html_e( 'Alle richtingen', 'eme-accounting' ); ?></option>
-                <option value="in"  <?= selected( 'in',  $direction, false ) ?>><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?></option>
-                <option value="out" <?= selected( 'out', $direction, false ) ?>><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></option>
-                <option value="transfer" <?= selected( 'transfer', $direction, false ) ?>><?php esc_html_e( 'Transfers', 'eme-accounting' ); ?></option>
             </select>
             <select name="coa_id" id="eme-acc-coa-filter" class="eme_snapselect" data-live-search="true">
                 <option value=""><?php esc_html_e( '— Kies categorie —', 'eme-accounting' ); ?></option>

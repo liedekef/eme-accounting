@@ -245,10 +245,10 @@
 
     /* Show/hide bulk bar based on selection; update counter */
     function updateBulkBar() {
-        if ( ! bulkBar ) return;
+        if ( ! bulkCountSpan ) return;
         const selected = linesTableInst?.getSelectedRows?.() || [];
         const count    = selected.length;
-        bulkBar.style.display   = count > 0 ? 'flex' : 'none';
+        bulkCountSpan.style.display   = count > 0 ? '' : 'none';
         bulkCountSpan.textContent = count > 0
             ? `${count} rij${count === 1 ? '' : 'en'} geselecteerd`
             : '';
@@ -278,7 +278,7 @@
         // Only process pending rows
         const pendingRows = selectedRows.filter( row => row.recordData?.status === 'pending' );
         if ( ! pendingRows.length ) {
-            linesTableInst.showInfo( 'Geen openstaande regels geselecteerd.' );
+            linesTableInst.showInfo( 'Geen openstaande rijen geselecteerd.' );
             return;
         }
 
@@ -286,8 +286,8 @@
 
         if ( action === 'ignore' ) {
             const ok = await ftConfirm(
-                'Negeer geselecteerde regels',
-                `<p>Ben je zeker dat je <strong>${ids.length}</strong> regel${ids.length === 1 ? '' : 's'} wil negeren?</p>`
+                'Negeer geselecteerde rijen',
+                `<p>Ben je zeker dat je deze <strong>${ids.length}</strong> geselecteerde rij${ids.length === 1 ? '' : 'en'} wil negeren?</p>`
             );
             if ( ! ok ) return;
         }
