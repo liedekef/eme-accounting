@@ -392,7 +392,7 @@ class Import {
                     [ 'status' => 'matched', 'journal_id' => $journal_id ],
                     [ 'id' => $line_id, 'status' => 'pending' ],
                     [ '%s', '%d' ],
-                    [ '%d' ]
+                    [ '%d', '%s' ]
                 );
                 if ($res) {
                     Journal::mark_reconciled( $journal_id );
@@ -880,7 +880,7 @@ class Import {
             [ 'status' => 'matched', 'journal_id' => $journal_id ],
             [ 'id' => $line_id, 'status' => 'pending' ],
             [ '%s', '%d' ],
-            [ '%d' ]
+            [ '%d', '%s' ]
         );
         if ($res) {
             Journal::mark_reconciled( $journal_id );
@@ -895,14 +895,18 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
         $line_id = (int) ( $_POST['line_id'] ?? 0 );
-        $wpdb->update(
+        $res = $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'ignored' ],
             [ 'id' => $line_id, 'status' => 'pending' ],
             [ '%s' ],
-            [ '%d' ]
+            [ '%d', '%s' ]
         );
-        wp_send_json_success( [ 'Record' => self::get_line( $line_id ) ] );
+        if ($res) {
+            wp_send_json_success( [ 'Record' => self::get_line( $line_id ) ] );
+        } else {
+            wp_send_json_error( 'Lijn niet kunnen negeren' );
+        }
     }
 
     public static function ajax_auto_reconcile(): void {
@@ -951,7 +955,7 @@ class Import {
             [ 'status' => 'manual', 'journal_id' => $journal_id ],
             [ 'id' => $line_id, 'status' => 'pending' ],
             [ '%s', '%d' ],
-            [ '%d' ]
+            [ '%d', '%s' ]
         );
 
         wp_send_json_success( [ 'journal_id' => $journal_id, 'Record' => self::get_line( $line_id ) ] );

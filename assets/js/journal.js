@@ -40,15 +40,17 @@
         JournalTable.reload();
     }
 
-    function handleJournalDelete(btn) {
-        if (!confirm(emeAccounting.i18n.confirm_delete)) return;
+    async function handleJournalDelete(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', emeAccounting.i18n.confirm_delete );
+        if (!ok) return;
         ajax('eme_accounting_delete_entry', { id: btn.dataset.id }, () =>
             fadeRemove(document.querySelector(`[data-journal-row="${btn.dataset.id}"]`))
         );
     }
 
-    function handleDeleteUpload(btn) {
-        if (!confirm(emeAccounting.i18n.confirm_delete)) return;
+    async function handleDeleteUpload(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', emeAccounting.i18n.confirm_delete );
+        if (!ok) return;
         const parentlink = btn.closest('.del_upload-button');
         let id = parentlink.dataset.id;
         let name = parentlink.dataset.name;

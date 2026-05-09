@@ -31,7 +31,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
             <option value="ing">ING</option>
             <option value="belfius">Belfius</option>
             <option value="coda">CODA v2</option>
-            <option value="csv"><?php esc_html_e( 'Generiek CSV', 'eme-accounting' ); ?></option>
+            <option value="csv"><?php esc_html_e( 'Generiek CSV bestand', 'eme-accounting' ); ?></option>
         </select>
         <div id="eme-acc-col-hint" style="margin-top:4px;font-size:12px;color:#646970"></div>
     </div>

@@ -279,8 +279,9 @@ function initSnapSelectRemote(selector, options = {}) {
         form.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function handleAccountDelete(btn) {
-        if (!confirm(i18n.confirm_delete)) return;
+    async function handleAccountDelete(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', i18n.confirm_delete );
+        if (!ok) return;
         ajax('eme_accounting_delete_account', { id: btn.dataset.id }, () =>
             fadeRemove(document.querySelector(`[data-account-row="${btn.dataset.id}"]`))
         );
@@ -338,8 +339,9 @@ function initSnapSelectRemote(selector, options = {}) {
         form.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function handleCoaDelete(btn) {
-        if (!confirm(i18n.confirm_delete)) return;
+    async function handleCoaDelete(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', i18n.confirm_delete );
+        if (!ok) return;
         ajax('eme_accounting_delete_coa', { id: btn.dataset.id }, () =>
             fadeRemove(document.querySelector(`li[data-id="${btn.dataset.id}"]`))
         );
@@ -444,8 +446,9 @@ function initSnapSelectRemote(selector, options = {}) {
         form.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function handleStockDelete(btn) {
-        if (!confirm(i18n.confirm_delete)) return;
+    async function handleStockDelete(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', i18n.confirm_delete );
+        if (!ok) return;
         ajax('eme_accounting_delete_stock', { id: btn.dataset.id }, () =>
             fadeRemove(document.querySelector(`[data-stock-row="${btn.dataset.id}"]`))
         );
@@ -491,24 +494,27 @@ function initSnapSelectRemote(selector, options = {}) {
         form.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function handleAssetDelete(btn) {
-        if (!confirm(i18n.confirm_delete)) return;
+    async function handleAssetDelete(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', i18n.confirm_delete );
+        if (!ok) return;
         ajax('eme_accounting_delete_asset', { id: btn.dataset.id }, () =>
             fadeRemove(document.querySelector(`[data-asset-row="${btn.dataset.id}"]`))
         );
     }
 
     // Delete patrimony
-    function handleDeletePatrimony(btn) {
-        if (!confirm(i18n.confirm_delete_patrimony)) return;
+    async function handleDeletePatrimony(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', i18n.confirm_delete_patrimony );
+        if (!ok) return;
         ajax('eme_accounting_delete_patrimony', { id: btn.dataset.id, nonce: nonce }, function() {
             setTimeout(() => location.reload(), 350);
         });
     }
 
     // Delete budget (all lines for a fiscal year)
-    function handleDeleteBudget(btn) {
-        if (!confirm(i18n.confirm_delete_budget)) return;
+    async function handleDeleteBudget(btn) {
+        const ok = await FTable.confirm( 'Verwijderen', i18n.confirm_delete_budget );
+        if (!ok) return;
         ajax('eme_accounting_delete_budget', { year: btn.dataset.year, nonce: nonce }, function() {
             setTimeout(() => location.reload(), 350);
         });

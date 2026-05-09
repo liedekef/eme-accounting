@@ -58,9 +58,10 @@
     });
 
     document.querySelectorAll('.btn-close').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', async function() {
             var year = this.dataset.year;
-            if (!confirm(emeAccounting.i18n.confirmClose.replace('%s', year))) return;
+            const ok = await FTable.confirm( 'Afsluiten', emeAccounting.i18n.confirmClose.replace('%s', year) );
+            if (!ok) return;
             this.disabled = true;
             this.textContent = emeAccounting.i18n.processing;
 
@@ -88,9 +89,10 @@
     });
 
     document.querySelectorAll('.btn-reopen').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', async function() {
             var year = this.dataset.year;
-            if (!confirm(emeAccounting.i18n.confirmReopen.replace('%s', year))) return;
+            const ok = await FTable.confirm( 'Heropenen', emeAccounting.i18n.confirmReopen.replace('%s', year) );
+            if (!ok) return;
             this.disabled = true;
             this.textContent = emeAccounting.i18n.processing;
 
@@ -118,9 +120,10 @@
     });
 
     document.querySelectorAll('.btn-delete').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', async function() {
             var year = this.dataset.year;
-            if (!confirm(emeAccounting.i18n.confirmDelete.replace('%s', year))) return;
+            const ok = await FTable.confirm( 'Verwijderen', emeAccounting.i18n.confirmDelete.replace('%s', year) );
+            if (!ok) return;
             this.disabled = true;
             this.textContent = emeAccounting.i18n.processing;
 

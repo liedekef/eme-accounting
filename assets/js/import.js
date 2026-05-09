@@ -21,29 +21,6 @@
         return fetch( ajaxUrl, { method: 'POST', body: fd } ).then( r => r.json() );
     }
 
-    /* FtableModal-based confirm — returns a Promise that resolves true/false */
-    function ftConfirm( title, message ) {
-        return new Promise( ( resolve ) => {
-            const modal = new FtableModal( {
-                title,
-                content : `<p>${message}</p>`,
-                buttons : [
-                    {
-                        text      : i18n.cancel || 'Annuleren',
-                        className : 'ftable-dialog-cancelbutton',
-                        onClick   : () => { modal.close(); resolve( false ); },
-                    },
-                    {
-                        text      : i18n.confirm || 'Bevestigen',
-                        className : 'ftable-dialog-deletebutton',
-                        onClick   : () => { modal.close(); resolve( true ); },
-                    },
-                ],
-            } );
-            modal.show();
-        } );
-    }
-
     /* Currency formatter */
     function fmtCur( n ) {
         return new Intl.NumberFormat( 'nl-BE', {
@@ -285,7 +262,7 @@
         const ids = pendingRows.map( row => row.dataset.recordKey );
 
         if ( action === 'ignore' ) {
-            const ok = await ftConfirm(
+            const ok = await FTable.confirm(
                 'Negeer geselecteerde rijen',
                 `<p>Ben je zeker dat je deze <strong>${ids.length}</strong> geselecteerde rij${ids.length === 1 ? '' : 'en'} wil negeren?</p>`
             );
@@ -300,7 +277,7 @@
                 /transfer/i.test( row.recordData?.description || '' )
             );
             if ( hasTransfer ) {
-                const ok = await ftConfirm(
+                const ok = await FTable.confirm(
                     'Transfer gedetecteerd',
                     '<p>Eén of meer geselecteerde regels bevatten "transfer" in de omschrijving. Toch nieuwe boekingen aanmaken?</p>'
                 );
@@ -459,7 +436,7 @@
         const wrap = e.target.closest( '.eme-import-actions' );
         const lineId = wrap?.dataset.line || null;
         if ( wrap && e.target.classList.contains( 'btn-ignore-line' ) ) {
-            const ok = await ftConfirm(
+            const ok = await FTable.confirm(
                 i18n.confirm_ignore_title || 'Lijn negeren',
                 i18n.confirm_ignore_msg   || 'Ben je zeker dat je deze lijn wil negeren?'
             );
@@ -497,7 +474,7 @@
             if ( ! coaId ) { linesTableInst.showInfo( 'Kies eerst een grootboekrekening.' ); return; }
             const description = wrap.closest( 'tr' )?.recordData?.description || '';
             if ( /transfer/i.test( description ) ) {
-                const ok = await ftConfirm(
+                const ok = await FTable.confirm(
                     i18n.confirm_transfer_title || 'Transfer gedetecteerd',
                     i18n.confirm_transfer_msg   || 'De omschrijving bevat "transfer". Ben je zeker dat je een nieuwe boeking wil aanmaken?'
                 );
@@ -590,7 +567,7 @@
         if ( d.duplicate_warnings?.length ) {
             const msg = d.duplicate_warnings.join( '\n' ) +
                 '\n\nToch importeren?';
-            const ok = await ftConfirm(
+            const ok = await FTable.confirm(
                 'Mogelijke duplicaten gedetecteerd',
                 d.duplicate_warnings.map( w => `<p>⚠️ ${esc(w)}</p>` ).join( '' ) +
                 '<p><strong>Toch importeren?</strong></p>'
