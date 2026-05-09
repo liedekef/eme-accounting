@@ -792,19 +792,20 @@ function initSnapSelectRemote(selector, options = {}) {
             let html = `<h2>Event boekingen voor ${esc(data.info.event_name)} met startdatum ${esc(data.info.event_start)}</h2>
                 <p><a href="#" onclick="loadEventsReport(${year});return false">← Terug naar overzicht</a></p>
                 <table class="eme-acc-table">
-                <tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th class="amount">Bedrag</th><th>Rekening</th></tr>`;
+                <tr><th>Datum</th><th>Omschrijving</th><th>Categorie</th><th>Tegenpartij</th><th class="amount">Bedrag</th><th>Rekening</th></tr>`;
 
             // Separate in and out transactions
             const inTransactions = data.details.filter(e => e.direction === 'in');
             const outTransactions = data.details.filter(e => e.direction === 'out');
 
             // Show all 'in' lines first
-            html += `<tr style="font-weight:600"><td colspan="5">Ontvangsten</td></tr>`;
+            html += `<tr style="font-weight:600"><td colspan="6">Ontvangsten</td></tr>`;
             inTransactions.forEach(e => {
                 html += `<tr>
                          <td>${esc(e.entry_date)}</td>
                          <td>${esc(e.description)}</td>
                          <td>${esc(e.coa_name)}</td>
+                         <td>${esc(e.counterparty_name)}</td>
                          <td class="amount in">${formatCurrency(e.amount)}</td>
                          <td>${esc(e.account_name)}</td>
                          </tr>`;
@@ -813,18 +814,19 @@ function initSnapSelectRemote(selector, options = {}) {
             // Show in-total
             const totalIn = inTransactions.reduce((s, e) => s + parseFloat(e.amount), 0);
             html += `<tr style="font-weight:600">
-                     <td colspan="3">Totaal ontvangen</td>
+                     <td colspan="4">Totaal ontvangen</td>
                      <td class="amount in">${formatCurrency(totalIn)}</td>
                      <td></td>
                      </tr>`;
 
             // Then show all 'out' lines
-            html += `<tr style="font-weight:600; border-top: 3px solid #ddd;"><td colspan="5">Uitgaven</td></tr>`;
+            html += `<tr style="font-weight:600; border-top: 3px solid #ddd;"><td colspan="6">Uitgaven</td></tr>`;
             outTransactions.forEach(e => {
                 html += `<tr>
                          <td>${esc(e.entry_date)}</td>
                          <td>${esc(e.description)}</td>
                          <td>${esc(e.coa_name)}</td>
+                         <td>${esc(e.counterparty_name)}</td>
                          <td class="amount out">${formatCurrency(e.amount)}</td>
                          <td>${esc(e.account_name)}</td>
                          </tr>`;
@@ -835,7 +837,7 @@ function initSnapSelectRemote(selector, options = {}) {
             if (totalOut > 0) totalOut *= -1;
             const totalOutClass = totalOut < 0 ? 'out' : 'in';
             html += `<tr style="font-weight:600">
-                     <td colspan="3">Totaal uitgegeven</td>
+                     <td colspan="4">Totaal uitgegeven</td>
                      <td class="amount ${totalOutClass}">${formatCurrency(totalOut)}</td>
                      <td></td>
                      </tr>`;
@@ -845,7 +847,7 @@ function initSnapSelectRemote(selector, options = {}) {
             const differenceClass = difference >= 0 ? 'in' : 'out';
             const differenceText = difference >= 0 ? 'Verschil (ontvangen - uitgegeven)' : 'Verschil (ontvangen - uitgegeven)';
             html += `<tr style="font-weight:600; border-top: 3px solid #ddd;">
-                     <td colspan="3">Saldo</td>
+                     <td colspan="4">Saldo</td>
                      <td class="amount ${differenceClass}">${formatCurrency(difference)}</td>
                      <td></td>
                      </tr>`;

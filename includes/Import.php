@@ -95,10 +95,10 @@ class Import {
                     'account_id'        => $line->account_id,
                     'bank_statement_ref'=> $line->bank_ref ?: $line->structured_ref,
                     'counterparty_name' => $line->counterparty_name ?? '',
-                    'eme_event_id'      => $eme_event_id,
                     'import_line_id'    => $line->id,
                     'is_reconciled'     => 1,
                     'coa_id'            => $coa_id,
+                    'eme_event_id'      => $eme_event_id,
                 ] );
                 if ( is_wp_error( $journal_id ) ) {
                     $errors[] = sprintf( 'Regel #%d: %s', $line_id, $journal_id->get_error_message() );
@@ -940,6 +940,7 @@ class Import {
             'direction'         => (float) $line->amount >= 0 ? 'in' : 'out',
             'account_id'        => $line->account_id,
             'bank_statement_ref'=> $line->bank_ref ?: $line->structured_ref,
+	    'counterparty_name' => $line->counterparty_name ?? '',
             'import_line_id'    => $line->id,
             'is_reconciled'     => 1,
             'coa_id'            => (int) ( $_POST['coa_id'] ?? 0 ),
