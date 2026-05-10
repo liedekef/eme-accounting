@@ -740,7 +740,7 @@ function initSnapSelectRemote(selector, options = {}) {
     }
 
     function renderPatrimony(data, container) {
-        let html = `<h2>Fianciële Status van Vermogen op ${esc(data.date)}</h2>
+        let html = `<h2>Financiële Status van Vermogen op ${esc(data.date)}</h2>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">`;
 
         html += '<div><h3>Activa</h3><table class="eme-acc-table">';
@@ -845,7 +845,6 @@ function initSnapSelectRemote(selector, options = {}) {
             // Show the difference between in and out totals
             const difference = totalIn + totalOut; // totalOut is already negative
             const differenceClass = difference >= 0 ? 'in' : 'out';
-            const differenceText = difference >= 0 ? 'Verschil (ontvangen - uitgegeven)' : 'Verschil (ontvangen - uitgegeven)';
             html += `<tr style="font-weight:600; border-top: 3px solid #ddd;">
                      <td colspan="4">Saldo</td>
                      <td class="amount ${differenceClass}">${formatCurrency(difference)}</td>
