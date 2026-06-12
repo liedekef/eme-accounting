@@ -284,7 +284,7 @@ class Journal {
             do_action( 'eme_accounting_journal_updated', $id, $row );
             if ( $old_entry ) {
                 Accounts::adjust_totals( (int) $old_entry->account_id, $old_entry->direction, (float) $old_entry->amount, 'subtract' );
-                Accounts::adjust_totals( (int) $row['account_id'], $old_entry->direction, (float) $row['amount'], 'add' );
+                Accounts::adjust_totals( (int) $row['account_id'], $direction, (float) $row['amount'], 'add' );
             }
             return $id;
         }
