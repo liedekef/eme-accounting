@@ -46,8 +46,9 @@ $currency  = $config->currency;
     <th><?php esc_html_e( 'Acties', 'eme-accounting' ); ?></th>
 </tr></thead>
 <tbody>
+<?php $balances = EMEAccounting\Accounts::get_all_balances(); ?>
 <?php foreach ( $accounts as $a ):
-    $balance = EMEAccounting\Accounts::get_balance( (int) $a->id );
+    $balance = $balances[ (int) $a->id ] ?? 0;
 ?>
 <tr data-account-row="<?= (int) $a->id ?>">
     <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>

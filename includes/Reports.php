@@ -109,8 +109,23 @@ class Reports {
         $assets   = [];
         $liabs    = [];
 
+        // Use grouped SUM query for date-precise balances
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.account_id,
+                        COALESCE(SUM(CASE WHEN j.direction = 'in' THEN j.amount WHEN j.direction = 'out' THEN -j.amount ELSE 0 END), 0) AS balance
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 WHERE j.entry_date <= %s
+                 GROUP BY j.account_id",
+                $date
+            )
+        );
+        $balance_map = [];
+        foreach ( $rows as $r ) {
+            $balance_map[ (int) $r->account_id ] = (float) $r->balance;
+        }
         foreach ( $accounts as $acc ) {
-            $balance = Accounts::get_balance( (int) $acc->id, $date );
+            $balance = (float) $acc->opening_balance + ( $balance_map[ (int) $acc->id ] ?? 0 );
             if ( $balance > 0 ) {
                 $assets[ $acc->name ] = $balance;
             } elseif ( $balance < 0 ) {

@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '19';
+    const DB_VERSION        = '20';
 
     public static function activate(): void {
         self::create_tables();
@@ -67,6 +67,23 @@ class Installer {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_import_lines ADD INDEX IF NOT EXISTS idx_status_log (status, import_log_id)" );
             // Composite index for cashflow and totals queries on journal
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_account (fiscal_year, account_id)" );
+        }
+        if ( (int) $current_version < 20 ) {
+            // Aggregated account totals table for O(1) balance lookups
+            $prefix = $wpdb->prefix;
+            $wpdb->query( "INSERT IGNORE INTO {$prefix}emeacc_account_totals (account_id, fiscal_year, total_in, total_out)
+                SELECT
+                    j.account_id,
+                    j.fiscal_year,
+                    COALESCE(SUM(CASE WHEN j.direction = 'in' THEN j.amount ELSE 0 END), 0) AS total_in,
+                    COALESCE(SUM(CASE WHEN j.direction = 'out' THEN j.amount ELSE 0 END), 0) AS total_out
+                FROM {$prefix}emeacc_journal j
+                GROUP BY j.account_id, j.fiscal_year" );
+            // Missing composite indexes for report queries
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_coa (fiscal_year, coa_id)" );
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_dir_transfer (fiscal_year, direction, transfer_id)" );
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_event (fiscal_year, eme_event_id)" );
+            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing_fiscal (is_closing_entry, fiscal_year)" );
         }
     }
 
@@ -335,6 +352,15 @@ class Installer {
             PRIMARY KEY (id),
             UNIQUE KEY uniq_year (fiscal_year)
         ) $charset;" );
+        // ── Aggregated account totals per fiscal year ──────────────────────
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_account_totals (
+            account_id  BIGINT UNSIGNED NOT NULL,
+            fiscal_year SMALLINT        NOT NULL,
+            total_in    DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            total_out   DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            PRIMARY KEY (account_id, fiscal_year)
+        ) $charset;" );
+
         // ── Bank import batches ─────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_log (
             id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -384,6 +410,7 @@ class Installer {
             'emeacc_import_lines',
             'emeacc_import_log',
             'emeacc_budget',
+            'emeacc_account_totals',
             'emeacc_depreciation',
             'emeacc_stock_movements',
             'emeacc_stock',

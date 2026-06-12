@@ -56,12 +56,12 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
                 <?= $formatter->formatCurrency( $totals['net'], $currency ); ?>
             </div>
         </div>
+        <?php $balances = EMEAccounting\Accounts::get_all_balances(); ?>
         <?php foreach ( $accounts as $acc ): ?>
         <div class="eme-acc-card">
             <h3><?= esc_html( $acc->name ); ?></h3>
-            <?php $bal = EMEAccounting\Accounts::get_balance( (int) $acc->id ); ?>
-            <div class="card-value <?= $bal >= 0 ? '' : 'negative' ?>">
-                <?= $formatter->formatCurrency( $bal, $currency ); ?>
+            <div class="card-value <?= ( $balances[ (int) $acc->id ] ?? 0 ) >= 0 ? '' : 'negative' ?>">
+                <?= $formatter->formatCurrency( $balances[ (int) $acc->id ] ?? 0, $currency ); ?>
             </div>
             <div class="card-sub"><?= esc_html( $acc->iban ); ?></div>
         </div>

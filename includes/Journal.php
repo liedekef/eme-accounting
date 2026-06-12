@@ -270,14 +270,22 @@ class Journal {
 
             do_action( 'eme_accounting_journal_created', $out_id, $out_row );
             do_action( 'eme_accounting_journal_created', $in_id, $in_row );
+            Accounts::adjust_totals( (int) $data['account_id'], $fiscal_year, 'out', (float) $row['amount'], 'add' );
+            Accounts::adjust_totals( (int) $data['contra_account_id'], $fiscal_year, 'in', (float) $row['amount'], 'add' );
             return $out_id;
         }
 
+        // for regular updates of an entry (no transfer)
         if ( $id > 0 ) {
+            $old_entry = self::get( $id );
             unset( $row['created_by'] );
             $row['updated_by'] = get_current_user_id() ?: null;
             $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
             do_action( 'eme_accounting_journal_updated', $id, $row );
+            if ( $old_entry ) {
+                Accounts::adjust_totals( (int) $old_entry->account_id, (int) $old_entry->fiscal_year, $old_entry->direction, (float) $old_entry->amount, 'subtract' );
+            }
+            Accounts::adjust_totals( (int) $row['account_id'], $fiscal_year, $direction, (float) $row['amount'], 'add' );
             return $id;
         }
 
@@ -286,6 +294,7 @@ class Journal {
         $wpdb->insert( $table, $row );
         $new_id = (int) $wpdb->insert_id;
         do_action( 'eme_accounting_journal_created', $new_id, $row );
+        Accounts::adjust_totals( (int) $row['account_id'], $fiscal_year, $direction, (float) $row['amount'], 'add' );
         return $new_id;
     }
 
@@ -293,7 +302,7 @@ class Journal {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_journal';
 
-        $entry = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `$table` WHERE id = %d", $id ) );
+        $entry = self::get( $id );
         if ( ! $entry ) {
             return true;
         }
@@ -302,14 +311,18 @@ class Journal {
             return new \WP_Error( 'year_closed', __( 'Kan boeking niet verwijderen: boekjaar is afgesloten.', 'eme-accounting' ) );
         }
 
-        $transfer_id = $wpdb->get_var( $wpdb->prepare( "SELECT transfer_id FROM `$table` WHERE id = %d", $id ) );
-        if ( $transfer_id ) {
-            $wpdb->delete( $table, [ 'id' => (int) $transfer_id ], [ '%d' ] );
-            do_action( 'eme_accounting_journal_deleted', (int) $transfer_id );
+        if ( $entry->transfer_id ) {
+            $transfer_entry = self::get( (int) $entry->transfer_id );
+            $wpdb->delete( $table, [ 'id' => (int) $entry->transfer_id ], [ '%d' ] );
+            do_action( 'eme_accounting_journal_deleted', (int) $entry->transfer_id );
+            if ( $transfer_entry ) {
+                Accounts::adjust_totals( (int) $transfer_entry->account_id, (int) $transfer_entry->fiscal_year, $transfer_entry->direction, (float) $transfer_entry->amount, 'subtract' );
+            }
         }
 
         $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
         do_action( 'eme_accounting_journal_deleted', $id );
+        Accounts::adjust_totals( (int) $entry->account_id, (int) $entry->fiscal_year, $entry->direction, (float) $entry->amount, 'subtract' );
         return true;
     }
 

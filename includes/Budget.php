@@ -50,6 +50,30 @@ class Budget {
     }
 
     /**
+     * Get actual totals for all COA accounts in a given year in a single query.
+     * Returns array of [coa_id => total].
+     *
+     * @return array<int,float>
+     */
+    public static function get_actuals_for_year( int $year ): array {
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT coa_id, COALESCE(SUM(amount), 0) AS total
+                 FROM `{$wpdb->prefix}emeacc_journal`
+                 WHERE fiscal_year = %d AND coa_id IS NOT NULL AND transfer_id IS NULL
+                 GROUP BY coa_id",
+                $year
+            )
+        );
+        $map = [];
+        foreach ( $rows as $r ) {
+            $map[ (int) $r->coa_id ] = (float) $r->total;
+        }
+        return $map;
+    }
+
+    /**
      * Get a summary of budgeted in/out/saldo for every fiscal year that has
      * at least one budget line.  Uses a JOIN with the COA table so that the
      * direction (in/out) is resolved in SQL rather than in PHP.
@@ -198,15 +222,10 @@ class Budget {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'budget' );
 
-        $year = (int) ( $_POST['year'] ?? gmdate( 'Y' ) );
-        $actuals = [];
-        $coa = ChartOfAccounts::get_all();
-        foreach ( $coa as $c ) {
-            $actual = self::get_actual_for_coa( $year, $c->id );
-            if ( $actual > 0 ) {
-                $actuals[ $c->id ] = $actual;
-            }
-        }
+        $year     = (int) ( $_POST['year'] ?? gmdate( 'Y' ) );
+        $actuals  = self::get_actuals_for_year( $year );
+        // Only return non-zero actuals
+        $actuals = array_filter( $actuals, fn( $v ) => $v > 0 );
 
         wp_send_json_success( $actuals );
     }
@@ -224,6 +243,7 @@ class Budget {
     public static function get_budget_data( int $year ): array {
         $coa        = ChartOfAccounts::get_all();
         $budget_map = self::get_year_map( $year );
+        $actuals    = self::get_actuals_for_year( $year );
 
         $income_rows  = [];
         $expense_rows = [];
@@ -234,7 +254,7 @@ class Budget {
             if ( ! $c->parent_id ) continue;
 
             $budget   = (float) ( $budget_map[ $c->id ] ?? 0 );
-            $actual   = self::get_actual_for_coa( $year, $c->id );
+            $actual   = $actuals[ $c->id ] ?? 0;
             $variance = $c->direction === 'out' ? $budget - $actual : $actual - $budget;
 
             $row = [

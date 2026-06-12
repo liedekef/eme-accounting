@@ -57,38 +57,82 @@ class Accounts {
     }
 
     /**
-     * Calculate running balance for an account.
-     * Balance = opening_balance + sum(in) - sum(out)
+     * Calculate balance on a specific end date for an account.
+     * Balance = opening_balance + total_in - total_out (from aggregated totals table).
      */
-    public static function get_balance( int $account_id, ?string $up_to_date = null ): float {
+    public static function get_balance( int $account_id, string $up_to_date ): float {
         global $wpdb;
         $account = self::get( $account_id );
         if ( ! $account ) {
             return 0.0;
         }
 
-        $date_clause = $up_to_date
-            ? $wpdb->prepare( 'AND entry_date <= %s', $up_to_date )
-            : '';
-
         $sum = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT
-                    COALESCE(SUM(
-                        CASE
-                        WHEN direction = 'in' THEN amount
-                        WHEN direction = 'out' THEN -amount
-                        ELSE 0
-                        END
-                    ), 0)
-                 FROM `{$wpdb->prefix}emeacc_journal`
-                 WHERE account_id = %d
-                   {$date_clause}",
-                $account_id
+                "SELECT COALESCE(SUM(
+                    CASE WHEN direction = 'in' THEN amount WHEN direction = 'out' THEN -amount ELSE 0 END
+            ), 0)
+            FROM `{$wpdb->prefix}emeacc_journal`
+            WHERE account_id = %d AND entry_date <= %s",
+            $account_id, $up_to_date
             )
         );
-
         return (float) $account->opening_balance + (float) $sum;
+    }
+
+    /**
+     * Get balances for all accounts in a single query.
+     * Returns array of [account_id => balance].
+     *
+     * @param  int|null $fiscal_year  When set, only totals for that year; when null, all years.
+     * @return array<int,float>
+     */
+    public static function get_all_balances( ?int $fiscal_year = null ): array {
+        global $wpdb;
+
+        $year_clause = $fiscal_year ? $wpdb->prepare( 'AND t.fiscal_year = %d', $fiscal_year ) : '';
+        $sql = "SELECT a.id,
+            a.opening_balance,
+            COALESCE(SUM(t.total_in),  0) AS total_in,
+            COALESCE(SUM(t.total_out), 0) AS total_out
+            FROM `{$wpdb->prefix}emeacc_accounts` a
+            LEFT JOIN `{$wpdb->prefix}emeacc_account_totals` t ON t.account_id = a.id {$year_clause}
+            GROUP BY a.id, a.opening_balance
+            ORDER BY a.sort_order, a.name";
+
+        $out = [];
+        foreach ( $wpdb->get_results( $sql ) as $r ) {
+            $out[ (int) $r->id ] = (float) $r->opening_balance + (float) $r->total_in - (float) $r->total_out;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Adjust aggregated totals by a delta for an account+fiscal_year.
+     * O(1) per write — no full SUM scan.
+     *
+     * @param int    $account_id
+     * @param int    $fiscal_year
+     * @param string $direction  'in' or 'out'
+     * @param float  $amount     Positive amount to add (or subtract when $op='subtract').
+     * @param string $op         'add' or 'subtract'
+     */
+    public static function adjust_totals( int $account_id, int $fiscal_year, string $direction, float $amount, string $op = 'add' ): void {
+        global $wpdb;
+        if ( $amount <= 0 ) {
+            return;
+        }
+        $col  = $direction === 'in' ? 'total_in' : 'total_out';
+        $sign = $op === 'add' ? '+' : '-';
+        $wpdb->query(
+            $wpdb->prepare(
+                "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, fiscal_year, total_in, total_out)
+                 VALUES (%d, %d, 0, 0)
+                 ON DUPLICATE KEY UPDATE {$col} = {$col} {$sign} %f",
+                $account_id, $fiscal_year, $amount
+            )
+        );
     }
 
     public static function can_book_on_date( int $account_id, string $entry_date ): bool {
@@ -154,6 +198,7 @@ class Accounts {
             );
         }
         $wpdb->delete( $wpdb->prefix . 'emeacc_accounts', [ 'id' => $id ], [ '%d' ] );
+        $wpdb->delete( $wpdb->prefix . 'emeacc_account_totals', [ 'account_id' => $id ], [ '%d' ] );
         return true;
     }
 

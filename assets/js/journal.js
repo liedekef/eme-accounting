@@ -121,6 +121,7 @@
             defaultSorting: 'entry_date DESC, id DESC',
             selecting: false,
             multiselect: false,
+            columnSelectButton: true,
             actions: {
                 listAction: emeAccounting.ajaxUrl + '?action=eme_accounting_journal_list&nonce=' + emeAccounting.nonce,
                 deleteAction: emeAccounting.ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + emeAccounting.nonce
