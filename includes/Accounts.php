@@ -84,53 +84,49 @@ class Accounts {
      * Get balances for all accounts in a single query.
      * Returns array of [account_id => balance].
      *
-     * @param  int|null $fiscal_year  When set, only totals for that year; when null, all years.
      * @return array<int,float>
      */
-    public static function get_all_balances( ?int $fiscal_year = null ): array {
+    public static function get_all_balances(): array {
         global $wpdb;
 
-        $year_clause = $fiscal_year ? $wpdb->prepare( 'AND t.fiscal_year = %d', $fiscal_year ) : '';
         $sql = "SELECT a.id,
             a.opening_balance,
-            COALESCE(SUM(t.total_in),  0) AS total_in,
-            COALESCE(SUM(t.total_out), 0) AS total_out
+            COALESCE(t.delta, 0) AS delta
             FROM `{$wpdb->prefix}emeacc_accounts` a
-            LEFT JOIN `{$wpdb->prefix}emeacc_account_totals` t ON t.account_id = a.id {$year_clause}
-            GROUP BY a.id, a.opening_balance
+            LEFT JOIN `{$wpdb->prefix}emeacc_account_totals` t ON t.account_id = a.id
             ORDER BY a.sort_order, a.name";
 
         $out = [];
         foreach ( $wpdb->get_results( $sql ) as $r ) {
-            $out[ (int) $r->id ] = (float) $r->opening_balance + (float) $r->total_in - (float) $r->total_out;
+            $out[ (int) $r->id ] = (float) $r->opening_balance + (float) $r->delta;
         }
 
         return $out;
     }
 
     /**
-     * Adjust aggregated totals by a delta for an account+fiscal_year.
+     * Adjust aggregated totals by a delta for an account.
      * O(1) per write — no full SUM scan.
      *
      * @param int    $account_id
-     * @param int    $fiscal_year
      * @param string $direction  'in' or 'out'
-     * @param float  $amount     Positive amount to add (or subtract when $op='subtract').
+     * @param float  $amount     Positive amount.
      * @param string $op         'add' or 'subtract'
      */
-    public static function adjust_totals( int $account_id, int $fiscal_year, string $direction, float $amount, string $op = 'add' ): void {
+    public static function adjust_totals( int $account_id, string $direction, float $amount, string $op = 'add' ): void {
         global $wpdb;
         if ( $amount <= 0 ) {
             return;
         }
-        $col  = $direction === 'in' ? 'total_in' : 'total_out';
-        $sign = $op === 'add' ? '+' : '-';
+
+        $delta = $direction === 'in' ? $amount : -$amount;
+        if ( $op === 'subtract' ) $delta = -$delta;
         $wpdb->query(
             $wpdb->prepare(
-                "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, fiscal_year, total_in, total_out)
-                 VALUES (%d, %d, 0, 0)
-                 ON DUPLICATE KEY UPDATE {$col} = {$col} {$sign} %f",
-                $account_id, $fiscal_year, $amount
+                "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, delta)
+                 VALUES (%d, 0)
+                 ON DUPLICATE KEY UPDATE delta = delta + %f",
+                $account_id, $delta
             )
         );
     }

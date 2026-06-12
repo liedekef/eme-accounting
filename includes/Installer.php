@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
-    const DB_VERSION        = '20';
+    const DB_VERSION        = '21';
 
     public static function activate(): void {
         self::create_tables();
@@ -84,6 +84,21 @@ class Installer {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_dir_transfer (fiscal_year, direction, transfer_id)" );
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_event (fiscal_year, eme_event_id)" );
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing_fiscal (is_closing_entry, fiscal_year)" );
+        }
+        if ( (int) $current_version < 21 ) {
+            $prefix = $wpdb->prefix;
+            // Collapse per-year totals into single row per account with net delta
+            $wpdb->query( "CREATE TABLE {$prefix}emeacc_account_totals_new (
+                account_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+                delta      DECIMAL(14,2)   NOT NULL DEFAULT 0.00
+            )" );
+            $wpdb->query( "INSERT INTO {$prefix}emeacc_account_totals_new (account_id, delta)
+                SELECT account_id, SUM(total_in) - SUM(total_out)
+                FROM {$prefix}emeacc_account_totals
+                GROUP BY account_id" );
+            $wpdb->query( "RENAME TABLE {$prefix}emeacc_account_totals TO {$prefix}emeacc_account_totals_old,
+                                         {$prefix}emeacc_account_totals_new TO {$prefix}emeacc_account_totals" );
+            $wpdb->query( "DROP TABLE IF EXISTS {$prefix}emeacc_account_totals_old" );
         }
     }
 
@@ -352,13 +367,10 @@ class Installer {
             PRIMARY KEY (id),
             UNIQUE KEY uniq_year (fiscal_year)
         ) $charset;" );
-        // ── Aggregated account totals per fiscal year ──────────────────────
+        // ── Aggregated account totals (single row per account) ─────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_account_totals (
-            account_id  BIGINT UNSIGNED NOT NULL,
-            fiscal_year SMALLINT        NOT NULL,
-            total_in    DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
-            total_out   DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
-            PRIMARY KEY (account_id, fiscal_year)
+            account_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            delta      DECIMAL(14,2)   NOT NULL DEFAULT 0.00
         ) $charset;" );
 
         // ── Bank import batches ─────────────────────────────────────────
