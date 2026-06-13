@@ -131,6 +131,23 @@ class Accounts {
         );
     }
 
+    /**
+     * Rebuild the account_totals table from scratch.
+     * Should only be called manually by an admin (e.g. after direct DB edits or data migration).
+     */
+    public static function rebuild_totals(): void {
+        global $wpdb;
+
+        $wpdb->query( "TRUNCATE TABLE `{$wpdb->prefix}emeacc_account_totals`" );
+        $wpdb->query(
+            "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, delta)
+            SELECT account_id,
+            SUM( CASE WHEN direction = 'in' THEN amount ELSE -amount END )
+            FROM `{$wpdb->prefix}emeacc_journal`
+            GROUP BY account_id"
+        );
+    }
+
     public static function can_book_on_date( int $account_id, string $entry_date ): bool {
         $account = self::get( $account_id );
         if ( ! $account || empty( $account->opening_date ) ) {

@@ -328,13 +328,7 @@ class Capabilities {
 
     /** Handle POST from the access form in settings. */
     public static function handle_save(): void {
-        if ( ! isset( $_POST['emeacc_access_nonce'] )
-             || ! wp_verify_nonce( $_POST['emeacc_access_nonce'], 'emeacc_access_save' )
-             || ! current_user_can( 'manage_options' )
-        ) {
-            return;
-        }
-
+        // referer and current_user_can already handled in templates/settings.php, no need to do it again
         foreach ( array_keys( wp_roles()->roles ) as $role_slug ) {
             $profile = sanitize_key( $_POST['emeacc_profile'][ $role_slug ] ?? 'none' );
 

@@ -30,7 +30,7 @@ class Installer {
         update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
         // Grant all EME Accounting capabilities to the administrator role.
         \EMEAccounting\Capabilities::add_caps_to_admin();
-        flush_rewrite_rules();
+        //flush_rewrite_rules();
     }
 
     /**
@@ -107,7 +107,7 @@ class Installer {
     }
 
     public static function deactivate(): void {
-        flush_rewrite_rules();
+        //flush_rewrite_rules();
     }
 
     public static function uninstall(): void {

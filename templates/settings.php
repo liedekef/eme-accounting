@@ -8,7 +8,8 @@ $eme_categories = eme_get_categories();
 
 // ── Handle: general settings ────────────────────────────────────────────────
 if ( isset( $_POST['eme_accounting_settings_nonce'] )
-     && wp_verify_nonce( $_POST['eme_accounting_settings_nonce'], 'eme_accounting_settings' ) ) {
+    && Capabilities::can_manage( 'settings' )
+    && check_admin_referer( 'eme_accounting_settings', 'eme_accounting_settings_nonce' ) ) {
     $settings = [
         'default_income_account' => (int)    ( $_POST['default_income_account']  ?? 0 ),
         'delete_on_uninstall'    => sanitize_key( $_POST['delete_on_uninstall'] ?? 'no' ),
@@ -28,9 +29,19 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
 }
 
 // ── Handle: access matrix ───────────────────────────────────────────────────
-if ( isset( $_POST['emeacc_access_nonce'] ) ) {
+if ( isset( $_POST['emeacc_access_nonce'] )
+    && Capabilities::can_manage( 'settings' )
+    && check_admin_referer( 'emeacc_access_save', 'emeacc_access_nonce' ) ) {
     Capabilities::handle_save();
     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Toegangsrechten opgeslagen.', 'eme-accounting' ) . '</p></div>';
+}
+
+// ── Handle: rebuild totals ──────────────────────────────────────────────────
+if ( isset( $_POST['emeacc_rebuild_totals_nonce'] )
+    && Capabilities::can_manage( 'settings' )
+    && check_admin_referer( 'emeacc_rebuild_totals_nonce' ) ) {
+    Accounts::rebuild_totals();
+    echo '<div class="notice notice-success"><p>' . __( 'Totals tabel succesvol herberekend.', 'eme-accounting' ) . '</p></div>';
 }
 
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
@@ -57,6 +68,10 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
     <a href="<?= esc_url( add_query_arg( 'tab', 'access' ) ) ?>"
        class="nav-tab <?= $active_tab === 'access' ? 'nav-tab-active' : '' ?>">
         <?php esc_html_e( 'Toegangsbeheer', 'eme-accounting' ); ?>
+    </a>
+    <a href="<?= esc_url( add_query_arg( 'tab', 'advanced' ) ) ?>"
+       class="nav-tab <?= $active_tab === 'advanced' ? 'nav-tab-active' : '' ?>">
+        <?php esc_html_e( 'Advanced', 'eme-accounting' ); ?>
     </a>
 </nav>
 
@@ -162,7 +177,7 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
 <h2 style="color:#d63638"><?php esc_html_e( 'Gevaarzone', 'eme-accounting' ); ?></h2>
 <table class="form-table">
 <tr>
-    <th><?php esc_html_e( 'Data verwijderen bij deactivatie', 'eme-accounting' ); ?></th>
+    <th><?php esc_html_e( 'Data verwijderen bij uninstall plugin?', 'eme-accounting' ); ?></th>
     <td>
         <select name="delete_on_uninstall">
             <option value="no"  <?= selected( 'no',  $settings['delete_on_uninstall'], false ) ?>><?php esc_html_e( 'Nee – data bewaren (aanbevolen)', 'eme-accounting' ); ?></option>
@@ -177,7 +192,7 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
 <p><button type="submit" class="button button-primary"><?php esc_html_e( 'Instellingen opslaan', 'eme-accounting' ); ?></button></p>
 </form>
 
-<?php else: ?>
+<?php elseif ( $active_tab === 'access' ): ?>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      TAB: ACCESS MANAGEMENT
@@ -195,41 +210,6 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 }
 ?>
 
-<style>
-/* ── Profile table ─────────────────────────────────────── */
-.emeacc-role-table { border-collapse: collapse; width: 100%; margin-bottom: 2em; }
-.emeacc-role-table th,
-.emeacc-role-table td { padding: 10px 14px; border: 1px solid #c3c4c7; vertical-align: middle; }
-.emeacc-role-table thead th { background: #f6f7f7; font-weight: 600; }
-.emeacc-role-table tbody tr:nth-child(even) { background: #fafafa; }
-.emeacc-role-table select { min-width: 190px; }
-.emeacc-profile-desc { color: #787c82; font-size: 12px; margin-top: 4px; }
-.emeacc-locked { color: #787c82; font-style: italic; }
-
-/* ── Custom detail panels ──────────────────────────────── */
-.emeacc-custom-panel { display: none; margin-top: 8px; }
-.emeacc-custom-panel.is-open { display: block; }
-.emeacc-custom-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 6px 16px;
-    background: #f6f7f7;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
-    padding: 12px 16px;
-    margin-top: 6px;
-}
-.emeacc-custom-grid label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    white-space: nowrap;
-}
-.emeacc-custom-grid label span { flex: 1; }
-.emeacc-custom-grid select { font-size: 12px; }
-</style>
-
 <p><?php esc_html_e(
     'Kies per WordPress-rol welk toegangsprofiel van toepassing is. '
     . 'De instellingenpagina is altijd toegankelijk voor beheerders (manage_options) en staat niet in deze lijst.',
@@ -239,7 +219,7 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 <form method="post" id="emeacc-access-form">
 <?php wp_nonce_field( 'emeacc_access_save', 'emeacc_access_nonce' ); ?>
 
-<table class="emeacc-role-table widefat">
+<table class="eme-acc-role-table widefat">
 <thead>
 <tr>
     <th style="width:220px"><?php esc_html_e( 'WordPress-rol', 'eme-accounting' ); ?></th>
@@ -257,7 +237,7 @@ foreach ( array_keys( $all_roles ) as $slug ) {
     <td>
         <?php /* Profile dropdown */ ?>
         <select name="emeacc_profile[<?= esc_attr( $role_slug ) ?>]"
-                class="emeacc-profile-select"
+                class="eme-acc-profile-select"
                 data-role="<?= esc_attr( $role_slug ) ?>"
                 style="margin-bottom:4px">
             <?php foreach ( $profiles as $prof_slug => $prof ): ?>
@@ -270,21 +250,21 @@ foreach ( array_keys( $all_roles ) as $slug ) {
         </select>
 
         <?php /* Live description line */ ?>
-        <div class="emeacc-profile-desc" id="desc-<?= esc_attr( $role_slug ) ?>">
+        <div class="eme-acc-role-profile-desc" id="desc-<?= esc_attr( $role_slug ) ?>">
             <?= esc_html( $profiles[ $current_prof ]['description'] ) ?>
         </div>
 
         <?php /* Hint for roles with manage_options */ ?>
         <?php if ( $has_manage_options ): ?>
-        <div class="emeacc-profile-desc" style="color:#b45309; margin-top:2px">
+        <div class="eme-acc-role-profile-desc" style="color:#b45309; margin-top:2px">
             ⚠️ <?php esc_html_e( 'Deze rol heeft manage_options: de instellingenpagina is altijd toegankelijk.', 'eme-accounting' ); ?>
         </div>
         <?php endif; ?>
 
         <?php /* Custom detail panel (hidden unless 'custom' selected) */ ?>
-        <div class="emeacc-custom-panel <?= $current_prof === 'custom' ? 'is-open' : '' ?>"
+        <div class="eme-acc-role-custom-panel <?= $current_prof === 'custom' ? 'is-open' : '' ?>"
              id="custom-<?= esc_attr( $role_slug ) ?>">
-            <div class="emeacc-custom-grid">
+            <div class="eme-acc-role-custom-grid">
                 <?php foreach ( $pages as $page_slug => $page_label ):
                     $level = $matrix[ $role_slug ][ $page_slug ] ?? 'none';
                 ?>
@@ -351,7 +331,7 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 (function () {
     const descs   = <?= json_encode( array_map( fn($p) => $p['description'], Capabilities::PROFILES ) ) ?>;
 
-    document.querySelectorAll('.emeacc-profile-select').forEach(function (sel) {
+    document.querySelectorAll('.eme-acc-profile-select').forEach(function (sel) {
         sel.addEventListener('change', function () {
             const role   = this.dataset.role;
             const prof   = this.value;
@@ -365,6 +345,17 @@ foreach ( array_keys( $all_roles ) as $slug ) {
     });
 }());
 </script>
+
+<?php else: ?> <!-- tab advanced -->
+<div class="eme-acc-form-box">
+<h2><?php esc_html_e( 'Herbereken account totals', 'eme-accounting' ); ?></h2>
+<form method="post">
+    <?php wp_nonce_field( 'emeacc_rebuild_totals_nonce' ); ?>
+    <p><?php _e( 'Herbereken de totals tabel vanuit het journaal. Gebruik dit enkel na directe DB-wijzigingen of bij vermoeden van inconsistentie.', 'eme-accounting' ); ?></p>
+    <input type="submit" name="emeacc_rebuild_totals" class="button button-secondary"
+           value="<?php esc_attr_e( 'Herbereken totals', 'eme-accounting' ); ?>">
+</form>
+</div>
 
 <?php endif; ?>
 </div><!-- .wrap -->
