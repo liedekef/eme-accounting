@@ -664,7 +664,11 @@ function initSnapSelectRemote(selector, options = {}) {
             ? `<span style="color:green;font-weight:bold">${fmt(n)}</span>`
             : `<span style="color:red;font-weight:bold">${fmt(n)}</span>`;
 
+        const accountIds = Object.keys(data.data || {});
+
         let html = `<h2>Cashflow per maand – ${esc(String(data.fiscal_year))}</h2>`;
+
+        // Table
         html += `<div style="overflow-x:auto">`;
         html += `<table class="widefat striped" style="min-width:900px;font-size:13px">`;
 
@@ -672,8 +676,6 @@ function initSnapSelectRemote(selector, options = {}) {
         html += `<thead><tr><th>Rekening</th>`;
         for (let m = 1; m <= 12; m++) html += `<th style="text-align:right">${months[m-1]}</th>`;
         html += `<th style="text-align:right">Totaal</th></tr></thead><tbody>`;
-
-        const accountIds = Object.keys(data.data || {});
 
         for (const aid of accountIds) {
             const name    = esc(data.accounts[aid] || aid);
@@ -713,7 +715,140 @@ function initSnapSelectRemote(selector, options = {}) {
         html += `<td style="text-align:right">${colorNet(data.totals?.net || 0)}</td></tr>`;
 
         html += `</tbody></table></div>`;
+
+        // Chart
+        html += `<div style="margin-top:30px;max-width:1000px; height:40vh; width:80vw">`;
+        html += `<label for="cf-account-select" style="margin-right:6px">Grafiek rekening:</label>`;
+        html += `<select id="cf-account-select">`;
+        html += `<option value="">Alle rekeningen</option>`;
+        for (const aid of accountIds) {
+            html += `<option value="${aid}">${esc(data.accounts[aid] || aid)}</option>`;
+        }
+        html += `</select>`;
+        html += `<canvas id="cashflow-chart" ></canvas>`;
+        html += `</div>`;
+
         container.innerHTML = html;
+
+        if (typeof Chart !== 'undefined') {
+            initCashflowChart(data);
+        }
+    }
+
+    function initCashflowChart(data) {
+        const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+        const canvas = document.getElementById('cashflow-chart');
+        if (!canvas) return;
+
+        let chartInstance = null;
+
+        function buildChartData(accountId) {
+            let source;
+            if (accountId && data.data[accountId]) {
+                source = data.data[accountId];
+            } else {
+                source = data.month_totals || {};
+            }
+            const inData = [], outData = [], netData = [];
+            for (let m = 1; m <= 12; m++) {
+                const d = source[m] || { in: 0, out: 0, net: 0 };
+                inData.push(d.in);
+                outData.push(-d.out);
+                netData.push(d.net);
+            }
+            return { inData, outData, netData };
+        }
+
+        function renderChart(accountId) {
+            const chartData = buildChartData(accountId);
+
+            if (chartInstance) {
+                chartInstance.data.datasets[0].data = chartData.inData;
+                chartInstance.data.datasets[1].data = chartData.outData;
+                chartInstance.data.datasets[2].data = chartData.netData;
+                chartInstance.update();
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: 'Inkomsten',
+                            data: chartData.inData,
+                            backgroundColor: 'rgba(34,139,34,0.7)',
+                            borderColor: 'rgba(34,139,34,1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Uitgaven',
+                            data: chartData.outData,
+                            backgroundColor: 'rgba(220,20,60,0.7)',
+                            borderColor: 'rgba(220,20,60,1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Netto',
+                            data: chartData.netData,
+                            type: 'line',
+                            borderColor: 'rgba(30,144,255,1)',
+                            backgroundColor: 'rgba(30,144,255,0.1)',
+                            fill: false,
+                            tension: 0.2,
+                            pointRadius: 4,
+                            pointBackgroundColor: 'rgba(30,144,255,1)',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: { display: false }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.dataset.label + ': ' + formatCurrency(context.raw);
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        renderChart('');
+
+        const sel = document.getElementById('cf-account-select');
+        if (sel) {
+            sel.addEventListener('change', function () {
+                renderChart(this.value);
+            });
+        }
     }
 
     function renderIncomeExpenditure(data, container) {

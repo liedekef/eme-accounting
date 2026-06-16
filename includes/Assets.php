@@ -85,6 +85,9 @@ class Assets {
                     'col_required'     => __( 'Vereist', 'eme-accounting' ),
             'col_optional'     => __( 'Optioneel', 'eme-accounting' ),
         ] );
+        if ( $plugin_page === 'emeaccounting-reports' ) {
+            wp_enqueue_script( 'emeaccounting-chartjs', 'https://cdn.jsdelivr.net/npm/chart.js@4', [], '4.4.7', true );
+        }
         if ( $plugin_page === 'emeaccounting-journal' ) {
             wp_enqueue_script( 'emeaccounting-journal', EME_ACCOUNTING_URL . 'assets/js/journal.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
         }
