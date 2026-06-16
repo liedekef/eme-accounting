@@ -717,7 +717,7 @@ function initSnapSelectRemote(selector, options = {}) {
         html += `</tbody></table></div>`;
 
         // Chart
-        html += `<div style="margin-top:30px;max-width:1000px; height:40vh; width:80vw">`;
+        html += `<div style="margin-top:30px;max-width:1000px; height:50vh; width:100vw">`;
         html += `<label for="cf-account-select" style="margin-right:6px">Grafiek rekening:</label>`;
         html += `<select id="cf-account-select">`;
         html += `<option value="">Alle rekeningen</option>`;
