@@ -205,11 +205,14 @@ class Journal {
             ? $data['direction']
             : null;
 
-        // when editing, make sure to not change the direction (normally the field is not even passed along, so we shouldn't get here)
-        if ( !empty( $id) && !empty($direction) ) {
-            $orig_entry = self::get($id);
-            if ($orig_entry->direction != $direction) {
-                return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$orig_entry->direction,$direction) );
+        // when editing, make sure to not change the direction
+        $old_entry = null;
+        if ( !empty( $id) ) {
+            $old_entry = self::get( $id );
+            if ( empty( $direction ) ) {
+                $direction = $old_entry->direction;
+            } elseif ( $old_entry->direction != $direction ) {
+                return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$old_entry->direction,$direction) );
             }
         }
         if ( empty( $id) && empty($direction) ) {
@@ -277,14 +280,13 @@ class Journal {
 
         // for regular updates of an entry (no transfer)
         if ( $id > 0 ) {
-            $old_entry = self::get( $id );
             unset( $row['created_by'] );
             $row['updated_by'] = get_current_user_id() ?: null;
             $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
             do_action( 'eme_accounting_journal_updated', $id, $row );
             if ( $old_entry ) {
                 Accounts::adjust_totals( (int) $old_entry->account_id, $old_entry->direction, (float) $old_entry->amount, 'subtract' );
-                Accounts::adjust_totals( (int) $row['account_id'], $direction, (float) $row['amount'], 'add' );
+                Accounts::adjust_totals( (int) $row['account_id'], $old_entry->direction, (float) $row['amount'], 'add' );
             }
             return $id;
         }
