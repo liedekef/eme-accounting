@@ -39,8 +39,8 @@ if ( isset( $_POST['emeacc_access_nonce'] )
 // ── Handle: rebuild totals ──────────────────────────────────────────────────
 if ( isset( $_POST['emeacc_rebuild_totals_nonce'] )
     && Capabilities::can_manage( 'settings' )
-    && check_admin_referer( 'emeacc_rebuild_totals_nonce' ) ) {
-    Accounts::rebuild_totals();
+    && check_admin_referer( 'emeacc_rebuild_totals', 'emeacc_rebuild_totals_nonce' ) ) {
+    EMEAccounting\Accounts::rebuild_totals();
     echo '<div class="notice notice-success"><p>' . __( 'Totals tabel succesvol herberekend.', 'eme-accounting' ) . '</p></div>';
 }
 
@@ -350,7 +350,7 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 <div class="eme-acc-form-box">
 <h2><?php esc_html_e( 'Herbereken account totals', 'eme-accounting' ); ?></h2>
 <form method="post">
-    <?php wp_nonce_field( 'emeacc_rebuild_totals_nonce' ); ?>
+    <?php wp_nonce_field( 'emeacc_rebuild_totals', 'emeacc_rebuild_totals_nonce' ); ?>
     <p><?php _e( 'Herbereken de totals tabel vanuit het journaal. Gebruik dit enkel na directe DB-wijzigingen of bij vermoeden van inconsistentie.', 'eme-accounting' ); ?></p>
     <input type="submit" name="emeacc_rebuild_totals" class="button button-secondary"
            value="<?php esc_attr_e( 'Herbereken totals', 'eme-accounting' ); ?>">
