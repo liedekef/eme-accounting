@@ -273,8 +273,18 @@ class Journal {
 
             do_action( 'eme_accounting_journal_created', $out_id, $out_row );
             do_action( 'eme_accounting_journal_created', $in_id, $in_row );
-            Accounts::adjust_totals( (int) $data['account_id'], 'out', (float) $row['amount'], 'add' );
-            Accounts::adjust_totals( (int) $data['contra_account_id'], 'in', (float) $row['amount'], 'add' );
+            $wpdb->query( 'START TRANSACTION' );
+            $r = Accounts::adjust_totals( (int) $data['account_id'], 'out', (float) $row['amount'], 'add', $out_id );
+            if ( !is_wp_error( $r ) ) {
+                $r = Accounts::adjust_totals( (int) $data['contra_account_id'], 'in', (float) $row['amount'], 'add', $in_id );
+            }
+            if ( is_wp_error( $r ) ) {
+                $wpdb->query( 'ROLLBACK' );          // eerst de open transactie sluiten...
+                Accounts::rebuild_totals();          // ...dan pas de rebuild aanroepen (anders geneste transactie)
+            } else {
+                $wpdb->query( 'COMMIT' );
+            }
+
             return $out_id;
         }
 
@@ -285,8 +295,17 @@ class Journal {
             $wpdb->update( $table, $row, [ 'id' => $id ], null, [ '%d' ] );
             do_action( 'eme_accounting_journal_updated', $id, $row );
             if ( $old_entry ) {
-                Accounts::adjust_totals( (int) $old_entry->account_id, $old_entry->direction, (float) $old_entry->amount, 'subtract' );
-                Accounts::adjust_totals( (int) $row['account_id'], $old_entry->direction, (float) $row['amount'], 'add' );
+                $wpdb->query( 'START TRANSACTION' );
+                $r = Accounts::adjust_totals( (int) $old_entry->account_id, $old_entry->direction, (float) $old_entry->amount, 'subtract', $id );
+                if ( ! is_wp_error( $r ) ) {
+                    $r = Accounts::adjust_totals( (int) $row['account_id'], $old_entry->direction, (float) $row['amount'], 'add', $id );
+                }
+                if ( is_wp_error( $r ) ) {
+                    $wpdb->query( 'ROLLBACK' );          // eerst de open transactie sluiten...
+                    Accounts::rebuild_totals();          // ...dan pas de rebuild aanroepen (anders geneste transactie)
+                } else {
+                    $wpdb->query( 'COMMIT' );
+                }
             }
             return $id;
         }
@@ -296,7 +315,14 @@ class Journal {
         $wpdb->insert( $table, $row );
         $new_id = (int) $wpdb->insert_id;
         do_action( 'eme_accounting_journal_created', $new_id, $row );
-        Accounts::adjust_totals( (int) $row['account_id'], $direction, (float) $row['amount'], 'add' );
+        $wpdb->query( 'START TRANSACTION' );
+        $r = Accounts::adjust_totals( (int) $row['account_id'], $direction, (float) $row['amount'], 'add', $new_id );
+        if ( is_wp_error( $r ) ) {
+            $wpdb->query( 'ROLLBACK' );          // eerst de open transactie sluiten...
+            Accounts::rebuild_totals();          // ...dan pas de rebuild aanroepen (anders geneste transactie)
+        } else {
+            $wpdb->query( 'COMMIT' );
+        }
         return $new_id;
     }
 
@@ -318,13 +344,27 @@ class Journal {
             $wpdb->delete( $table, [ 'id' => (int) $entry->transfer_id ], [ '%d' ] );
             do_action( 'eme_accounting_journal_deleted', (int) $entry->transfer_id );
             if ( $transfer_entry ) {
-                Accounts::adjust_totals( (int) $transfer_entry->account_id, $transfer_entry->direction, (float) $transfer_entry->amount, 'subtract' );
+                $wpdb->query( 'START TRANSACTION' );
+                $r = Accounts::adjust_totals( (int) $transfer_entry->account_id, $transfer_entry->direction, (float) $transfer_entry->amount, 'subtract', $entry->transfer_id );
+                if ( is_wp_error( $r ) ) {
+                    $wpdb->query( 'ROLLBACK' );          // eerst de open transactie sluiten...
+                    Accounts::rebuild_totals();          // ...dan pas de rebuild aanroepen (anders geneste transactie)
+                } else {
+                    $wpdb->query( 'COMMIT' );
+                }
             }
         }
 
         $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
         do_action( 'eme_accounting_journal_deleted', $id );
-        Accounts::adjust_totals( (int) $entry->account_id, $entry->direction, (float) $entry->amount, 'subtract' );
+        $wpdb->query( 'START TRANSACTION' );
+        $r = Accounts::adjust_totals( (int) $entry->account_id, $entry->direction, (float) $entry->amount, 'subtract', $id );
+        if ( is_wp_error( $r ) ) {
+            $wpdb->query( 'ROLLBACK' );          // eerst de open transactie sluiten...
+            Accounts::rebuild_totals();          // ...dan pas de rebuild aanroepen (anders geneste transactie)
+        } else {
+            $wpdb->query( 'COMMIT' );
+        }
         return true;
     }
 

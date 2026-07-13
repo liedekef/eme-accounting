@@ -40,8 +40,14 @@ if ( isset( $_POST['emeacc_access_nonce'] )
 if ( isset( $_POST['emeacc_rebuild_totals_nonce'] )
     && Capabilities::can_manage( 'settings' )
     && check_admin_referer( 'emeacc_rebuild_totals', 'emeacc_rebuild_totals_nonce' ) ) {
-    EMEAccounting\Accounts::rebuild_totals();
-    echo '<div class="notice notice-success"><p>' . __( 'Totals tabel succesvol herberekend.', 'eme-accounting' ) . '</p></div>';
+    $r = EMEAccounting\Accounts::rebuild_totals();
+    if ( is_wp_error( $r ) ) {
+        echo '<div class="notice notice-error"><p>' . esc_html__( 'Fout bij het herberekenen van de totalen:', 'eme-accounting' ) . '<br>' ;
+        echo esc_html($r->get_error_message());
+        echo '</p></div>';
+    } else {
+        echo '<div class="notice notice-success"><p>' . __( 'Totals tabel succesvol herberekend.', 'eme-accounting' ) . '</p></div>';
+    }
 }
 
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [

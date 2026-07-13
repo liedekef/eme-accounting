@@ -112,40 +112,64 @@ class Accounts {
      * @param string $direction  'in' or 'out'
      * @param float  $amount     Positive amount.
      * @param string $op         'add' or 'subtract'
+     * @param int    $journal_id Optional, for logging context on failure.
      */
-    public static function adjust_totals( int $account_id, string $direction, float $amount, string $op = 'add' ): void {
+    public static function adjust_totals( int $account_id, string $direction, float $amount, string $op = 'add', int $journal_id = 0 ): bool|\WP_Error {
         global $wpdb;
         if ( $amount <= 0 ) {
-            return;
+            return true;
         }
 
         $delta = $direction === 'in' ? $amount : -$amount;
         if ( $op === 'subtract' ) $delta = -$delta;
-        $wpdb->query(
+        $result = $wpdb->query(
             $wpdb->prepare(
                 "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, delta)
-                 VALUES (%d, 0)
-                 ON DUPLICATE KEY UPDATE delta = delta + %f",
-                $account_id, $delta
+                VALUES (%d, 0)
+                ON DUPLICATE KEY UPDATE delta = delta + %f",
+            $account_id, $delta
             )
         );
+
+        if ( false === $result ) {
+            error_log( sprintf(
+                '[EME Accounting] adjust_totals failed (journal_id=%d, account_id=%d, delta=%F, op=%s): %s — rebuild_totals required.',
+                $journal_id, $account_id, $delta, $op, $wpdb->last_error
+            ) );
+            return new \WP_Error( 'db_problem_adjust_totals', __( 'Totalen aanpassen mislukt.', 'eme-accounting' ) );
+        }
+        return true;
     }
 
     /**
      * Rebuild the account_totals table from scratch.
      * Should only be called manually by an admin (e.g. after direct DB edits or data migration).
      */
-    public static function rebuild_totals(): void {
+    public static function rebuild_totals(): bool|\WP_Error {
         global $wpdb;
+        $totals_table  = "{$wpdb->prefix}emeacc_account_totals";
+        $journal_table = "{$wpdb->prefix}emeacc_journal";
 
-        $wpdb->query( "TRUNCATE TABLE `{$wpdb->prefix}emeacc_account_totals`" );
-        $wpdb->query(
-            "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, delta)
+        $wpdb->query( 'START TRANSACTION' );
+
+        $r1 = $wpdb->query( "DELETE FROM `{$totals_table}`" );
+        $r2 = ( false === $r1 ) ? false : $wpdb->query(
+            "INSERT INTO `{$totals_table}` (account_id, delta)
             SELECT account_id,
             SUM( CASE WHEN direction = 'in' THEN amount ELSE -amount END )
-            FROM `{$wpdb->prefix}emeacc_journal`
+            FROM `{$journal_table}`
             GROUP BY account_id"
         );
+
+        if ( false === $r1 || false === $r2 ) {
+            $wpdb->query( 'ROLLBACK' );
+            error_log( sprintf( '[EME Accounting] rebuild_totals FAILED: %s — totals table may now be inconsistent!', $wpdb->last_error ) );
+            return new \WP_Error( 'db_rebuild_failed', $wpdb->last_error );
+        }
+
+        $wpdb->query( 'COMMIT' );
+        error_log( '[EME Accounting] rebuild_totals succeeded.' );
+        return true;
     }
 
     public static function can_book_on_date( int $account_id, string $entry_date ): bool {
