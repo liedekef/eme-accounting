@@ -54,6 +54,7 @@ function eme_accounting_init(): void {
         return;
     }
 
+    EMEAccounting\Installer::init();
     EMEAccounting\Admin\Menu::init();
     EMEAccounting\Accounts::init();
     EMEAccounting\ChartOfAccounts::init();

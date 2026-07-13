@@ -22,6 +22,8 @@ if ( isset( $_POST['eme_accounting_settings_nonce'] )
     if ( $settings['eme_auto_booking'] && ! $settings['default_coa'] ) {
         echo '<div class="notice notice-error"><p>' . esc_html__( 'Kies een resultatenrekening aub.', 'eme-accounting' ) . '</p></div>';
     } else {
+        // Preserve the weekly-rebuild setting, which is saved via its own form/handler below.
+        $settings['weekly_rebuild_totals'] = (int) ( get_option( 'eme_accounting_settings', [] )['weekly_rebuild_totals'] ?? 0 );
         update_option( 'eme_accounting_settings', $settings );
         update_option( 'eme_accounting_delete_on_uninstall', $settings['delete_on_uninstall'] );
         echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
@@ -34,6 +36,17 @@ if ( isset( $_POST['emeacc_access_nonce'] )
     && check_admin_referer( 'emeacc_access_save', 'emeacc_access_nonce' ) ) {
     Capabilities::handle_save();
     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Toegangsrechten opgeslagen.', 'eme-accounting' ) . '</p></div>';
+}
+
+// ── Handle: weekly rebuild cron setting ─────────────────────────────────────
+if ( isset( $_POST['emeacc_weekly_rebuild_nonce'] )
+    && Capabilities::can_manage( 'settings' )
+    && check_admin_referer( 'emeacc_weekly_rebuild', 'emeacc_weekly_rebuild_nonce' ) ) {
+    $settings                           = get_option( 'eme_accounting_settings', [] );
+    $settings['weekly_rebuild_totals']  = (int) (bool) ( $_POST['weekly_rebuild_totals'] ?? 0 );
+    update_option( 'eme_accounting_settings', $settings );
+    EMEAccounting\Installer::sync_weekly_rebuild_cron();
+    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Instelling opgeslagen.', 'eme-accounting' ) . '</p></div>';
 }
 
 // ── Handle: rebuild totals ──────────────────────────────────────────────────
@@ -55,6 +68,7 @@ $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'delete_on_uninstall'    => 'no',
     'default_coa'            => 0,
     'eme_auto_booking'       => 0,
+    'weekly_rebuild_totals'  => 0,
     'eme_scope'              => '-3m--12m',
     'eme_cat_ids'            => [],
     'eme_exclude_cat_ids'    => [],
@@ -360,6 +374,19 @@ foreach ( array_keys( $all_roles ) as $slug ) {
     <p><?php _e( 'Herbereken de totals tabel vanuit het journaal. Gebruik dit enkel na directe DB-wijzigingen of bij vermoeden van inconsistentie.', 'eme-accounting' ); ?></p>
     <input type="submit" name="emeacc_rebuild_totals" class="button button-secondary"
            value="<?php esc_attr_e( 'Herbereken totals', 'eme-accounting' ); ?>">
+</form>
+<hr>
+<form method="post">
+    <?php wp_nonce_field( 'emeacc_weekly_rebuild', 'emeacc_weekly_rebuild_nonce' ); ?>
+    <p>
+        <label>
+            <input type="checkbox" name="weekly_rebuild_totals" value="1" <?= checked( 1, $settings['weekly_rebuild_totals'] ) ?>>
+            <?php esc_html_e( 'Automatisch wekelijks herberekenen (zondagnacht 03:00)', 'eme-accounting' ); ?>
+        </label>
+    </p>
+    <p class="description"><?php esc_html_e( 'Vangt drift op die niet via een gefaalde query loopt (bv. rechtstreekse DB-wijzigingen). Standaard uit.', 'eme-accounting' ); ?></p>
+    <input type="submit" name="submit" class="button button-secondary"
+           value="<?php esc_attr_e( 'Instelling opslaan', 'eme-accounting' ); ?>">
 </form>
 </div>
 

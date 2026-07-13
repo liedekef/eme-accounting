@@ -262,4 +262,12 @@ class Accounts {
         }
         wp_send_json_success();
     }
+
+    public static function scheduled_rebuild_totals(): void {
+        $result = self::rebuild_totals();
+        if ( is_wp_error( $result ) ) {
+            error_log( '[EME Accounting] Scheduled rebuild_totals failed: ' . $result->get_error_message() );
+        }
+    }
+
 }

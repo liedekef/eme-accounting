@@ -22,6 +22,44 @@ class Installer {
 
     const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
     const DB_VERSION        = '21';
+    const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
+
+    /**
+     * Register cron plumbing. Must run on every request (via plugins_loaded),
+     * NOT only on activation, because WP-Cron needs the 'weekly' interval and
+     * the action callback registered whenever wp-cron.php actually fires.
+     */
+    public static function init(): void {
+        add_filter( 'cron_schedules', [ __CLASS__, 'register_cron_schedule' ] );
+        add_action( self::CRON_HOOK, [ 'EMEAccounting\\Accounts', 'scheduled_rebuild_totals' ] );
+    }
+
+    public static function register_cron_schedule( array $schedules ): array {
+        if ( ! isset( $schedules['weekly'] ) ) {
+            $schedules['weekly'] = [
+                'interval' => WEEK_IN_SECONDS,
+                'display'  => __( 'Once Weekly', 'eme-accounting' ),
+            ];
+        }
+        return $schedules;
+    }
+
+    /**
+     * Schedule or clear the weekly rebuild cron based on the
+     * 'weekly_rebuild_totals' setting. Call this on activation and whenever
+     * the settings form is saved, so a toggle takes effect immediately.
+     */
+    public static function sync_weekly_rebuild_cron(): void {
+        $settings  = get_option( 'eme_accounting_settings', [] );
+        $enabled   = ! empty( $settings['weekly_rebuild_totals'] );
+        $scheduled = wp_next_scheduled( self::CRON_HOOK );
+
+        if ( $enabled && ! $scheduled ) {
+            wp_schedule_event( strtotime( 'next sunday 03:00' ), 'weekly', self::CRON_HOOK );
+        } elseif ( ! $enabled && $scheduled ) {
+            wp_clear_scheduled_hook( self::CRON_HOOK );
+        }
+    }
 
     public static function activate(): void {
         self::create_tables();
@@ -30,6 +68,8 @@ class Installer {
         update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
         // Grant all EME Accounting capabilities to the administrator role.
         \EMEAccounting\Capabilities::add_caps_to_admin();
+        // In case of re-activation with a pre-existing 'yes' setting.
+        self::sync_weekly_rebuild_cron();
         //flush_rewrite_rules();
     }
 
@@ -108,6 +148,9 @@ class Installer {
 
     public static function deactivate(): void {
         //flush_rewrite_rules();
+        // Always clear, regardless of the setting, so no orphaned cron event
+        // survives a deactivation (re-activation will reschedule if enabled).
+        wp_clear_scheduled_hook( self::CRON_HOOK );
     }
 
     public static function uninstall(): void {
