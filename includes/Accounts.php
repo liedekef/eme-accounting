@@ -195,14 +195,14 @@ class Accounts {
         $table = $wpdb->prefix . 'emeacc_accounts';
 
         $row = [
-            'name'            => eme_sanitize_request( $data['name'] ?? '' ),
-            'iban'            => strtoupper( preg_replace( '/\s+/', '', $data['iban'] ?? '' ) ),
-            'bic'             => strtoupper( eme_sanitize_request( $data['bic'] ?? '' ) ),
+            'name'            => trim( eme_sanitize_request( $data['name'] ?? '' ) ),
+            'iban'            => strtoupper( trim( eme_sanitize_request( $data['iban'] ?? '' ) ) ),
+            'bic'             => strtoupper( trim( eme_sanitize_request( $data['bic'] ?? '' ) ) ),
             'opening_balance' => (float) ( $data['opening_balance'] ?? 0 ),
             'opening_date'   => ! empty( $data['opening_date'] ) ? eme_sanitize_request( $data['opening_date'] ) : null,
             'is_active'       => (int) (bool) ( $data['is_active'] ?? 1 ),
             'sort_order'      => (int) ( $data['sort_order'] ?? 0 ),
-            'description'     => eme_sanitize_request( $data['description'] ?? '' ),
+            'description'     => trim ( eme_sanitize_request( $data['description'] ?? '' ) ),
         ];
 
         $id = isset( $data['id'] ) ? (int) $data['id'] : 0;
