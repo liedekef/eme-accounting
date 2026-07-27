@@ -56,13 +56,52 @@ class Patrimony {
         }
 
         return (object) [
-            'fiscal_year    '   => $fiscal_year,
-            'asset_real_estate' => $asset_real_estate,
-            'asset_machines'    => $asset_machines,
-            'asset_movables'    => $asset_movables,
-            'asset_cash'        => $asset_cash,
-            'status'            => 'draft',
-            'id'                => 0,
+            'id'                        => 0,
+            'fiscal_year'               => $fiscal_year,
+            'status'                    => 'draft',
+
+            // ── Waarderingsregels ──────────────────────────────────
+            'depr_machines_new_years'   => 5,
+            'depr_machines_used_years'  => 2,
+            'depr_computers_new_years'  => 5,
+            'depr_computers_used_years' => 2,
+            'depr_furniture_new_years'  => 5,
+            'depr_furniture_used_years' => 2,
+            'depr_other_new_years'      => 5,
+            'depr_other_used_years'     => 2,
+            'depr_method'               => 'linear',
+            'cash_valuation_note'       => '',
+            'valuation_changes'         => '',
+            'additional_info'           => '',
+            'non_numeric_obligations'   => '',
+            'notes'                     => '',
+
+            // ── BEZITTINGEN ────────────────────────────────────────
+            'asset_real_estate'         => $asset_real_estate,
+            'asset_machines'            => $asset_machines,
+            'asset_movables'            => $asset_movables,
+            'asset_stocks'              => 0,
+            'asset_receivables'         => 0,
+            'asset_investments'         => 0,
+            'asset_cash'                => $asset_cash,
+            'asset_other'               => 0,
+
+            // ── SCHULDEN ───────────────────────────────────────────
+            'liab_financial'            => 0,
+            'liab_suppliers'            => 0,
+            'liab_members'              => 0,
+            'liab_fiscal_social'        => 0,
+            'liab_other'                => 0,
+
+            // ── RECHTEN ────────────────────────────────────────────
+            'right_subsidies'           => 0,
+            'right_donations'           => 0,
+            'right_other'               => 0,
+
+            // ── VERPLICHTINGEN ─────────────────────────────────────
+            'oblig_mortgages'           => 0,
+            'oblig_guarantees'          => 0,
+            'oblig_other'               => 0,
         ];
     }
 
