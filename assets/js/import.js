@@ -104,7 +104,7 @@
                     let html = statusBadge[ value ] ||
                         `<span class="eme-acc-tag">${esc(value)}</span>`;
                     if ( record.journal_id ) {
-                        html += `<br><span style="font-size:11px;color:#646970">#${record.journal_id}</span>`;
+                        html += `<br><span style="font-size:11px;color:#646970"><a target="_blank" href="admin.php?page=emeaccounting-journal&edit=${esc(record.journal_id)}">Wijzig boeking</a></span>`;
                     }
                     return html;
                 },
