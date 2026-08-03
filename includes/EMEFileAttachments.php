@@ -369,8 +369,17 @@ class EMEFileAttachments {
      * Create a directory (recursively) and drop an empty index.html in it
      * to prevent directory listing.
      */
-    private function mkdir_with_index( string $path ): bool {
-        return eme_mkdir_with_index( $path );
+    private function mkdir_with_index( string $targetPath ): bool {
+        $mkdir_res = true;
+        if ( ! is_dir( $targetPath ) ) {
+            $mkdir_res = wp_mkdir_p( $targetPath );
+        }
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- filesystem check
+        if ( $mkdir_res && is_writable( $targetPath ) && ! is_file( $targetPath . '/index.html' ) ) {
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_touch -- filesystem check
+            touch( $targetPath . '/index.html' );
+        } 
+        return $mkdir_res;
     }
 
     /**
@@ -403,7 +412,12 @@ class EMEFileAttachments {
      * Recursively delete a directory and all its contents.
      */
     private function del_tree( string $dir ): bool {
-        return eme_delTree( $dir);
+        foreach ( array_diff( scandir( $dir ), [ '.', '..' ] ) as $item ) {
+            $full = "$dir/$item";
+            is_dir( $full ) ? $this->del_tree( $full ) : wp_delete_file( $full );
+        }
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- directory cleanup
+        return rmdir( $dir );
     }
 
     /**
