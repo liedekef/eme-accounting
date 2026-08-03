@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 /**
  * PDF template: Financieel Dagboek
  * Variabelen: $data (financial_diary_report record - date => entries), $config (vzw config), $year (int)
@@ -58,17 +59,17 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 <div class="page">
 
     <!-- HOOFDING -->
-    <h1 class="vzw-title"><?= $vzw_name ?> <?= $vzw_form ?></h1>
+    <h1 class="vzw-title"><?php echo esc_html( $vzw_name ); ?> <?php echo esc_html( $vzw_form ); ?></h1>
     <p class="vzw-subtitle">
-        <?= $street ?>, <?= $postal ?><br>
-        Ondernemingsnr. <?= $vzw_number ?>
+        <?php echo esc_html( $street ); ?>, <?php echo esc_html( $postal ); ?><br>
+        Ondernemingsnr. <?php echo esc_html( $vzw_number ); ?>
     </p>
     <p class="vzw-subtitle">
-        <?= $website ?> | <?= $email ?><br>
-        <?= $court ?>
+        <?php echo esc_url( $website ); ?> | <?php echo esc_html( $email ); ?><br>
+        <?php echo esc_html( $court ); ?>
     </p>
 
-    <div class="doc-title">Boekjaar <?= $year ?> Financieel Dagboek</div>
+    <div class="doc-title">Boekjaar <?php echo esc_html( $year ); ?> Financieel Dagboek</div>
         <table class="schema-table">
             <thead>
                 <tr>
@@ -90,13 +91,13 @@ $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
                 $direction_class = $amount >= 0 ? 'direction-in' : 'direction-out';
             ?>
                 <tr>
-                    <td class="date-cell"><?= $i==0 ? esc_html( $date ) : '' ?></td>
-                    <td><?= esc_html( $entry->description ?? '' ) ?></td>
-                    <td><?= esc_html( $entry->account_name ) ?></td>
-                    <td><?= esc_html( $entry->bank_statement_ref ) ?></td>
-                    <td><?= esc_html( $entry->coa_name ) ?></td>
-                    <td class="amount <?= $direction_class ?>">
-                        <?= $formatter->formatCurrency( $amount, $currency ) ?>
+                    <td class="date-cell"><?php echo $i==0 ? esc_html( $date ) : ''; ?></td>
+                    <td><?php echo esc_html( $entry->description ?? '' ); ?></td>
+                    <td><?php echo esc_html( $entry->account_name ); ?></td>
+                    <td><?php echo esc_html( $entry->bank_statement_ref ); ?></td>
+                    <td><?php echo esc_html( $entry->coa_name ); ?></td>
+                    <td class="amount <?php echo esc_attr( $direction_class ); ?>">
+                        <?php echo esc_html( $formatter->formatCurrency( $amount, $currency ) ); ?>
                     </td>
                 </tr>
             <?php endforeach; ?>

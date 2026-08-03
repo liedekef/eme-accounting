@@ -10,7 +10,7 @@ use EMEAccounting\Capabilities;
  *
  * Each page is gated on its view-capability.
  * Templates receive $form_disabled (string: '' or 'disabled="disabled"')
- * so they can wrap their forms in <fieldset <?= $form_disabled ?>>.
+ * so they can wrap their forms in <fieldset <?php echo $form_disabled; ?>>.
  */
 class Menu {
 

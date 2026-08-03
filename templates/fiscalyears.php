@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
@@ -15,7 +16,7 @@ if ( empty( $fiscal_years ) ) {
 
 ?>
 <div class="wrap eme-acc-wrap">
-<fieldset <?= $form_disabled ?>>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
     <h1><?php esc_html_e( 'Boekjaren', 'eme-accounting' ); ?></h1>
 
     <?php if ( empty( $config->fiscal_year_start_mm) || empty( $config->fiscal_year_end_mm ) ): ?>
@@ -37,7 +38,7 @@ if ( empty( $fiscal_years ) ) {
             <div class="eme-acc-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Jaar', 'eme-accounting' ); ?></label>
-                    <input type="number" name="year" id="fy_year_input" min="2015" max="2100" placeholder="<?= $current_year ?>" required>
+                    <input type="number" name="year" id="fy_year_input" min="2015" max="2100" placeholder="<?php echo esc_attr( $current_year ); ?>" required>
                     <?php if ( ! empty( $config->fiscal_year_start_mm ) && ! empty( $config->fiscal_year_end_mm ) ): ?>
                     <p>
                         <button type="submit" class="button button-primary submit-btn" id="fy_submit">
@@ -72,12 +73,12 @@ if ( empty( $fiscal_years ) ) {
                     $result = EMEAccounting\FiscalYear::get_year_result( (int) $fy->year );
                     $closed_by_user = $fy->closed_by ? get_userdata( (int) $fy->closed_by ) : null;
                 ?>
-                <tr data-year="<?= (int) $fy->year ?>">
-                    <td><strong><?= (int) $fy->year ?></strong></td>
+                <tr data-year="<?php echo (int) $fy->year; ?>">
+                    <td><strong><?php echo (int) $fy->year; ?></strong></td>
                     <td>
-                        <?= esc_html( date_i18n( 'd/m/Y', strtotime( $fy->start_date ) ) ) ?>
+                        <?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $fy->start_date ) ) ); ?>
                         –
-                        <?= esc_html( date_i18n( 'd/m/Y', strtotime( $fy->end_date ) ) ) ?>
+                        <?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $fy->end_date ) ) ); ?>
                     </td>
                     <td>
                         <?php if ( $fy->status === 'closed' ): ?>
@@ -92,34 +93,34 @@ if ( empty( $fiscal_years ) ) {
                     </td>
                     <td>
                         <?php if ( $fy->closed_at ): ?>
-                            <?= esc_html( date_i18n( 'd/m/Y H:i', strtotime( $fy->closed_at ) ) ) ?>
+                            <?php echo esc_html( date_i18n( 'd/m/Y H:i', strtotime( $fy->closed_at ) ) ); ?>
                         <?php else: ?>
                             —
                         <?php endif; ?>
                     </td>
                     <td>
                         <?php if ( $closed_by_user ): ?>
-                            <?= esc_html( $closed_by_user->display_name ) ?>
+                            <?php echo esc_html( $closed_by_user->display_name ); ?>
                         <?php else: ?>
                             —
                         <?php endif; ?>
                     </td>
-                    <td class="amount <?= $result >= 0 ? 'in' : 'out' ?>">
-                        <?= $result >= 0 ? '+' : '–' ?>
-                        <?= $formatter->formatCurrency( abs( $result ), $currency ) ?>
+                    <td class="amount <?php echo $result >= 0 ? 'in' : 'out'; ?>">
+                        <?php echo $result >= 0 ? '+' : '–'; ?>
+                        <?php echo esc_html( $formatter->formatCurrency( abs( $result ), $currency ) ); ?>
                     </td>
                     <td>
                         <?php if ( $fy->status === 'open' ): ?>
-                        <button type="button" class="button btn-close" data-year="<?= (int) $fy->year ?>">
+                        <button type="button" class="button btn-close" data-year="<?php echo (int) $fy->year; ?>">
                             <?php esc_html_e( 'Afsluiten', 'eme-accounting' ); ?>
                         </button>
                         <?php else: ?>
-                        <button type="button" class="button btn-reopen" data-year="<?= (int) $fy->year ?>">
+                        <button type="button" class="button btn-reopen" data-year="<?php echo (int) $fy->year; ?>">
                             <?php esc_html_e( 'Heropenen', 'eme-accounting' ); ?>
                         </button>
                         <?php endif; ?>
                         <?php if ( $fy->status === 'open' ): ?>
-                        <button type="button" class="button btn-delete" data-year="<?= (int) $fy->year ?>">
+                        <button type="button" class="button btn-delete" data-year="<?php echo (int) $fy->year; ?>">
                             <?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?>
                         </button>
                         <?php endif; ?>

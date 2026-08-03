@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 /**
  * PDF template: Cashflow per maand
  * Variabelen: $data (cashflow array), $config (vzw config), $year (int)
@@ -50,8 +51,8 @@ $cf_fmt = fn( float $n ) => $formatter->formatCurrency( abs( $n ), $currency );
 </style>
 
 <div class="page">
-  <h1 class="vzw-title"><?= $vzw_form ?> <?= $vzw_name ?></h1>
-  <p class="vzw-subtitle">Boekjaar <?= (int) $year ?></p>
+  <h1 class="vzw-title"><?php echo esc_html( $vzw_form ); ?> <?php echo esc_html( $vzw_name ); ?></h1>
+  <p class="vzw-subtitle">Boekjaar <?php echo (int) $year; ?></p>
   <div class="doc-title">Cashflow per maand</div>
 
   <table>
@@ -60,7 +61,7 @@ $cf_fmt = fn( float $n ) => $formatter->formatCurrency( abs( $n ), $currency );
         <th class="col-account" style="width:14%">Rekening</th>
         <th class="col-type" style="width:4%"></th>
         <?php for ( $m = 1; $m <= 12; $m++ ): ?>
-        <th style="width:6%"><?= $month_names[$m] ?></th>
+        <th style="width:6%"><?php echo esc_html( $month_names[$m] ); ?></th>
         <?php endfor; ?>
         <th style="width:7%">Totaal</th>
       </tr>
@@ -77,20 +78,20 @@ $cf_fmt = fn( float $n ) => $formatter->formatCurrency( abs( $n ), $currency );
     ?>
       <!-- In row -->
       <tr class="row-in">
-        <td class="account-name" rowspan="3"><?= esc_html( $account_name ) ?></td>
+        <td class="account-name" rowspan="3"><?php echo esc_html( $account_name ); ?></td>
         <td class="label">Ontvangsten</td>
         <?php for ( $m = 1; $m <= 12; $m++ ): ?>
-        <td class="amount"><?= $months[$m]['in'] > 0 ? $cf_fmt( $months[$m]['in'] ) : '' ?></td>
+        <td class="amount"><?php echo esc_html( $months[$m]['in'] > 0 ? $cf_fmt( $months[$m]['in'] ) : '' ); ?></td>
         <?php endfor; ?>
-        <td class="amount"><?= $acc_in > 0 ? $cf_fmt( $acc_in ) : '' ?></td>
+        <td class="amount"><?php echo esc_html( $acc_in > 0 ? $cf_fmt( $acc_in ) : '' ); ?></td>
       </tr>
       <!-- Out row -->
       <tr class="row-out">
         <td class="label">Uitgaven</td>
         <?php for ( $m = 1; $m <= 12; $m++ ): ?>
-        <td class="amount"><?= $months[$m]['out'] > 0 ? $cf_fmt( $months[$m]['out'] ) : '' ?></td>
+        <td class="amount"><?php echo esc_html( $months[$m]['out'] > 0 ? $cf_fmt( $months[$m]['out'] ) : '' ); ?></td>
         <?php endfor; ?>
-        <td class="amount"><?= $acc_out > 0 ? $cf_fmt( $acc_out ) : '' ?></td>
+        <td class="amount"><?php echo esc_html( $acc_out > 0 ? $cf_fmt( $acc_out ) : '' ); ?></td>
       </tr>
       <!-- Net row -->
       <tr class="row-net">
@@ -99,9 +100,9 @@ $cf_fmt = fn( float $n ) => $formatter->formatCurrency( abs( $n ), $currency );
             $net = $months[$m]['net'];
             $cls = $net >= 0 ? 'positive' : 'negative';
         ?>
-        <td class="amount <?= $cls ?>"><?= $net != 0 ? $cf_fmt( $net ) : '' ?></td>
+        <td class="amount <?php echo esc_attr( $cls ); ?>"><?php echo esc_html( $net != 0 ? $cf_fmt( $net ) : '' ); ?></td>
         <?php endfor; ?>
-        <td class="amount <?= $acc_net >= 0 ? 'positive' : 'negative' ?>"><?= $cf_fmt( $acc_net ) ?></td>
+        <td class="amount <?php echo $acc_net >= 0 ? 'positive' : 'negative'; ?>"><?php echo esc_html( $cf_fmt( $acc_net ) ); ?></td>
       </tr>
     <?php endforeach; ?>
 
@@ -116,12 +117,12 @@ $cf_fmt = fn( float $n ) => $formatter->formatCurrency( abs( $n ), $currency );
           $net = $t[$m]['net'];
           $cls = $net >= 0 ? 'positive' : 'negative';
       ?>
-      <td class="amount <?= $cls ?>"><?= $net != 0 ? $cf_fmt( $net ) : '' ?></td>
+      <td class="amount <?php echo esc_attr( $cls ); ?>"><?php echo esc_html( $net != 0 ? $cf_fmt( $net ) : '' ); ?></td>
       <?php endfor; ?>
-      <td class="amount <?= $grand['net'] >= 0 ? 'positive' : 'negative' ?>"><?= $cf_fmt( $grand['net'] ) ?></td>
+      <td class="amount <?php echo $grand['net'] >= 0 ? 'positive' : 'negative'; ?>"><?php echo esc_html( $cf_fmt( $grand['net'] ) ); ?></td>
     </tr>
     </tbody>
   </table>
 
-  <p class="footer">Gegenereerd op <?= esc_html( date_i18n( 'd/m/Y' ) ) ?></p>
+  <p class="footer">Gegenereerd op <?php echo esc_html( date_i18n( 'd/m/Y' ) ); ?></p>
 </div>

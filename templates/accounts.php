@@ -1,4 +1,6 @@
-<?php // eme-accounting/templates/accounts.php
+<?php
+// eme-accounting/templates/accounts.php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 $accounts = EMEAccounting\Accounts::get_all();
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
@@ -8,7 +10,7 @@ $currency  = $config->currency;
 ?>
 <div class="wrap eme-acc-wrap">
 <form id="eme-acc-account-form">
-<fieldset <?= $form_disabled ?>>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 <h1><?php esc_html_e( 'Financiële Rekeningen', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
 <h2 id="eme-acc-account-form-title"><?php esc_html_e( 'Rekening toevoegen', 'eme-accounting' ); ?></h2>
@@ -50,25 +52,25 @@ $currency  = $config->currency;
 <?php foreach ( $accounts as $a ):
     $balance = $balances[ (int) $a->id ] ?? 0;
 ?>
-<tr data-account-row="<?= (int) $a->id ?>">
-    <td><strong><?= esc_html( $a->name ) ?></strong><?= $a->is_active ? '' : ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' ?></td>
-    <td><?= esc_html( $a->iban ) ?></td>
-    <td class="amount <?= $a->opening_balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $a->opening_balance, $currency) ?></td>
-    <td><?= esc_html( $a->opening_date ?? '' ) ?></td>
-    <td class="amount <?= $balance >= 0 ? '' : 'negative' ?>"><?= $formatter->formatCurrency( $balance, $currency) ?></td>
+<tr data-account-row="<?php echo (int) $a->id; ?>">
+    <td><strong><?php echo esc_html( $a->name ); ?></strong><?php echo $a->is_active ? '' : ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>'; ?></td>
+    <td><?php echo esc_html( $a->iban ); ?></td>
+    <td class="amount <?php echo $a->opening_balance >= 0 ? '' : 'negative'; ?>"><?php echo esc_html( $formatter->formatCurrency( $a->opening_balance, $currency) ); ?></td>
+    <td><?php echo esc_html( $a->opening_date ?? '' ); ?></td>
+    <td class="amount <?php echo $balance >= 0 ? '' : 'negative'; ?>"><?php echo esc_html( $formatter->formatCurrency( $balance, $currency) ); ?></td>
     <td>
         <button class="button button-small eme-acc-edit-account"
-                data-id="<?= (int) $a->id ?>"
-                data-name="<?= esc_attr( $a->name ) ?>"
-                data-iban="<?= esc_attr( $a->iban ) ?>"
-                data-bic="<?= esc_attr( $a->bic ) ?>"
-                data-opening-balance="<?= esc_attr( $a->opening_balance ) ?>"
-                data-opening-date="<?= esc_attr( $a->opening_date ?? '' ) ?>"
-                data-sort-order="<?= (int) $a->sort_order ?>"
-                data-is-active="<?= (int) $a->is_active ?>"
-                data-description="<?= esc_attr( $a->description ?? '' ) ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal&account_id=' . $a->id ) ) ?>" class="button button-small"><?php esc_html_e( 'Boekingen', 'eme-accounting' ); ?></a>
-        <button class="button button-small eme-acc-delete-account" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
+                data-id="<?php echo (int) $a->id; ?>"
+                data-name="<?php echo esc_attr( $a->name ); ?>"
+                data-iban="<?php echo esc_attr( $a->iban ); ?>"
+                data-bic="<?php echo esc_attr( $a->bic ); ?>"
+                data-opening-balance="<?php echo esc_attr( $a->opening_balance ); ?>"
+                data-opening-date="<?php echo esc_attr( $a->opening_date ?? '' ); ?>"
+                data-sort-order="<?php echo (int) $a->sort_order; ?>"
+                data-is-active="<?php echo (int) $a->is_active; ?>"
+                data-description="<?php echo esc_attr( $a->description ?? '' ); ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-journal&account_id=' . $a->id ) ); ?>" class="button button-small"><?php esc_html_e( 'Boekingen', 'eme-accounting' ); ?></a>
+        <button class="button button-small eme-acc-delete-account" data-id="<?php echo (int) $a->id; ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
     </td>
 </tr>
 <?php endforeach; ?>

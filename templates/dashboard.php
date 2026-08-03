@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
@@ -12,14 +13,14 @@ $recent     = EMEAccounting\Journal::get_entries( [ 'fiscal_year' => $year ], ''
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
-<fieldset <?= $form_disabled ?>>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
     <h1><?php esc_html_e( 'EME Boekhouding – Dashboard', 'eme-accounting' ); ?></h1>
 
     <div class="eme-acc-toolbar">
         <label><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?>
         <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting&year='+this.value">
             <?php foreach ( $fiscal_years as $f ): ?>
-            <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
+            <option value="<?php echo (int) $f->year; ?>" <?php echo selected( $f->year, $year, false ); ?>>
             <?php echo (int) $f->year;
                   if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
             ?>
@@ -28,10 +29,10 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
         </select>
         </label>
         <div class="spacer"></div>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>" class="button button-primary">
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>" class="button button-primary">
             + <?php esc_html_e( 'Nieuwe boeking', 'eme-accounting' ); ?>
         </a>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-import' ) ); ?>" class="button">
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-import' ) ); ?>" class="button">
             <?php esc_html_e( 'Bankimport', 'eme-accounting' ); ?>
         </a>
     </div>
@@ -39,31 +40,31 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
     <!-- KPI Cards -->
     <div class="eme-acc-cards">
         <div class="eme-acc-card">
-            <h3><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?> <?= $year ?></h3>
+            <h3><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?> <?php echo esc_html( $year ); ?></h3>
             <div class="card-value positive">
-                <?= $formatter->formatCurrency( $totals['income'], $currency ); ?>
+                <?php echo esc_html( $formatter->formatCurrency( $totals['income'], $currency ) ); ?>
             </div>
         </div>
         <div class="eme-acc-card">
-            <h3><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?> <?= $year ?></h3>
+            <h3><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?> <?php echo esc_html( $year ); ?></h3>
             <div class="card-value negative">
-                <?= $formatter->formatCurrency( $totals['expenses'], $currency ); ?>
+                <?php echo esc_html( $formatter->formatCurrency( $totals['expenses'], $currency ) ); ?>
             </div>
         </div>
         <div class="eme-acc-card">
-            <h3><?php esc_html_e( 'Resultaat', 'eme-accounting' ); ?> <?= $year ?></h3>
-            <div class="card-value <?= $totals['net'] >= 0 ? 'positive' : 'negative' ?>">
-                <?= $formatter->formatCurrency( $totals['net'], $currency ); ?>
+            <h3><?php esc_html_e( 'Resultaat', 'eme-accounting' ); ?> <?php echo esc_html( $year ); ?></h3>
+            <div class="card-value <?php echo $totals['net'] >= 0 ? 'positive' : 'negative'; ?>">
+                <?php echo esc_html( $formatter->formatCurrency( $totals['net'], $currency ) ); ?>
             </div>
         </div>
         <?php $balances = EMEAccounting\Accounts::get_all_balances(); ?>
         <?php foreach ( $accounts as $acc ): ?>
         <div class="eme-acc-card">
-            <h3><?= esc_html( $acc->name ); ?></h3>
-            <div class="card-value <?= ( $balances[ (int) $acc->id ] ?? 0 ) >= 0 ? '' : 'negative' ?>">
-                <?= $formatter->formatCurrency( $balances[ (int) $acc->id ] ?? 0, $currency ); ?>
+            <h3><?php echo esc_html( $acc->name ); ?></h3>
+            <div class="card-value <?php echo ( $balances[ (int) $acc->id ] ?? 0 ) >= 0 ? '' : 'negative'; ?>">
+                <?php echo esc_html( $formatter->formatCurrency( $balances[ (int) $acc->id ] ?? 0, $currency ) ); ?>
             </div>
-            <div class="card-sub"><?= esc_html( $acc->iban ); ?></div>
+            <div class="card-sub"><?php echo esc_html( $acc->iban ); ?></div>
         </div>
         <?php endforeach; ?>
     </div>
@@ -87,18 +88,18 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
             <tr><td colspan="7"><?php esc_html_e( 'Geen boekingen gevonden.', 'eme-accounting' ); ?></td></tr>
             <?php else: ?>
             <?php foreach ( $recent as $entry ): ?>
-            <tr data-journal-row="<?= (int) $entry->id ?>">
-                <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $entry->entry_date ) ) ); ?></td>
-                <td><?= esc_html( $entry->description ); ?></td>
-                <td><?= $entry->coa_name ? '<span class="eme-acc-tag">' . esc_html( $entry->coa_name ) . '</span>' : ''; ?></td>
-                <td style="font-size:11px;color:#646970"><?= esc_html( $entry->bank_statement_ref ); ?></td>
-                <td><?= esc_html( $entry->account_name ?? '' ); ?></td>
-                <td class="amount <?= esc_attr( $entry->direction ) ?>">
+            <tr data-journal-row="<?php echo (int) $entry->id; ?>">
+                <td><?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $entry->entry_date ) ) ); ?></td>
+                <td><?php echo esc_html( $entry->description ); ?></td>
+                <td><?php echo $entry->coa_name ? '<span class="eme-acc-tag">' . esc_html( $entry->coa_name ) . '</span>' : ''; ?></td>
+                <td style="font-size:11px;color:#646970"><?php echo esc_html( $entry->bank_statement_ref ); ?></td>
+                <td><?php echo esc_html( $entry->account_name ?? '' ); ?></td>
+                <td class="amount <?php echo esc_attr( $entry->direction ); ?>">
                     <?php if ($entry->direction === 'out')
                             $real_amount = -1 * $entry->amount;
                           else
                             $real_amount = $entry->amount;
-                          echo $formatter->formatCurrency($real_amount, $currency );
+                          echo esc_html( $formatter->formatCurrency( $real_amount, $currency ) );
                     ?>
                 </td>
                 <td>
@@ -115,11 +116,11 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
     </table>
 
     <p style="margin-top:12px">
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>">
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-journal' ) ); ?>">
             <?php esc_html_e( '→ Alle boekingen bekijken', 'eme-accounting' ); ?>
         </a>
         &nbsp;|&nbsp;
-        <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-reports' ) ); ?>">
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-reports' ) ); ?>">
             <?php esc_html_e( '→ Rapporten', 'eme-accounting' ); ?>
         </a>
     </p>

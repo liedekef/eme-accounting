@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -62,10 +63,10 @@ class Stock {
             'created_by'    => get_current_user_id(),
         ] );
         // Update current_qty
-        $sign = in_array( $type, [ 'in', 'adjustment' ], true ) ? '+' : '-';
+        $sign = in_array( $type, [ 'in', 'adjustment' ], true ) ? 1 : -1;
         $wpdb->query( $wpdb->prepare(
-            "UPDATE `{$wpdb->prefix}emeacc_stock` SET current_qty = current_qty {$sign} %f WHERE id = %d",
-            $qty, $stock_id
+            "UPDATE `{$wpdb->prefix}emeacc_stock` SET current_qty = current_qty + ( %f * %d ) WHERE id = %d",
+            $qty, $sign, $stock_id
         ) );
         return (int) $wpdb->insert_id;
     }
@@ -81,11 +82,11 @@ class Stock {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'stock' );
         $r = self::add_movement(
-            (int) ( $_POST['stock_id'] ?? 0 ),
-            eme_sanitize_request( $_POST['type'] ?? 'in' ),
-            (float) ( $_POST['qty'] ?? 0 ),
-            (float) ( $_POST['unit_price'] ?? 0 ),
-            eme_sanitize_request( $_POST['notes'] ?? '' )
+            (int) eme_sanitize_request( $_POST['stock_id'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            eme_sanitize_request( $_POST['type'] ?? 'in' ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            (float) eme_sanitize_request( $_POST['qty'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            (float) eme_sanitize_request( $_POST['unit_price'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            eme_sanitize_request( $_POST['notes'] ?? '' ) //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         );
         is_wp_error( $r ) ? wp_send_json_error( $r->get_error_message() ) : wp_send_json_success();
     }
@@ -94,7 +95,7 @@ class Stock {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'stock' );
         global $wpdb;
-        $id = (int) ( $_POST['id'] ?? 0 );
+        $id = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( $id > 0 ) {
             $wpdb->delete( $wpdb->prefix . 'emeacc_stock', [ 'id' => $id ], [ '%d' ] );
         }

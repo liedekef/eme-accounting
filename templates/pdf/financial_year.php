@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 /**
  * PDF template: Financieel Jaarverslag per rekening
  * Variabelen: $data (financial_year_report record), $config (vzw config), $year (int)
@@ -66,17 +67,17 @@ $outAccounts = array_filter( $accounts, fn( $a ) => $a['direction'] === 'out' );
 <div class="page">
 
     <!-- HOOFDING -->
-    <h1 class="vzw-title"><?= $vzw_name ?> <?= $vzw_form ?></h1>
+    <h1 class="vzw-title"><?php echo esc_html( $vzw_name ); ?> <?php echo esc_html( $vzw_form ); ?></h1>
     <p class="vzw-subtitle">
-        <?= $street ?>, <?= $postal ?><br>
-        Ondernemingsnr. <?= $vzw_number ?>
+        <?php echo esc_html( $street ); ?>, <?php echo esc_html( $postal ); ?><br>
+        Ondernemingsnr. <?php echo esc_html( $vzw_number ); ?>
     </p>
     <p class="vzw-subtitle">
-        <?= $website ?> | <?= $email ?><br>
-        <?= $court ?>
+        <?php echo esc_url( $website ); ?> | <?php echo esc_html( $email ); ?><br>
+        <?php echo esc_html( $court ); ?>
     </p>
 
-    <div class="doc-title">Boekjaar <?= $year ?> Financieel Jaarverslag per rekening</div>
+    <div class="doc-title">Boekjaar <?php echo esc_html( $year ); ?> Financieel Jaarverslag per rekening</div>
 
     <table class="schema-table">
         <thead>
@@ -132,25 +133,25 @@ $outAccounts = array_filter( $accounts, fn( $a ) => $a['direction'] === 'out' );
         ?>
         <?php for ( $i = 0; $i < $row_count; $i++ ): ?>
             <tr>
-                <td <?= isset( $inRows[ $i ] ) && ! empty( $inRows[ $i ]['indent'] ) ? 'style="padding-left:20px"' : '' ?>>
-                    <?= isset( $inRows[ $i ] ) ? esc_html( $inRows[ $i ]['name'] ) : '' ?>
+                <td <?php echo isset( $inRows[ $i ] ) && ! empty( $inRows[ $i ]['indent'] ) ? 'style="padding-left:20px"' : ''; ?>>
+                    <?php echo isset( $inRows[ $i ] ) ? esc_html( $inRows[ $i ]['name'] ) : ''; ?>
                 </td>
                 <td class="amount">
-                    <?= isset( $inRows[ $i ] ) ? $formatter->formatCurrency( $inRows[ $i ]['total'], $currency ) : '' ?>
+                    <?php echo esc_html( isset( $inRows[ $i ] ) ? $formatter->formatCurrency( $inRows[ $i ]['total'], $currency ) : '' ); ?>
                 </td>
-                <td <?= isset( $outRows[ $i ] ) && ! empty( $outRows[ $i ]['indent'] ) ? 'style="padding-left:20px"' : '' ?>>
-                    <?= isset( $outRows[ $i ] ) ? esc_html( $outRows[ $i ]['name'] ) : '' ?>
+                <td <?php echo isset( $outRows[ $i ] ) && ! empty( $outRows[ $i ]['indent'] ) ? 'style="padding-left:20px"' : ''; ?>>
+                    <?php echo isset( $outRows[ $i ] ) ? esc_html( $outRows[ $i ]['name'] ) : ''; ?>
                 </td>
                 <td class="amount">
-                    <?= isset( $outRows[ $i ] ) ? $formatter->formatCurrency( $outRows[ $i ]['total'], $currency ) : '' ?>
+                    <?php echo esc_html( isset( $outRows[ $i ] ) ? $formatter->formatCurrency( $outRows[ $i ]['total'], $currency ) : '' ); ?>
                 </td>
             </tr>
         <?php endfor; ?>
             <tr style="font-weight:bold; background:#f0f0f0;">
                 <td>Totaal ontvangsten</td>
-                <td class="amount"><?= $formatter->formatCurrency( $totalIn, $currency ) ?></td>
+                <td class="amount"><?php echo esc_html( $formatter->formatCurrency( $totalIn, $currency ) ); ?></td>
                 <td>Totaal uitgaven</td>
-                <td class="amount"><?= $formatter->formatCurrency( $totalOut, $currency ) ?></td>
+                <td class="amount"><?php echo esc_html( $formatter->formatCurrency( $totalOut, $currency ) ); ?></td>
             </tr>
         </tbody>
     </table>
@@ -158,12 +159,12 @@ $outAccounts = array_filter( $accounts, fn( $a ) => $a['direction'] === 'out' );
     <?php $saldo = $totalIn - $totalOut; ?>
     <table class="schema-table" style="margin-top:4pt;">
         <tbody>
-            <tr style="font-weight:bold; background:<?= $saldo >= 0 ? '#eef3ff' : '#fff0f0' ?>;">
-                <td style="width:50%; border:1.5px solid <?= $saldo >= 0 ? '#3a5fc8' : '#d63638' ?>;">
+            <tr style="font-weight:bold; background:<?php echo $saldo >= 0 ? '#eef3ff' : '#fff0f0'; ?>;">
+                <td style="width:50%; border:1.5px solid <?php echo $saldo >= 0 ? '#3a5fc8' : '#d63638'; ?>;">
                     Saldo
                 </td>
-                <td class="amount" style="width:50%; border:1.5px solid <?= $saldo >= 0 ? '#3a5fc8' : '#d63638' ?>; color:<?= $saldo >= 0 ? '#1a3a8f' : '#d63638' ?>; font-size:10pt;">
-                    <?= $formatter->formatCurrency( $saldo, $currency ) ?>
+                <td class="amount" style="width:50%; border:1.5px solid <?php echo $saldo >= 0 ? '#3a5fc8' : '#d63638'; ?>; color:<?php echo $saldo >= 0 ? '#1a3a8f' : '#d63638'; ?>; font-size:10pt;">
+                    <?php echo esc_html( $formatter->formatCurrency( $saldo, $currency ) ); ?>
                 </td>
             </tr>
         </tbody>

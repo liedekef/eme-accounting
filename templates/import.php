@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
@@ -11,14 +12,14 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
 <h2><?php esc_html_e( 'Bankafschrift importeren', 'eme-accounting' ); ?></h2>
 <p class="description"><?php esc_html_e( 'Ondersteunde formaten: CSV (BNP, KBC, ING, Belfius), CODA v2, generiek CSV.', 'eme-accounting' ); ?></p>
 <form id="eme-acc-import-form" enctype="multipart/form-data">
-<fieldset <?= $form_disabled ?>>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 <div class="eme-acc-row">
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
         <select name="account_id" required>
             <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
             <?php foreach ( $accounts as $id => $name ): ?>
-            <option value="<?= (int) $id ?>"><?= esc_html( $name ) ?></option>
+            <option value="<?php echo (int) $id; ?>"><?php echo esc_html( $name ); ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -67,14 +68,14 @@ $accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
                 <?php foreach ( $coa_accounts as $id => $acc ):
                       if ( $acc && $acc->direction === 'in' ):
                 ?>
-                <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> ><?= esc_html( $acc->code . ' - ' . $acc->name ) ?></option>
+                <option value="<?php echo (int) $id; ?>" <?php echo selected( $edit_entry->coa_id ?? '', $id, false ); ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> ><?php echo esc_html( $acc->code . ' - ' . $acc->name ); ?></option>
                 <?php endif; endforeach; ?>
                 </optgroup>
                 <optgroup label="<?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?>">
                 <?php foreach ( $coa_accounts as $id => $acc ):
                       if ( $acc && $acc->direction === 'out' ):
                 ?>
-                <option value="<?= (int) $id ?>" <?= selected( $edit_entry->coa_id ?? '', $id, false ) ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> ><?= esc_html( $acc->code . ' - ' . $acc->name ) ?></option>
+                <option value="<?php echo (int) $id; ?>" <?php echo selected( $edit_entry->coa_id ?? '', $id, false ); ?> <?php if (empty($acc->parent_id)) echo 'disabled'; ?> ><?php echo esc_html( $acc->code . ' - ' . $acc->name ); ?></option>
                 <?php endif; endforeach; ?>
                 </optgroup>
             </select>

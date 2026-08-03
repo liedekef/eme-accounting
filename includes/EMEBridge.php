@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -35,7 +36,8 @@ class EMEBridge {
         Journal::save( [
             'entry_date'     => $payment['payment_date'] ?? current_time( 'Y-m-d' ),
             'description'    => sprintf(
-                __( 'EME betaling #%d – %s', 'eme-accounting' ),
+                // translators: %1$d is the EME payment ID, %2$s is the event name.
+                __( 'EME betaling #%1$d – %2$s', 'eme-accounting' ),
                 $payment_id,
                 $payment['event_name'] ?? ''
             ),

@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -56,7 +57,8 @@ class Depreciation {
                 Journal::save( [
                     'entry_date'      => current_time( 'Y-m-d' ),
                     'description'   => sprintf(
-                        __( 'Afschrijving %s – %s', 'eme-accounting' ),
+                        // translators: %1$s is the asset name, %2$s is the year.
+                        __( 'Afschrijving %1$s – %2$s', 'eme-accounting' ),
                         $asset->name,
                         gmdate( 'Y' )
                     ),
@@ -68,7 +70,8 @@ class Depreciation {
                 Journal::save( [
                     'entry_date'      => current_time( 'Y-m-d' ),
                     'description'   => sprintf(
-                        __( 'Afschrijving %s – %s', 'eme-accounting' ),
+                        // translators: %1$s is the asset name, %2$s is the year.
+                        __( 'Afschrijving %1$s – %2$s', 'eme-accounting' ),
                         $asset->name,
                         gmdate( 'Y' )
                     ),
@@ -148,7 +151,7 @@ class Depreciation {
         // Otherwise: NULL (will be handled by first daily cron on Jan 2)
         $last_depreciation = null;
         if ( $years_elapsed >= 1 ) {
-            $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' );
+            $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' ); //phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
             $last_depreciation = sprintf( '%d-01-02', $purchase_year + $years_elapsed );
         }
 
@@ -201,7 +204,7 @@ class Depreciation {
                 }
 
                 if ( $years_elapsed >= 1 ) {
-                    $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' );
+            $purchase_year = $purchase_date ? (int) date( 'Y', strtotime( $purchase_date ) ) : (int) gmdate( 'Y' ); //phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
                     $row['last_depreciation'] = sprintf( '%d-01-02', $purchase_year + 1 );
                 } else {
                     $row['last_depreciation'] = null;
@@ -314,7 +317,7 @@ class Depreciation {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'depreciation' );
         global $wpdb;
-        $id = (int) ( $_POST['id'] ?? 0 );
+        $id = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( $id > 0 ) {
             $wpdb->delete( $wpdb->prefix . 'emeacc_depreciation', [ 'id' => $id ], [ '%d' ] );
         }

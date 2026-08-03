@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching WordPress.DB.DirectDatabaseQuery.SchemaChange
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -110,14 +111,13 @@ class Installer {
         }
         if ( (int) $current_version < 20 ) {
             // Aggregated account totals table for O(1) balance lookups
-            $prefix = $wpdb->prefix;
-            $wpdb->query( "INSERT IGNORE INTO {$prefix}emeacc_account_totals (account_id, fiscal_year, total_in, total_out)
+            $wpdb->query( "INSERT IGNORE INTO {$wpdb->prefix}emeacc_account_totals (account_id, fiscal_year, total_in, total_out)
                 SELECT
                     j.account_id,
                     j.fiscal_year,
                     COALESCE(SUM(CASE WHEN j.direction = 'in' THEN j.amount ELSE 0 END), 0) AS total_in,
                     COALESCE(SUM(CASE WHEN j.direction = 'out' THEN j.amount ELSE 0 END), 0) AS total_out
-                FROM {$prefix}emeacc_journal j
+                FROM {$wpdb->prefix}emeacc_journal j
                 GROUP BY j.account_id, j.fiscal_year" );
             // Missing composite indexes for report queries
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_coa (fiscal_year, coa_id)" );
@@ -126,19 +126,18 @@ class Installer {
             $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing_fiscal (is_closing_entry, fiscal_year)" );
         }
         if ( (int) $current_version < 21 ) {
-            $prefix = $wpdb->prefix;
             // Collapse per-year totals into single row per account with net delta
-            $wpdb->query( "CREATE TABLE {$prefix}emeacc_account_totals_new (
+            $wpdb->query( "CREATE TABLE {$wpdb->prefix}emeacc_account_totals_new (
                 account_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
                 delta      DECIMAL(14,2)   NOT NULL DEFAULT 0.00
             )" );
-            $wpdb->query( "INSERT INTO {$prefix}emeacc_account_totals_new (account_id, delta)
+            $wpdb->query( "INSERT INTO {$wpdb->prefix}emeacc_account_totals_new (account_id, delta)
                 SELECT account_id, SUM(total_in) - SUM(total_out)
-                FROM {$prefix}emeacc_account_totals
+                FROM {$wpdb->prefix}emeacc_account_totals
                 GROUP BY account_id" );
-            $wpdb->query( "RENAME TABLE {$prefix}emeacc_account_totals TO {$prefix}emeacc_account_totals_old,
-                                         {$prefix}emeacc_account_totals_new TO {$prefix}emeacc_account_totals" );
-            $wpdb->query( "DROP TABLE IF EXISTS {$prefix}emeacc_account_totals_old" );
+            $wpdb->query( "RENAME TABLE {$wpdb->prefix}emeacc_account_totals TO {$wpdb->prefix}emeacc_account_totals_old,
+                                         {$wpdb->prefix}emeacc_account_totals_new TO {$wpdb->prefix}emeacc_account_totals" );
+            $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}emeacc_account_totals_old" );
         }
     }
 
@@ -190,7 +189,7 @@ class Installer {
             updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY idx_active (is_active)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Fiscal years ─────────────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_fiscal_years (
@@ -209,7 +208,7 @@ class Installer {
             PRIMARY KEY (id),
             KEY idx_status (status),
             KEY idx_year (year)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Chart of accounts (rekeningstelsel) ───────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_chart_of_accounts (
@@ -226,7 +225,7 @@ class Installer {
             KEY idx_parent (parent_id),
             KEY idx_direction (direction),
             KEY idx_code (code)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Journal entries ─────────────────────────────────────────────
         // Each entry = one financial transaction (may have multiple lines)
@@ -274,7 +273,7 @@ class Installer {
             KEY idx_bank_ref (bank_statement_ref),
             KEY idx_transfer (transfer_id),
             KEY idx_fiscal_account (fiscal_year, account_id)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Stock items ─────────────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock (
@@ -294,7 +293,7 @@ class Installer {
             PRIMARY KEY (id),
             UNIQUE KEY sku (sku),
             KEY idx_active (is_active)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Stock movements ─────────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_stock_movements (
@@ -312,7 +311,7 @@ class Installer {
             PRIMARY KEY (id),
             KEY idx_stock (stock_id),
             KEY idx_date (movement_date)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Depreciable assets ──────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_depreciation (
@@ -335,7 +334,7 @@ class Installer {
             updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY idx_active (is_active)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Budget lines ────────────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_budget (
@@ -348,7 +347,7 @@ class Installer {
             PRIMARY KEY (id),
             UNIQUE KEY uniq_year_coa (fiscal_year, coa_id),
             KEY idx_year (fiscal_year)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Staat van het Vermogen (Bijlage C – per boekjaar) ───────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_patrimony (
@@ -409,12 +408,12 @@ class Installer {
             updated_at                  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY uniq_year (fiscal_year)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         // ── Aggregated account totals (single row per account) ─────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_account_totals (
             account_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
             delta      DECIMAL(14,2)   NOT NULL DEFAULT 0.00
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Bank import batches ─────────────────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_log (
@@ -427,7 +426,7 @@ class Installer {
             notes           VARCHAR(255)    NOT NULL DEFAULT '',
             PRIMARY KEY (id),
             KEY idx_account (account_id)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
         // ── Individual bank statement lines ─────────────────────────────
         $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_import_lines (
@@ -452,7 +451,7 @@ class Installer {
             KEY idx_status (status),
             KEY idx_date (transaction_date),
             KEY idx_status_log (status, import_log_id)
-        ) $charset;" );
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
     }
 
     /* ------------------------------------------------------------------

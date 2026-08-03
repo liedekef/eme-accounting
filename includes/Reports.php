@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -23,12 +24,11 @@ class Reports {
      */
     public static function income_expenditure_report( int $year ): array {
         global $wpdb;
-        $coa_table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
         // ── Step 1: all active main accounts, pre-seeded at 0.00 ─────────
-        $main_accounts = $wpdb->get_results(
+        $main_accounts = $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             "SELECT id, code, name, direction
-             FROM `{$coa_table}`
+             FROM `{$wpdb->prefix}emeacc_chart_of_accounts`
              WHERE parent_id IS NULL AND is_active = 1
              ORDER BY direction DESC, code"
         );
@@ -47,7 +47,7 @@ class Reports {
         // ── Step 2: actual totals from the journal for this year ──────────
         // COALESCE(parent.id, coa.id) resolves the main account regardless of
         // whether the booking was made on a child or directly on the main account.
-        $rows = $wpdb->get_results(
+        $rows = $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prepare(
                 "SELECT j.direction,
                         COALESCE(parent.id,   coa.id)   AS main_id,
@@ -55,8 +55,8 @@ class Reports {
                         COALESCE(parent.name, coa.name) AS main_name,
                         COALESCE(SUM(j.amount), 0)      AS total
                  FROM `{$wpdb->prefix}emeacc_journal` j
-                 LEFT JOIN `{$coa_table}` coa    ON coa.id    = j.coa_id
-                 LEFT JOIN `{$coa_table}` parent ON parent.id = coa.parent_id
+                 LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` coa    ON coa.id    = j.coa_id
+                 LEFT JOIN `{$wpdb->prefix}emeacc_chart_of_accounts` parent ON parent.id = coa.parent_id
                  WHERE j.fiscal_year = %d
                    AND transfer_id IS NULL
                    AND j.is_closing_entry = 0
@@ -261,12 +261,11 @@ class Reports {
      */
     public static function financial_year_report( int $year ): array {
         global $wpdb;
-        $coa_table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
         // Get all active COA accounts (main + children)
-        $accounts = $wpdb->get_results(
+        $accounts = $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             "SELECT id, code, name, parent_id, direction
-             FROM `{$coa_table}`
+             FROM `{$wpdb->prefix}emeacc_chart_of_accounts`
              WHERE is_active = 1
              ORDER BY direction DESC, code"
         );
@@ -412,7 +411,7 @@ class Reports {
 
         $extra = $exclude_transfers ? 'AND j.transfer_id IS NULL' : '';
 
-        $rows = $wpdb->get_results(
+        $rows = $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prepare(
                 "SELECT a.id        AS account_id,
                         a.name      AS account_name,
@@ -424,7 +423,7 @@ class Reports {
                         ON j.account_id = a.id
                        AND j.fiscal_year = %d
                        AND j.is_closing_entry = 0
-                       {$extra}
+                       {$extra} //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                  WHERE a.is_active = 1
                  GROUP BY a.id, MONTH(j.entry_date)
                  ORDER BY a.id, month",
@@ -477,15 +476,16 @@ class Reports {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
 
-        $type              = eme_sanitize_request( $_GET['type'] ?? 'financial_diary' );
-        $year              = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
-        $event_id          = ( ! empty( $_GET['event_id'] ) ) ? (int) $_GET['event_id'] : null;
-        $format            = eme_sanitize_request( $_GET['format'] ?? 'csv' );
-        $exclude_transfers = ! empty( $_GET['exclude_transfers'] ) && $_GET['exclude_transfers'] === '1';
+        $type              = eme_sanitize_request( $_GET['type'] ?? 'financial_diary' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $year              = (int) eme_sanitize_request( $_GET['year'] ?? gmdate( 'Y' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $event_id          = (int) eme_sanitize_request( $_GET['event_id'] ?? 0 ) ?: null; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $format            = eme_sanitize_request( $_GET['format'] ?? 'csv' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $exclude_transfers = eme_sanitize_request( $_GET['exclude_transfers'] ?? '' ) === '1'; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $date              = eme_sanitize_request( $_GET['date'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 
         $data = match ( $type ) {
             'income_expenditure' => self::income_expenditure_report( $year ),
-            'patrimony'          => self::patrimony_report( $_GET['date'] ?? '' ),
+            'patrimony'          => self::patrimony_report( $date ),
             'events'             => self::events_report( $year, $event_id ),
             'financial_year'     => self::financial_year_report( $year ),
             'vat_report'         => self::vat_report( $year ),
@@ -524,6 +524,26 @@ class Reports {
     }
 
     /**
+     * Neutralize spreadsheet formula injection for text cells.
+     * Cells starting with = + - @ are interpreted as formulas by
+     * Excel/LibreOffice; prefixing them with a single quote prevents that.
+     */
+    private static function csv_safe( $value ) {
+        if ( ! is_string( $value ) || $value === '' ) {
+            return $value;
+        }
+        $chars = [ '=', '+', '-', '@' ];
+        if ( ! in_array( $value[0], $chars, true ) ) {
+            return $value;
+        }
+        // Never break legitimate negative numbers ("-1.234,56").
+        if ( is_numeric( $value ) ) {
+            return $value;
+        }
+        return "'" . $value;
+    }
+
+    /**
      * Dedicated CSV export for the financial diary:
      * one row per entry with explicit column headers, no _id fields.
      */
@@ -533,12 +553,12 @@ class Reports {
             foreach ( $entries as $entry ) {
                 fputcsv( $handle, [
                     $date,
-                    $entry->description       ?? '',
-                    $entry->account_name      ?? '',
-                    $entry->bank_statement_ref ?? '',
-                    $entry->counterparty_name  ?? '',
-                    $entry->coa_name           ?? '',
-                    $entry->direction          ?? '',
+                    self::csv_safe( $entry->description       ?? '' ),
+                    self::csv_safe( $entry->account_name      ?? '' ),
+                    self::csv_safe( $entry->bank_statement_ref ?? '' ),
+                    self::csv_safe( $entry->counterparty_name  ?? '' ),
+                    self::csv_safe( $entry->coa_name           ?? '' ),
+                    self::csv_safe( $entry->direction          ?? '' ),
                     number_format( (float) $entry->amount, 2, ',', '' ),
                 ], ';', escape: "" );
             }
@@ -551,9 +571,9 @@ class Reports {
                 fputcsv( $handle, [ $key ], ';', escape: "" );
                 self::array_to_csv( $handle, $value, $depth + 1 );
             } elseif ( is_object( $value ) ) {
-                fputcsv( $handle, (array) $value, ';', escape: "" );
+                fputcsv( $handle, array_map( [ __CLASS__, 'csv_safe' ], (array) $value ), ';', escape: "" );
             } else {
-                fputcsv( $handle, [ $key, $value ], ';', escape: "" );
+                fputcsv( $handle, [ $key, self::csv_safe( $value ) ], ';', escape: "" );
             }
         }
     }

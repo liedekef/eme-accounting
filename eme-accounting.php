@@ -9,7 +9,6 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       eme-accounting
- * Domain Path:       /languages
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Requires Plugins:  events-made-easy
@@ -42,8 +41,6 @@ spl_autoload_register( function ( string $class ): void {
  * Boot
  * ------------------------------------------------------------------ */
 function eme_accounting_init(): void {
-    load_plugin_textdomain( 'eme-accounting', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-
     // Check dependency
     if ( ! function_exists( 'eme_get_event' ) ) {
         add_action( 'admin_notices', function () {

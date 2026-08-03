@@ -1,11 +1,12 @@
-<?php // eme-accounting/templates/coa.php
+<?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound // eme-accounting/templates/coa.php
 defined( 'ABSPATH' ) || exit;
 
 $accounts     = EMEAccounting\ChartOfAccounts::get_tree();
 $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
-<fieldset <?= $form_disabled ?>>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 <h1><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
@@ -36,14 +37,14 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
             <?php if ( $main_in ): ?>
             <optgroup label="<?php esc_attr_e( 'Ontvangsten', 'eme-accounting' ); ?>">
                 <?php foreach ( $main_in as $a ): ?>
-                <option value="<?= (int) $a->id ?>" data-direction="in"><?= esc_html( $a->code . ' - ' . $a->name ) ?></option>
+                <option value="<?php echo (int) $a->id; ?>" data-direction="in"><?php echo esc_html( $a->code . ' - ' . $a->name ); ?></option>
                 <?php endforeach; ?>
             </optgroup>
             <?php endif; ?>
             <?php if ( $main_out ): ?>
             <optgroup label="<?php esc_attr_e( 'Uitgaven', 'eme-accounting' ); ?>">
                 <?php foreach ( $main_out as $a ): ?>
-                <option value="<?= (int) $a->id ?>" data-direction="out"><?= esc_html( $a->code . ' - ' . $a->name ) ?></option>
+                <option value="<?php echo (int) $a->id; ?>" data-direction="out"><?php echo esc_html( $a->code . ' - ' . $a->name ); ?></option>
                 <?php endforeach; ?>
             </optgroup>
             <?php endif; ?>
@@ -65,24 +66,24 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
 <h3><?php esc_html_e( 'Ontvangsten', 'eme-accounting' ); ?></h3>
 <ul class="eme-acc-coa-tree" data-direction="in">
 <?php foreach ( $accounts as $a ): if ( $a->direction === 'in' ): ?>
-<li class="<?= $a->parent_id ? 'sub' : 'main' ?>"
-    data-id="<?= (int) $a->id ?>"
-    data-direction="<?= esc_attr( $a->direction ) ?>"
-    data-parent-id="<?= (int) ( $a->parent_id ?? 0 ) ?>"
-    data-code="<?= esc_attr( $a->code ) ?>"
-    data-name="<?= esc_attr( $a->name ) ?>"
-    data-description="<?= esc_attr( $a->description ?? '' ) ?>"
-    data-is-active="<?= (int) ( $a->is_active ?? 1 ) ?>"
-    style="margin-left: <?= (int) ( $a->depth * 20 ) ?>px">
+<li class="<?php echo $a->parent_id ? 'sub' : 'main'; ?>"
+    data-id="<?php echo (int) $a->id; ?>"
+    data-direction="<?php echo esc_attr( $a->direction ); ?>"
+    data-parent-id="<?php echo (int) ( $a->parent_id ?? 0 ); ?>"
+    data-code="<?php echo esc_attr( $a->code ); ?>"
+    data-name="<?php echo esc_attr( $a->name ); ?>"
+    data-description="<?php echo esc_attr( $a->description ?? '' ); ?>"
+    data-is-active="<?php echo (int) ( $a->is_active ?? 1 ); ?>"
+    style="margin-left: <?php echo (int) ( $a->depth * 20 ); ?>px">
     <?php if ($a->parent_id) : ?>
         <span class="handle">☰</span>
     <?php endif; ?>
-    <span class="code"><?= esc_html( $a->code ) ?></span>
-    <span class="name"><?= esc_html( $a->name ) ?><?= empty( $a->is_active ) ? ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' : '' ?></span>
+    <span class="code"><?php echo esc_html( $a->code ); ?></span>
+    <span class="name"><?php echo esc_html( $a->name ); ?><?php echo empty( $a->is_active ) ? ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' : ''; ?></span>
     <span class="actions">
-        <button class="button button-small eme-acc-edit-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
+        <button class="button button-small eme-acc-edit-coa" data-id="<?php echo (int) $a->id; ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
         <?php if ( ! $a->has_children ) : ?>
-        <button class="button button-small eme-acc-delete-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
+        <button class="button button-small eme-acc-delete-coa" data-id="<?php echo (int) $a->id; ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
         <?php endif; ?>
     </span>
 </li>
@@ -93,24 +94,24 @@ $all_accounts = EMEAccounting\ChartOfAccounts::get_all();
 <h3><?php esc_html_e( 'Uitgaven', 'eme-accounting' ); ?></h3>
 <ul class="eme-acc-coa-tree" data-direction="out">
 <?php foreach ( $accounts as $a ): if ( $a->direction === 'out' ): ?>
-<li class="<?= $a->parent_id ? 'sub' : 'main' ?>"
-    data-id="<?= (int) $a->id ?>"
-    data-direction="<?= esc_attr( $a->direction ) ?>"
-    data-parent-id="<?= (int) ( $a->parent_id ?? 0 ) ?>"
-    data-code="<?= esc_attr( $a->code ) ?>"
-    data-name="<?= esc_attr( $a->name ) ?>"
-    data-description="<?= esc_attr( $a->description ?? '' ) ?>"
-    data-is-active="<?= (int) ( $a->is_active ?? 1 ) ?>"
-    style="margin-left: <?= (int) ( $a->depth * 20 ) ?>px">
+<li class="<?php echo $a->parent_id ? 'sub' : 'main'; ?>"
+    data-id="<?php echo (int) $a->id; ?>"
+    data-direction="<?php echo esc_attr( $a->direction ); ?>"
+    data-parent-id="<?php echo (int) ( $a->parent_id ?? 0 ); ?>"
+    data-code="<?php echo esc_attr( $a->code ); ?>"
+    data-name="<?php echo esc_attr( $a->name ); ?>"
+    data-description="<?php echo esc_attr( $a->description ?? '' ); ?>"
+    data-is-active="<?php echo (int) ( $a->is_active ?? 1 ); ?>"
+    style="margin-left: <?php echo (int) ( $a->depth * 20 ); ?>px">
     <?php if ($a->parent_id) : ?>
         <span class="handle">☰</span>
     <?php endif; ?>
-    <span class="code"><?= esc_html( $a->code ) ?></span>
-    <span class="name"><?= esc_html( $a->name ) ?><?= empty( $a->is_active ) ? ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' : '' ?></span>
+    <span class="code"><?php echo esc_html( $a->code ); ?></span>
+    <span class="name"><?php echo esc_html( $a->name ); ?><?php echo empty( $a->is_active ) ? ' <span class="eme-acc-tag">' . esc_html__( 'inactief', 'eme-accounting' ) . '</span>' : ''; ?></span>
     <span class="actions">
-        <button class="button button-small eme-acc-edit-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
+        <button class="button button-small eme-acc-edit-coa" data-id="<?php echo (int) $a->id; ?>"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></button>
         <?php if ( ! $a->has_children ) : ?>
-        <button class="button button-small eme-acc-delete-coa" data-id="<?= (int) $a->id ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
+        <button class="button button-small eme-acc-delete-coa" data-id="<?php echo (int) $a->id; ?>"><?php esc_html_e( 'Verwijder', 'eme-accounting' ); ?></button>
         <?php endif; ?>
     </span>
 </li>

@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 /**
  * PDF template: Staat van Ontvangsten en Uitgaven
  * Variabelen: $data (income_expenditure record), $config (vzw config), $year (int)
@@ -74,17 +75,17 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
 <div class="page">
 
     <!-- HOOFDING -->
-    <h1 class="vzw-title"><?= $vzw_name ?> <?= $vzw_form ?></h1>
+    <h1 class="vzw-title"><?php echo esc_html( $vzw_name ); ?> <?php echo esc_html( $vzw_form ); ?></h1>
     <p class="vzw-subtitle">
-        <?= $street ?>, <?= $postal ?><br>
-        Ondernemingsnr. <?= $vzw_number ?>
+        <?php echo esc_html( $street ); ?>, <?php echo esc_html( $postal ); ?><br>
+        Ondernemingsnr. <?php echo esc_html( $vzw_number ); ?>
     </p>
     <p class="vzw-subtitle">
-        <?= $website ?> | <?= $email ?><br>
-        <?= $court ?>
+        <?php echo esc_url( $website ); ?> | <?php echo esc_html( $email ); ?><br>
+        <?php echo esc_html( $court ); ?>
     </p>
 
-    <div class="doc-title">Boekjaar <?= $year ?> Staat van Ontvangsten en Uitgaven
+    <div class="doc-title">Boekjaar <?php echo esc_html( $year ); ?> Staat van Ontvangsten en Uitgaven
     </div>
 
     <?php
@@ -122,18 +123,18 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
         <tbody>
         <?php for ( $i = 0; $i < $row_count; $i++ ): ?>
             <tr>
-                <td><?= isset( $income_keys[ $i ] ) ? esc_html( $income_keys[ $i ] ) : '' ?></td>
-                <td class="amount"><?= isset( $income_vals[ $i ] ) ? $formatter->formatCurrency( $income_vals[ $i ], $currency) : '' ?></td>
-                <td><?= isset( $expense_keys[ $i ] ) ? esc_html( $expense_keys[ $i ] ) : '' ?></td>
-                <td class="amount"><?= isset( $expense_vals[ $i ] ) ? $formatter->formatCurrency( $expense_vals[ $i ], $currency  ) : '' ?></td>
+                <td><?php echo isset( $income_keys[ $i ] ) ? esc_html( $income_keys[ $i ] ) : ''; ?></td>
+                <td class="amount"><?php echo esc_html( isset( $income_vals[ $i ] ) ? $formatter->formatCurrency( $income_vals[ $i ], $currency) : '' ); ?></td>
+                <td><?php echo isset( $expense_keys[ $i ] ) ? esc_html( $expense_keys[ $i ] ) : ''; ?></td>
+                <td class="amount"><?php echo esc_html( isset( $expense_vals[ $i ] ) ? $formatter->formatCurrency( $expense_vals[ $i ], $currency  ) : '' ); ?></td>
             </tr>
         <?php endfor; ?>
             <tr class="section-gap"><td colspan="4"></td></tr>
             <tr style="font-weight:bold; background:#f0f0f0;">
                 <td>Totaal ontvangsten</td>
-                <td class="amount"><?= $formatter->formatCurrency( $total_income, $currency ) ?></td>
+                <td class="amount"><?php echo esc_html( $formatter->formatCurrency( $total_income, $currency ) ); ?></td>
                 <td>Totaal uitgaven</td>
-                <td class="amount"><?= $formatter->formatCurrency( $total_expenses, $currency ) ?></td>
+                <td class="amount"><?php echo esc_html( $formatter->formatCurrency( $total_expenses, $currency ) ); ?></td>
             </tr>
         </tbody>
     </table>
@@ -141,12 +142,12 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
 
     <table class="schema-table" style="margin-top:4pt;">
         <tbody>
-            <tr style="font-weight:bold; background:<?= $result >= 0 ? '#eef3ff' : '#fff0f0' ?>;">
-                <td style="width:50%; border:1.5px solid <?= $result >= 0 ? '#3a5fc8' : '#d63638' ?>;">
-                    <?= $result >= 0 ? 'Overschot van het boekjaar' : 'Tekort van het boekjaar' ?>
+            <tr style="font-weight:bold; background:<?php echo $result >= 0 ? '#eef3ff' : '#fff0f0'; ?>;">
+                <td style="width:50%; border:1.5px solid <?php echo $result >= 0 ? '#3a5fc8' : '#d63638'; ?>;">
+                    <?php echo $result >= 0 ? 'Overschot van het boekjaar' : 'Tekort van het boekjaar'; ?>
                 </td>
-                <td class="amount" style="width:50%; border:1.5px solid <?= $result >= 0 ? '#3a5fc8' : '#d63638' ?>; color:<?= $result >= 0 ? '#1a3a8f' : '#d63638' ?>; font-size:10pt;">
-                    <?= $formatter->formatCurrency( abs( $result ), $currency ) ?>
+                <td class="amount" style="width:50%; border:1.5px solid <?php echo $result >= 0 ? '#3a5fc8' : '#d63638'; ?>; color:<?php echo $result >= 0 ? '#1a3a8f' : '#d63638'; ?>; font-size:10pt;">
+                    <?php echo esc_html( $formatter->formatCurrency( abs( $result ), $currency ) ); ?>
                 </td>
             </tr>
         </tbody>
@@ -161,8 +162,8 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
                     <?php foreach ( $vertegenwoordigers_per2 as $v ): ?>
                     <td>
                         <div class="sig-identity">
-                            <?= esc_html( $v->first_name . ' ' . $v->last_name ) ?><br>
-                            <em><?= esc_html( EMEVzw\Config::legal_capacity_label( $v->legal_capacity ?? 'bestuurder' ) ) ?><?= ! empty( $v->function_title ) ? ' · ' . esc_html( EMEVzw\Config::function_title_label( $v->function_title ) ) : '' ?></em>
+                            <?php echo esc_html( $v->first_name . ' ' . $v->last_name ); ?><br>
+                            <em><?php echo esc_html( EMEVzw\Config::legal_capacity_label( $v->legal_capacity ?? 'bestuurder' ) ); ?><?php echo ! empty( $v->function_title ) ? ' · ' . esc_html( EMEVzw\Config::function_title_label( $v->function_title ) ) : ''; ?></em>
                         </div>
                         <div class="sig-label">Handtekening</div>
                         <div class="sig-line"></div>

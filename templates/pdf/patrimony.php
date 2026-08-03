@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 /**
  * PDF template: Staat van het Vermogen (Bijlage C)
  * Variabelen: $p (patrimony record), $config (vzw config), $totals (array)
@@ -87,18 +88,18 @@ $depr_method_label = $p->depr_method === 'degressive'
 <div class="page">
 
     <!-- HOOFDING -->
-    <h1 class="acc-title"><?= $vzw_name ?> <?= $vzw_form ?></h1>
+    <h1 class="acc-title"><?php echo esc_html( $vzw_name ); ?> <?php echo esc_html( $vzw_form ); ?></h1>
     <p class="acc-subtitle">
-        <?= $street ?>, <?= $postal ?><br>
-        Ondernemingsnr. <?= $vzw_number ?>
+        <?php echo esc_html( $street ); ?>, <?php echo esc_html( $postal ); ?><br>
+        Ondernemingsnr. <?php echo esc_html( $vzw_number ); ?>
     </p>
     <p class="acc-subtitle">
-        <?= $website ?> | <?= $email ?><br>
-        <?= $court ?>
+        <?php echo esc_url( $website ); ?> | <?php echo esc_html( $email ); ?><br>
+        <?php echo esc_html( $court ); ?>
     </p>
 
     <div class="doc-title">
-        Boekjaar <?= $year ?> Bijlage C
+        Boekjaar <?php echo esc_html( $year ); ?> Bijlage C
         <br>
         Inventaris van Activa, Rechten, Schulden en Verbintenissen
     </div>
@@ -119,19 +120,19 @@ $depr_method_label = $p->depr_method === 'degressive'
         <tbody>
             <?php foreach ( $depr_rows as [ $cat, $new, $used ] ): ?>
             <tr>
-                <td><?= esc_html( $cat ) ?></td>
-                <td class="num"><?= (int) $new ?></td>
-                <td class="num"><?= (int) $used ?></td>
+                <td><?php echo esc_html( $cat ); ?></td>
+                <td class="num"><?php echo (int) $new; ?></td>
+                <td class="num"><?php echo (int) $used; ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 
     <p>
-        <strong><?php esc_html_e( 'Afschrijvingsmethode:', 'eme-accounting' ); ?></strong> <?= esc_html( $depr_method_label ) ?>.
+        <strong><?php esc_html_e( 'Afschrijvingsmethode:', 'eme-accounting' ); ?></strong> <?php echo esc_html( $depr_method_label ); ?>.
     </p>
     <p>
-        <?= $nihil( $p->cash_valuation_note ) ?>
+        <?php echo $nihil( $p->cash_valuation_note ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
     </p>
     <p>
         <?php esc_html_e( 'Het jaar van aankoop wordt de volledige aankoopwaarde genoteerd. Pas vanaf het jaar daarna worden de afschrijvingen toegepast volgens bovenstaande waardering.', 'eme-accounting' ); ?>
@@ -141,13 +142,13 @@ $depr_method_label = $p->depr_method === 'degressive'
     <!-- ── SECTIE 2: AANPASSING WAARDERINGSREGELS ── -->
     <div class="doc-section">
     <h2 class="section-title">2. Aanpassing van de waarderingsregels (art. 7)</h2>
-    <p><?= $nihil( $p->valuation_changes ) ?></p>
+    <p><?php echo $nihil( $p->valuation_changes ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></p>
     </div>
 
     <!-- ── SECTIE 3: BIJKOMENDE INLICHTINGEN ── -->
     <div class="doc-section">
     <h2 class="section-title">3. Bijkomende inlichtingen (art. 14)</h2>
-    <p><?= $nihil( $p->additional_info ) ?></p>
+    <p><?php echo $nihil( $p->additional_info ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></p>
     </div>
 
     <!-- ── SECTIE 4: GENORMALISEERD SCHEMA ── -->
@@ -191,10 +192,10 @@ $depr_method_label = $p->depr_method === 'degressive'
                 $l = $liab_rows[ $i ]   ?? [ null, null ];
             ?>
             <tr>
-                <td><?= $a[0] !== null ? esc_html( $a[0] ) : '' ?></td>
-                <td class="amount"><?= $a[1] !== null ? esc_html( $fmt( (float) $a[1] ) ) : '' ?></td>
-                <td><?= $l[0] !== null ? esc_html( $l[0] ) : '' ?></td>
-                <td class="amount"><?= $l[1] !== null ? esc_html( $fmt( (float) $l[1] ) ) : '' ?></td>
+                <td><?php echo $a[0] !== null ? esc_html( $a[0] ) : ''; ?></td>
+                <td class="amount"><?php echo $a[1] !== null ? esc_html( $fmt( (float) $a[1] ) ) : ''; ?></td>
+                <td><?php echo $l[0] !== null ? esc_html( $l[0] ) : ''; ?></td>
+                <td class="amount"><?php echo $l[1] !== null ? esc_html( $fmt( (float) $l[1] ) ) : ''; ?></td>
             </tr>
             <?php endfor; ?>
 
@@ -226,10 +227,10 @@ $depr_method_label = $p->depr_method === 'degressive'
                 $o = $oblig_rows[ $i ]  ?? [ null, null ];
             ?>
             <tr>
-                <td><?= $r[0] !== null ? esc_html( $r[0] ) : '' ?></td>
-                <td class="amount"><?= $r[1] !== null ? esc_html( $fmt( (float) $r[1] ) ) : '' ?></td>
-                <td><?= $o[0] !== null ? esc_html( $o[0] ) : '' ?></td>
-                <td class="amount"><?= $o[1] !== null ? esc_html( $fmt( (float) $o[1] ) ) : '' ?></td>
+                <td><?php echo $r[0] !== null ? esc_html( $r[0] ) : ''; ?></td>
+                <td class="amount"><?php echo $r[1] !== null ? esc_html( $fmt( (float) $r[1] ) ) : ''; ?></td>
+                <td><?php echo $o[0] !== null ? esc_html( $o[0] ) : ''; ?></td>
+                <td class="amount"><?php echo $o[1] !== null ? esc_html( $fmt( (float) $o[1] ) ) : ''; ?></td>
             </tr>
             <?php endfor; ?>
 
@@ -242,7 +243,7 @@ $depr_method_label = $p->depr_method === 'degressive'
     <h2 class="section-title" style="margin-top:12pt">
         5. Rechten en verplichtingen die niet in cijfers kunnen worden weergegeven (art. 14)
     </h2>
-    <p><?= $nihil( $p->non_numeric_obligations ) ?></p>
+    <p><?php echo $nihil( $p->non_numeric_obligations ); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></p>
     </div>
 
 </div>

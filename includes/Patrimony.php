@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -250,7 +251,7 @@ class Patrimony {
     public static function ajax_get(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'patrimony' );
-        $year = (int) ( $_GET['year'] ?? 0 );
+        $year = (int) eme_sanitize_request( $_GET['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $p    = self::get( $year );
         $p ? wp_send_json_success( $p ) : wp_send_json_error( 'Niet gevonden.' );
     }
@@ -260,7 +261,7 @@ class Patrimony {
         Capabilities::require_manage_ajax( 'patrimony' );
         global $wpdb;
         $wpdb->delete( $wpdb->prefix . 'emeacc_patrimony',
-            [ 'id' => (int) ( $_POST['id'] ?? 0 ) ], [ '%d' ] );
+            [ 'id' => (int) eme_sanitize_request( $_POST['id'] ?? 0 ) ], [ '%d' ] ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         wp_send_json_success();
     }
 
@@ -268,7 +269,7 @@ class Patrimony {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'patrimony' );
 
-        $year = (int) ( $_GET['year'] ?? 0 );
+        $year = (int) eme_sanitize_request( $_GET['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $html = self::generate_pdf_html( $year );
 
         if ( empty( $html ) ) {

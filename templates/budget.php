@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
 $formatter = new NumberFormatter( 'nl_BE', NumberFormatter::CURRENCY );
@@ -21,8 +22,8 @@ $prev_years = array_filter( $fiscal_years, fn( $f ) => $f->year < $year );
 $fmt = fn( float $v ) => $formatter->formatCurrency( $v, $currency );
 ?>
 <div class="wrap eme-acc-wrap">
-<fieldset <?= $form_disabled ?>>
-<h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?= $year ?></h1>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
+<h1><?php esc_html_e( 'Begroting', 'eme-accounting' ); ?> <?php echo esc_html( $year ); ?></h1>
 
 <?php if ( $is_closed ): ?>
 <div class="notice notice-warning">
@@ -35,8 +36,8 @@ $fmt = fn( float $v ) => $formatter->formatCurrency( $v, $currency );
     <label><strong><?php esc_html_e( 'Boekjaar:', 'eme-accounting' ); ?></strong>
     <select id="eme-acc-year-select" onchange="window.location='?page=emeaccounting-budget&year='+this.value">
         <?php foreach ( $fiscal_years as $f ): ?>
-        <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
-            <?= (int) $f->year ?>
+        <option value="<?php echo (int) $f->year; ?>" <?php echo selected( $f->year, $year, false ); ?>>
+            <?php echo (int) $f->year; ?>
             <?php if ( $f->status === 'closed' ): ?>(<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)<?php endif; ?>
         </option>
         <?php endforeach; ?>
@@ -48,7 +49,7 @@ $fmt = fn( float $v ) => $formatter->formatCurrency( $v, $currency );
     <select id="eme-acc-copy-year">
         <option value="">— <?php esc_html_e( 'Kies jaar', 'eme-accounting' ); ?> —</option>
         <?php foreach ( $prev_years as $y ): ?>
-        <option value="<?= $y->year ?>"><?= $y->year ?>
+        <option value="<?php echo esc_attr( $y->year ); ?>"><?php echo esc_html( $y->year ); ?>
             <?php if ( $y->status === 'closed' ): ?>(<?php esc_html_e( 'gesloten', 'eme-accounting' ); ?>)<?php endif; ?>
         </option>
         <?php endforeach; ?>
@@ -57,7 +58,7 @@ $fmt = fn( float $v ) => $formatter->formatCurrency( $v, $currency );
     </label>
     <?php endif; ?>
 
-    <button type="button" class="button button-primary btn-budget-export-pdf" data-year="<?= $year ?>">
+    <button type="button" class="button button-primary btn-budget-export-pdf" data-year="<?php echo esc_attr( $year ); ?>">
         <?php esc_html_e( 'Download PDF', 'eme-accounting' ); ?>
     </button>
 </div>
@@ -70,7 +71,7 @@ $total_actual = $dir === 'in' ? $totals['actual_in'] : $totals['actual_out'];
 $total_var    = $dir === 'in' ? $total_actual - $total_budget : $total_budget - $total_actual;
 ?>
 <div class="eme-acc-form-box">
-<h2><?= $dir === 'in' ? esc_html__( 'Ontvangsten', 'eme-accounting' ) : esc_html__( 'Uitgaven', 'eme-accounting' ) ?></h2>
+<h2><?php echo $dir === 'in' ? esc_html__( 'Ontvangsten', 'eme-accounting' ) : esc_html__( 'Uitgaven', 'eme-accounting' ); ?></h2>
 <table class="eme-acc-table">
 <thead><tr>
     <th><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?></th>
@@ -85,37 +86,37 @@ $total_var    = $dir === 'in' ? $total_actual - $total_budget : $total_budget - 
     $var_cls = $row['variance'] >= 0 ? 'green' : 'red';
     $over    = $pct > 100;
 ?>
-<tr data-coa-id="<?= $row['coa_id'] ?>">
+<tr data-coa-id="<?php echo esc_attr( $row['coa_id'] ); ?>">
     <td>
-        <?= esc_html( $row['code'] . ' - ' . $row['name'] ) ?>
-        <input type="hidden" name="lines[<?= $row['coa_id'] ?>][coa_id]" value="<?= $row['coa_id'] ?>">
+        <?php echo esc_html( $row['code'] . ' - ' . $row['name'] ); ?>
+        <input type="hidden" name="lines[<?php echo esc_attr( $row['coa_id'] ); ?>][coa_id]" value="<?php echo esc_attr( $row['coa_id'] ); ?>">
     </td>
     <td>
-        <input type="text" name="lines[<?= $row['coa_id'] ?>][budgeted_amount]"
-               value="<?= $row['budget'] > 0 ? number_format( $row['budget'], 2, ',', '.' ) : '' ?>"
+        <input type="text" name="lines[<?php echo esc_attr( $row['coa_id'] ); ?>][budgeted_amount]"
+               value="<?php echo $row['budget'] > 0 ? number_format( $row['budget'], 2, ',', '.' ) : ''; ?>"
                inputmode="decimal"
                oninput="this.value=this.value.replace(/[^0-9,.]/g,'');"
                style="width:120px"
-               data-orig="<?= $row['budget'] > 0 ? number_format( $row['budget'], 2, ',', '.' ) : '' ?>"
-               <?= $is_closed ? 'disabled' : '' ?>>
+               data-orig="<?php echo $row['budget'] > 0 ? number_format( $row['budget'], 2, ',', '.' ) : ''; ?>"
+               <?php echo $is_closed ? 'disabled' : ''; ?>>
     </td>
-    <td class="amount"><?= $fmt( $row['actual'] ) ?></td>
-    <td class="amount <?= $var_cls ?>"><?= $fmt( $row['variance'] ) ?></td>
+    <td class="amount"><?php echo esc_html( $fmt( $row['actual'] ) ); ?></td>
+    <td class="amount <?php echo esc_attr( $var_cls ); ?>"><?php echo esc_html( $fmt( $row['variance'] ) ); ?></td>
     <td>
         <div class="budget-bar-wrap">
-            <div class="budget-bar-fill <?= $over ? 'over' : '' ?>" style="width:<?= min( 100, $pct ) ?>%"></div>
+            <div class="budget-bar-fill <?php echo esc_attr( $over ? 'over' : '' ); ?>" style="width:<?php echo esc_attr( min( 100, $pct ) ); ?>%"></div>
         </div>
-        <span style="font-size:11px;margin-left:4px"><?= $pct ?>%</span>
+        <span style="font-size:11px;margin-left:4px"><?php echo esc_html( $pct ); ?>%</span>
     </td>
 </tr>
 <?php endforeach; ?>
 </tbody>
 <tfoot>
 <tr style="font-weight:bold;border-top:2px solid #ccc">
-    <td><?= $dir === 'in' ? esc_html__( 'Totaal ontvangsten', 'eme-accounting' ) : esc_html__( 'Totaal uitgaven', 'eme-accounting' ) ?></td>
-    <td class="amount"><?= $fmt( $total_budget ) ?></td>
-    <td class="amount"><?= $fmt( $total_actual ) ?></td>
-    <td class="amount <?= $total_var >= 0 ? 'green' : 'red' ?>"><?= $fmt( $total_var ) ?></td>
+    <td><?php echo $dir === 'in' ? esc_html__( 'Totaal ontvangsten', 'eme-accounting' ) : esc_html__( 'Totaal uitgaven', 'eme-accounting' ); ?></td>
+    <td class="amount"><?php echo esc_html( $fmt( $total_budget ) ); ?></td>
+    <td class="amount"><?php echo esc_html( $fmt( $total_actual ) ); ?></td>
+    <td class="amount <?php echo esc_attr( $total_var >= 0 ? 'green' : 'red' ); ?>"><?php echo esc_html( $fmt( $total_var ) ); ?></td>
     <td></td>
 </tr>
 </tfoot>
@@ -138,20 +139,20 @@ $saldo_diff = $totals['net_actual'] - $totals['net_budget'];
 <tbody>
 <tr style="font-weight:bold">
     <td><?php esc_html_e( 'Totalen', 'eme-accounting' ); ?></td>
-    <td class="amount <?= $totals['net_budget'] >= 0 ? 'green' : 'red' ?>"><?= $fmt( $totals['net_budget'] ) ?></td>
-    <td class="amount <?= $totals['net_actual'] >= 0 ? 'green' : 'red' ?>"><?= $fmt( $totals['net_actual'] ) ?></td>
-    <td class="amount <?= $saldo_diff >= 0 ? 'green' : 'red' ?>"><?= $fmt( $saldo_diff ) ?></td>
+    <td class="amount <?php echo esc_attr( $totals['net_budget'] >= 0 ? 'green' : 'red' ); ?>"><?php echo esc_html( $fmt( $totals['net_budget'] ) ); ?></td>
+    <td class="amount <?php echo esc_attr( $totals['net_actual'] >= 0 ? 'green' : 'red' ); ?>"><?php echo esc_html( $fmt( $totals['net_actual'] ) ); ?></td>
+    <td class="amount <?php echo esc_attr( $saldo_diff >= 0 ? 'green' : 'red' ); ?>"><?php echo esc_html( $fmt( $saldo_diff ) ); ?></td>
 </tr>
 </tbody>
 </table>
 </div>
 
-<input type="hidden" name="fiscal_year" value="<?= $year ?>">
+<input type="hidden" name="fiscal_year" value="<?php echo esc_attr( $year ); ?>">
 <p>
-    <button type="submit" class="button button-primary submit-btn" <?= $is_closed ? 'disabled' : '' ?>>
+    <button type="submit" class="button button-primary submit-btn" <?php echo $is_closed ? 'disabled' : ''; ?>>
         <?php esc_html_e( 'Opslaan', 'eme-accounting' ); ?>
     </button>
-    <button type="button" class="button eme-acc-delete-budget" data-year="<?= $year ?>"
+    <button type="button" class="button eme-acc-delete-budget" data-year="<?php echo esc_attr( $year ); ?>"
             style="margin-left:8px;color:#d63638;border-color:#d63638">
         <?php esc_html_e( 'Verwijder deze begroting', 'eme-accounting' ); ?>
     </button>
@@ -178,19 +179,19 @@ if ( $all_budget_years ):
     <tbody>
     <?php foreach ( $all_budget_years as $row ): ?>
     <tr>
-        <td><strong><?= (int) $row->fiscal_year ?></strong></td>
-        <td><?= esc_html( $fmtSimple( $row->total_in ) ) ?></td>
-        <td><?= esc_html( $fmtSimple( $row->total_out ) ) ?></td>
-        <td style="<?= $row->saldo < 0 ? 'color:#d63638;font-weight:600' : '' ?>">
-            <?= esc_html( $fmtSimple( $row->saldo ) ) ?>
+        <td><strong><?php echo (int) $row->fiscal_year; ?></strong></td>
+        <td><?php echo esc_html( $fmtSimple( $row->total_in ) ); ?></td>
+        <td><?php echo esc_html( $fmtSimple( $row->total_out ) ); ?></td>
+        <td style="<?php echo $row->saldo < 0 ? 'color:#d63638;font-weight:600' : ''; ?>">
+            <?php echo esc_html( $fmtSimple( $row->saldo ) ); ?>
         </td>
         <td>
-            <a href="<?= esc_url( admin_url( 'admin.php?page=emeaccounting-budget&year=' . (int) $row->fiscal_year ) ) ?>"
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-budget&year=' . (int) $row->fiscal_year ) ); ?>"
                class="button button-small"><?php esc_html_e( 'Bewerk', 'eme-accounting' ); ?></a>
             <button type="button" class="button button-small btn-budget-export-pdf"
-                    data-year="<?= (int) $row->fiscal_year ?>"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
+                    data-year="<?php echo (int) $row->fiscal_year; ?>"><?php esc_html_e( 'PDF', 'eme-accounting' ); ?></button>
             <button type="button" class="button button-small eme-acc-delete-budget"
-                    data-year="<?= (int) $row->fiscal_year ?>">✕</button>
+                    data-year="<?php echo (int) $row->fiscal_year; ?>">✕</button>
         </td>
     </tr>
     <?php endforeach; ?>

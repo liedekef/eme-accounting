@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
 $vzw_name   = esc_html( $config->vzw_name ?? '' );
@@ -71,17 +72,17 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
 <div class="page">
 
     <!-- HOOFDING -->
-    <h1 class="vzw-title"><?= $vzw_name ?> <?= $vzw_form ?></h1>
+    <h1 class="vzw-title"><?php echo esc_html( $vzw_name ); ?> <?php echo esc_html( $vzw_form ); ?></h1>
     <p class="vzw-subtitle">
-        <?= $street ?>, <?= $postal ?><br>
-        Ondernemingsnr. <?= $vzw_number ?>
+        <?php echo esc_html( $street ); ?>, <?php echo esc_html( $postal ); ?><br>
+        Ondernemingsnr. <?php echo esc_html( $vzw_number ); ?>
     </p>
     <p class="vzw-subtitle">
-        <?= $website ?> | <?= $email ?><br>
-        <?= $court ?>
+        <?php echo esc_url( $website ); ?> | <?php echo esc_html( $email ); ?><br>
+        <?php echo esc_html( $court ); ?>
     </p>
 
-    <div class="doc-title">Boekjaar <?= $year ?> Begroting
+    <div class="doc-title">Boekjaar <?php echo esc_html( $year ); ?> Begroting
     </div>
 
     <?php
@@ -110,20 +111,20 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
         <tbody>
         <?php foreach ( $income_rows as $row ): ?>
             <tr>
-                <td><?= esc_html( $row['code'] . ' - ' . $row['name'] ) ?></td>
-                <td class="amount"><?= $row['budget'] > 0 ? $fmt->formatCurrency( $row['budget'], $currency ) : '' ?></td>
-                <td class="amount"><?= $fmt->formatCurrency( $row['actual'], $currency ) ?></td>
-                <td class="amount <?= $row['variance'] >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-                    <?= $fmt->formatCurrency( $row['variance'], $currency ) ?>
+                <td><?php echo esc_html( $row['code'] . ' - ' . $row['name'] ); ?></td>
+                <td class="amount"><?php echo esc_html( $row['budget'] > 0 ? $fmt->formatCurrency( $row['budget'], $currency ) : '' ); ?></td>
+                <td class="amount"><?php echo esc_html( $fmt->formatCurrency( $row['actual'], $currency ) ); ?></td>
+                <td class="amount <?php echo $row['variance'] >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+                    <?php echo esc_html( $fmt->formatCurrency( $row['variance'], $currency ) ); ?>
                 </td>
             </tr>
         <?php endforeach; ?>
             <tr class="total-row">
                 <td>Totaal Ontvangsten</td>
-                <td class="amount"><?= $fmt->formatCurrency( $total_budget_in, $currency ) ?></td>
-                <td class="amount"><?= $fmt->formatCurrency( $total_actual_in, $currency ) ?></td>
-                <td class="amount <?= ( $total_actual_in - $total_budget_in ) >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-                    <?= $fmt->formatCurrency( $total_actual_in - $total_budget_in, $currency ) ?>
+                <td class="amount"><?php echo esc_html( $fmt->formatCurrency( $total_budget_in, $currency ) ); ?></td>
+                <td class="amount"><?php echo esc_html( $fmt->formatCurrency( $total_actual_in, $currency ) ); ?></td>
+                <td class="amount <?php echo ( $total_actual_in - $total_budget_in ) >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+                    <?php echo esc_html( $fmt->formatCurrency( $total_actual_in - $total_budget_in, $currency ) ); ?>
                 </td>
             </tr>
         </tbody>
@@ -144,20 +145,20 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
         <tbody>
         <?php foreach ( $expense_rows as $row ): ?>
             <tr>
-                <td><?= esc_html( $row['code'] . ' - ' . $row['name'] ) ?></td>
-                <td class="amount"><?= $row['budget'] > 0 ? $fmt->formatCurrency( $row['budget'], $currency ) : '' ?></td>
-                <td class="amount"><?= $fmt->formatCurrency( $row['actual'], $currency ) ?></td>
-                <td class="amount <?= $row['variance'] >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-                    <?= $fmt->formatCurrency( $row['variance'], $currency ) ?>
+                <td><?php echo esc_html( $row['code'] . ' - ' . $row['name'] ); ?></td>
+                <td class="amount"><?php echo esc_html( $row['budget'] > 0 ? $fmt->formatCurrency( $row['budget'], $currency ) : '' ); ?></td>
+                <td class="amount"><?php echo esc_html( $fmt->formatCurrency( $row['actual'], $currency ) ); ?></td>
+                <td class="amount <?php echo $row['variance'] >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+                    <?php echo esc_html( $fmt->formatCurrency( $row['variance'], $currency ) ); ?>
                 </td>
             </tr>
         <?php endforeach; ?>
             <tr class="total-row">
                 <td>Totaal Uitgaven</td>
-                <td class="amount"><?= $fmt->formatCurrency( $total_budget_out, $currency ) ?></td>
-                <td class="amount"><?= $fmt->formatCurrency( $total_actual_out, $currency ) ?></td>
-                <td class="amount <?= ( $total_budget_out - $total_actual_out ) >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-                    <?= $fmt->formatCurrency( $total_budget_out - $total_actual_out, $currency ) ?>
+                <td class="amount"><?php echo esc_html( $fmt->formatCurrency( $total_budget_out, $currency ) ); ?></td>
+                <td class="amount"><?php echo esc_html( $fmt->formatCurrency( $total_actual_out, $currency ) ); ?></td>
+                <td class="amount <?php echo ( $total_budget_out - $total_actual_out ) >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+                    <?php echo esc_html( $fmt->formatCurrency( $total_budget_out - $total_actual_out, $currency ) ); ?>
                 </td>
             </tr>
         </tbody>
@@ -174,14 +175,14 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
 <tbody>
 <tr class="total-row">
     <td><?php esc_html_e( 'Totalen', 'eme-accounting' ); ?></td>
-    <td class="amount <?= $net_budget >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-          <?= $fmt->formatCurrency( $net_budget, $currency ) ?>
+    <td class="amount <?php echo $net_budget >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+          <?php echo esc_html( $fmt->formatCurrency( $net_budget, $currency ) ); ?>
     </td>
-    <td class="amount <?= $net_actual >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-          <?= $fmt->formatCurrency( $net_actual, $currency ) ?>
+    <td class="amount <?php echo $net_actual >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+          <?php echo esc_html( $fmt->formatCurrency( $net_actual, $currency ) ); ?>
     </td>
-    <td class="amount <?= $net_actual-$net_budget >= 0 ? 'balance-positive' : 'balance-negative' ?>">
-          <?= $fmt->formatCurrency( $net_actual-$net_budget, $currency ) ?>
+    <td class="amount <?php echo $net_actual-$net_budget >= 0 ? 'balance-positive' : 'balance-negative'; ?>">
+          <?php echo esc_html( $fmt->formatCurrency( $net_actual-$net_budget, $currency ) ); ?>
     </td>
 </tr>
 </tbody>
@@ -196,8 +197,8 @@ $vertegenwoordigers = EMEVzw\Config::get_legal_representatives();
                     <?php foreach ( $vertegenwoordigers_per2 as $v ): ?>
                     <td>
                         <div class="sig-identity">
-                            <?= esc_html( $v->first_name . ' ' . $v->last_name ) ?><br>
-                            <em><?= esc_html( EMEVzw\Config::legal_capacity_label( $v->legal_capacity ?? 'bestuurder' ) ) ?><?= ! empty( $v->function_title ) ? ' · ' . esc_html( EMEVzw\Config::function_title_label( $v->function_title ) ) : '' ?></em>
+                            <?php echo esc_html( $v->first_name . ' ' . $v->last_name ); ?><br>
+                            <em><?php echo esc_html( EMEVzw\Config::legal_capacity_label( $v->legal_capacity ?? 'bestuurder' ) ); ?><?php echo ! empty( $v->function_title ) ? ' · ' . esc_html( EMEVzw\Config::function_title_label( $v->function_title ) ) : ''; ?></em>
                         </div>
                         <div class="sig-label">Handtekening</div>
                         <div class="sig-line"></div>

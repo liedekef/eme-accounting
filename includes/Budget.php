@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -165,7 +166,7 @@ class Budget {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'budget' );
         global $wpdb;
-        $year = (int) ( $_POST['year'] ?? 0 );
+        $year = (int) eme_sanitize_request( $_POST['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( $year <= 0 ) {
             wp_send_json_error( __( 'Ongeldig boekjaar.', 'eme-accounting' ) );
         }
@@ -181,13 +182,13 @@ class Budget {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'budget' );
 
-        $fiscal_year = (int) ( $_POST['fiscal_year'] ?? gmdate( 'Y' ) );
+        $fiscal_year = (int) eme_sanitize_request( $_POST['fiscal_year'] ?? gmdate( 'Y' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 
         if ( FiscalYear::is_closed( $fiscal_year ) ) {
             wp_send_json_error( __( 'Boekjaar is afgesloten. Begroting kan niet meer aangepast worden.', 'eme-accounting' ) );
         }
 
-        $lines     = $_POST['lines'] ?? [];
+        $lines     = eme_sanitize_request( $_POST['lines'] ?? [] ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $saved    = 0;
 
         foreach ( $lines as $line ) {
@@ -222,7 +223,7 @@ class Budget {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'budget' );
 
-        $year     = (int) ( $_POST['year'] ?? gmdate( 'Y' ) );
+        $year     = (int) eme_sanitize_request( $_POST['year'] ?? gmdate( 'Y' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $actuals  = self::get_actuals_for_year( $year );
         // Only return non-zero actuals
         $actuals = array_filter( $actuals, fn( $v ) => $v > 0 );
@@ -305,7 +306,7 @@ class Budget {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'budget' );
 
-        $year = (int) ( $_GET['year'] ?? gmdate( 'Y' ) );
+        $year = (int) eme_sanitize_request( $_GET['year'] ?? gmdate( 'Y' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $html = self::generate_pdf_html( $year );
 
         if ( empty( $html ) ) {

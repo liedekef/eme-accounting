@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);
 $config =  \EMEVzw\Config::get();
@@ -8,7 +9,7 @@ $assets   = EMEAccounting\Depreciation::get_all();
 $accounts = EMEAccounting\Accounts::get_dropdown();
 ?>
 <div class="wrap eme-acc-wrap">
-<fieldset <?= $form_disabled ?>>
+<fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 <h1><?php esc_html_e( 'Activa en Afschrijvingen', 'eme-accounting' ); ?></h1>
 
 <div class="eme-acc-form-box">
@@ -22,7 +23,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Aankoopdatum', 'eme-accounting' ); ?> *</label>
-        <input type="date" name="purchase_date" required value="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>">
+        <input type="date" name="purchase_date" required value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>">
     </div>
     <div class="eme-acc-field">
         <label><?php esc_html_e( 'Aankoopprijs (€)', 'eme-accounting' ); ?> *</label>
@@ -70,7 +71,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
         <select name="account_id">
             <option value=""><?php esc_html_e( '—', 'eme-accounting' ); ?></option>
             <?php foreach ( $accounts as $id => $name ): ?>
-            <option value="<?= $id ?>"><?= esc_html( $name ) ?></option>
+            <option value="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $name ); ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -79,7 +80,7 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
         <select name="depreciation_account_id">
             <option value=""><?php esc_html_e( '—', 'eme-accounting' ); ?></option>
             <?php foreach ( $accounts as $id => $name ): ?>
-            <option value="<?= $id ?>"><?= esc_html( $name ) ?></option>
+            <option value="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $name ); ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -113,33 +114,33 @@ $accounts = EMEAccounting\Accounts::get_dropdown();
         ? round( ( 1 - $asset->current_book_value / $asset->purchase_price ) * 100, 1 )
         : 0;
 ?>
-<tr data-asset-row="<?= (int) $asset->id ?>">
+<tr data-asset-row="<?php echo (int) $asset->id; ?>">
     <td>
-        <strong><?= esc_html( $asset->name ) ?></strong>
+        <strong><?php echo esc_html( $asset->name ); ?></strong>
         <?php if ( $asset->description ): ?>
-        <br><span style="font-size:11px;color:#646970"><?= esc_html( mb_substr( $asset->description, 0, 60 ) ) ?></span>
+        <br><span style="font-size:11px;color:#646970"><?php echo esc_html( mb_substr( $asset->description, 0, 60 ) ); ?></span>
         <?php endif; ?>
         <div class="row-actions">
-            <a href="#" class="eme-acc-edit-asset" data-id="<?= (int) $asset->id ?>" data-name="<?= esc_attr( $asset->name ) ?>" data-purchase-date="<?= esc_attr( $asset->purchase_date ) ?>" data-purchase-price="<?= (float) $asset->purchase_price ?>" data-residual-value="<?= (float) $asset->residual_value ?>" data-current-book-value="<?= (float) $asset->current_book_value ?>" data-useful-life-years="<?= (int) $asset->useful_life_years ?>" data-method="<?= esc_attr( $asset->method ) ?>" data-asset-type="<?= esc_attr( $asset->asset_type ) ?>" data-account-id="<?= (int) $asset->account_id ?>" data-depreciation-account-id="<?= (int) $asset->depreciation_account_id ?>" data-description="<?= esc_attr( $asset->description ) ?>"><?php esc_html_e( 'Bewerken', 'eme-accounting' ); ?></a> |
-            <a href="#" class="eme-acc-delete-asset" data-id="<?= (int) $asset->id ?>"><?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?></a>
+            <a href="#" class="eme-acc-edit-asset" data-id="<?php echo (int) $asset->id; ?>" data-name="<?php echo esc_attr( $asset->name ); ?>" data-purchase-date="<?php echo esc_attr( $asset->purchase_date ); ?>" data-purchase-price="<?php echo (float) $asset->purchase_price; ?>" data-residual-value="<?php echo (float) $asset->residual_value; ?>" data-current-book-value="<?php echo (float) $asset->current_book_value; ?>" data-useful-life-years="<?php echo (int) $asset->useful_life_years; ?>" data-method="<?php echo esc_attr( $asset->method ); ?>" data-asset-type="<?php echo esc_attr( $asset->asset_type ); ?>" data-account-id="<?php echo (int) $asset->account_id; ?>" data-depreciation-account-id="<?php echo (int) $asset->depreciation_account_id; ?>" data-description="<?php echo esc_attr( $asset->description ); ?>"><?php esc_html_e( 'Bewerken', 'eme-accounting' ); ?></a> |
+            <a href="#" class="eme-acc-delete-asset" data-id="<?php echo (int) $asset->id; ?>"><?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?></a>
         </div>
     </td>
-    <td><span class="eme-acc-tag"><?= isset( $asset->asset_type ) ? esc_html__( ucfirst( str_replace( '_', ' ', $asset->asset_type ) ), 'eme-accounting' ) : '—' ?></span></td>
-    <td><?= esc_html( date_i18n( 'd/m/Y', strtotime( $asset->purchase_date ) ) ) ?></td>
-    <td class="amount"><?= $formatter->formatCurrency( $asset->purchase_price, $currency ) ?></td>
+    <td><span class="eme-acc-tag"><?php echo isset( $asset->asset_type ) ? esc_html__( ucfirst( str_replace( '_', ' ', $asset->asset_type ) ), 'eme-accounting' ) : '—'; ?></span></td>
+    <td><?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $asset->purchase_date ) ) ); ?></td>
+    <td class="amount"><?php echo esc_html( $formatter->formatCurrency( $asset->purchase_price, $currency ) ); ?></td>
     <td>
-        <?= $formatter->formatCurrency( (float) $asset->current_book_value, $currency ) ?>
-        <div class="budget-bar-wrap" title="<?= $pct ?>% afgeschreven">
-            <div class="budget-bar-fill <?= $pct >= 100 ? 'over' : '' ?>" style="width:<?= min(100,$pct) ?>%"></div>
+        <?php echo esc_html( $formatter->formatCurrency( (float) $asset->current_book_value, $currency ) ); ?>
+        <div class="budget-bar-wrap" title="<?php echo esc_attr( $pct ); ?>% afgeschreven">
+            <div class="budget-bar-fill <?php echo esc_attr( $pct >= 100 ? 'over' : '' ); ?>" style="width:<?php echo esc_attr( min(100,$pct) ); ?>%"></div>
         </div>
     </td>
-    <td><span class="eme-acc-tag"><?= $asset->method === 'linear' ? esc_html__( 'Lineair', 'eme-accounting' ) : esc_html__( 'Degressief', 'eme-accounting' ) ?></span></td>
-    <td><?= (int) $asset->useful_life_years ?> <?php esc_html_e( 'jaar', 'eme-accounting' ); ?></td>
-    <td class="amount out"><?= $formatter->formatCurrency( $annual, $currency ) ?></td>
+    <td><span class="eme-acc-tag"><?php echo $asset->method === 'linear' ? esc_html__( 'Lineair', 'eme-accounting' ) : esc_html__( 'Degressief', 'eme-accounting' ); ?></span></td>
+    <td><?php echo (int) $asset->useful_life_years; ?> <?php esc_html_e( 'jaar', 'eme-accounting' ); ?></td>
+    <td class="amount out"><?php echo esc_html( $formatter->formatCurrency( $annual, $currency ) ); ?></td>
     <td style="font-size:11px;color:#646970">
-        <?= $asset->last_depreciation
+        <?php echo $asset->last_depreciation
             ? esc_html( date_i18n( 'd/m/Y', strtotime( $asset->last_depreciation ) ) )
-            : '—' ?>
+            : '—'; ?>
     </td>
 </tr>
 <?php endforeach; ?>

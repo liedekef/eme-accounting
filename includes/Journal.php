@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -94,13 +95,13 @@ class Journal {
 
         $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) . " AND transfer_id IS NULL" : "WHERE transfer_id IS NULL";
 
-        $row = $wpdb->get_row(
+        $row = $wpdb->get_row( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prepare(
                 "SELECT
                     COALESCE(SUM(CASE WHEN direction = 'in'  THEN amount ELSE 0 END), 0) AS income,
                     COALESCE(SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0) AS expenses
                  FROM `{$wpdb->prefix}emeacc_journal`
-                 {$where_sql}",
+                 {$where_sql}", //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 ...$prepare
             )
         );
@@ -150,7 +151,8 @@ class Journal {
             return new \WP_Error(
                 'year_closed',
                 sprintf(
-                    __( 'Boekjaar %d is afgesloten op %s.', 'eme-accounting' ),
+                    // translators: %1$d is the fiscal year, %2$s is the closing date.
+                    __( 'Boekjaar %1$d is afgesloten op %2$s.', 'eme-accounting' ),
                     $fiscal_year,
                     date_i18n( 'd/m/Y', strtotime( $fy->closed_at ) )
                 )
@@ -165,6 +167,7 @@ class Journal {
             return new \WP_Error(
                 'before_opening_date',
                 sprintf(
+                    // translators: %s is the account name.
                     __( 'Boeking valt voor de begindatum van rekening "%s".', 'eme-accounting' ),
                     $account->name
                 )
@@ -212,7 +215,12 @@ class Journal {
             if ( empty( $direction ) ) {
                 $direction = $old_entry->direction;
             } elseif ( $old_entry->direction != $direction ) {
-                return new \WP_Error( 'no_direction_update', sprintf(__( 'Richting (%s =>%s) kan niet aangepast worden.', 'eme-accounting' ),$old_entry->direction,$direction) );
+                return new \WP_Error( 'no_direction_update', sprintf(
+                    // translators: %1$s and %2$s are the old and the new direction.
+                    __( 'Richting (%1$s =>%2$s) kan niet aangepast worden.', 'eme-accounting' ),
+                    $old_entry->direction,
+                    $direction
+                ) );
             }
         }
         if ( empty( $id) && empty($direction) ) {
@@ -235,6 +243,7 @@ class Journal {
                 return new \WP_Error(
                     'before_opening_date',
                     sprintf(
+                        // translators: %s is the account name.
                         __( 'Boeking valt voor de begindatum van rekening "%s".', 'eme-accounting' ),
                         $contra_account->name
                     )
@@ -401,7 +410,7 @@ class Journal {
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'journal' );
-        $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
+        $result = self::delete( (int) eme_sanitize_request( $_POST['id'] ?? 0 ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
         }
@@ -459,10 +468,10 @@ class Journal {
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
             'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
             'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
-	        'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ): null,
-            'search'            => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
-            'counterparty_name' => isset( $_POST['counterparty_name'] ) && $_POST['counterparty_name'] !== '' ? eme_sanitize_request( $_POST['counterparty_name'] ) : null,
-            'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
+	        'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'search'            => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'counterparty_name' => isset( $_POST['counterparty_name'] ) && $_POST['counterparty_name'] !== '' ? eme_sanitize_request( $_POST['counterparty_name'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         ];
 
         $total = self::count_entries( $where_args );
@@ -512,6 +521,19 @@ class Journal {
         wp_die();
     }
 
+    /**
+     * Neutralize spreadsheet formula injection for text cells.
+     * Cells starting with = + - @ are interpreted as formulas by
+     * Excel/LibreOffice; prefixing them with a single quote prevents that.
+     */
+    public static function csv_safe_text( $value ): string {
+        $value = (string) ( $value ?? '' );
+        if ( $value === '' ) {
+            return $value;
+        }
+        return in_array( $value[0], [ '=', '+', '-', '@' ], true ) ? "'" . $value : $value;
+    }
+
     public static function fputcsv( $fh, $fields, $delimiter = ';', $enclosure = '"' ) : void {
         $delimiter_esc = preg_quote( $delimiter, '/' );
         $enclosure_esc = preg_quote( $enclosure, '/' );
@@ -539,7 +561,7 @@ class Journal {
         $formatter = new \NumberFormatter('nl_BE', \NumberFormatter::CURRENCY);
 
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="journal_' . date('Y-m-d') . '.csv"');
+        header('Content-Disposition: attachment; filename="journal_' . date('Y-m-d') . '.csv"'); //phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
         $output = fopen('php://output', 'w');
         // Add BOM for UTF-8
         fwrite($output, "\xEF\xBB\xBF");
@@ -550,10 +572,10 @@ class Journal {
             'direction'    => isset( $_POST['direction'] ) && $_POST['direction'] !== '' ? sanitize_key( $_POST['direction'] ) : null,
             'coa_id'       => isset( $_POST['coa_id'] ) && $_POST['coa_id'] > 0 ? (int) $_POST['coa_id'] : null,
             'eme_event_id' => isset( $_POST['eme_event_id'] ) && $_POST['eme_event_id'] > 0 ? (int) $_POST['eme_event_id'] : null,
-	        'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ): null,
-            'search'            => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null,
-            'counterparty_name' => isset( $_POST['counterparty_name'] ) && $_POST['counterparty_name'] !== '' ? eme_sanitize_request( $_POST['counterparty_name'] ) : null,
-            'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null,
+	        'amount'       => isset( $_POST['amount'] ) && $_POST['amount'] > 0 ? eme_sanitize_request( $_POST['amount'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'search'            => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'counterparty_name' => isset( $_POST['counterparty_name'] ) && $_POST['counterparty_name'] !== '' ? eme_sanitize_request( $_POST['counterparty_name'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'daterange'         => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : null, //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         ];
 
         $total = self::count_entries( $where_args );
@@ -592,12 +614,12 @@ class Journal {
             $row = [
                 (int) $entry->id,
                 eme_localized_date( $entry->entry_date, EME_TIMEZONE ),
-                $entry->description,
-                $entry->coa_name ?? '',
-                $event_name,
-                $entry->bank_statement_ref ?? '',
-                $entry->counterparty_name ?? '',
-                $entry->account_name ?? '',
+                self::csv_safe_text( $entry->description ),
+                self::csv_safe_text( $entry->coa_name ?? '' ),
+                self::csv_safe_text( $event_name ),
+                self::csv_safe_text( $entry->bank_statement_ref ?? '' ),
+                self::csv_safe_text( $entry->counterparty_name ?? '' ),
+                self::csv_safe_text( $entry->account_name ?? '' ),
                 $formatter->formatCurrency( $signed_amount, $currency ),
                 $entry->direction,
             ];
@@ -624,8 +646,8 @@ class Journal {
         $settings = get_option( 'eme_accounting_settings', [] );
         header( 'Content-type: application/json; charset=utf-8' );
         // snapselect gives us paging, but currently we ignore it here and return everything we can
-        $q           = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : '';
-        $year        = isset( $_REQUEST['entry_date'] ) ? intval(date( 'Y', strtotime( $_REQUEST['entry_date'] ) )) : (int) gmdate( 'Y' );
+        $q           = isset( $_REQUEST['q'] ) ? strtolower( eme_sanitize_request( $_REQUEST['q'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $year        = isset( $_REQUEST['entry_date'] ) ? intval( date( 'Y', strtotime( eme_sanitize_request( $_REQUEST['entry_date'] ) ) ) ) : (int) gmdate( 'Y' ); //phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date, WordPress.Security.ValidatedSanitizedInput
         $search_all  = isset( $_REQUEST['search_all'] ) ? intval( $_REQUEST['search_all'] ) : 0;
         $scope       = $settings['eme_scope'];
         $eme_cat_ids = implode(',',$settings['eme_cat_ids']);
@@ -733,11 +755,11 @@ class Journal {
         [ $where_sql, $prepare ] = self::build_filter_where( $where_args );
 
         if ( empty( $prepare ) ) {
-            return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} $where_sql" );
+            return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} $where_sql" ); //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         }
 
-        return (int) $wpdb->get_var(
-            $wpdb->prepare( "SELECT COUNT(*) FROM {$table} {$where_sql}", ...$prepare )
+        return (int) $wpdb->get_var( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $wpdb->prepare( "SELECT COUNT(*) FROM {$table} {$where_sql}", ...$prepare ) //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         );
     }
 
@@ -764,9 +786,9 @@ class Journal {
                 {$limit}";
 
         if ( empty( $prepare ) ) {
-            $rows = $wpdb->get_results( $sql );
+            $rows = $wpdb->get_results( $sql ); //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
         } else {
-            $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) );
+            $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) ); //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
         }
         if ($include_files) {
             foreach ($rows as &$row) {

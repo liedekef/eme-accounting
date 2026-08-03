@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -18,7 +19,7 @@ class ChartOfAccounts {
         global $wpdb;
         $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
-        $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$table`" );
+        $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_chart_of_accounts`" );
         if ( $count > 0 ) {
             return;
         }
@@ -169,8 +170,7 @@ class ChartOfAccounts {
 
     public static function get_all(): array {
         global $wpdb;
-        $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
-        return $wpdb->get_results( "SELECT * FROM `$table` ORDER BY code" );
+        return $wpdb->get_results( "SELECT * FROM `{$wpdb->prefix}emeacc_chart_of_accounts` ORDER BY code" );
     }
 
     public static function get( int $id ): ?object {
@@ -189,14 +189,13 @@ class ChartOfAccounts {
 
     public static function get_by_direction( string $direction, bool $active_only = true ): array {
         global $wpdb;
-        $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
         if ( $active_only ) {
             return $wpdb->get_results(
-                $wpdb->prepare( "SELECT * FROM `$table` WHERE direction = %s AND is_active = 1 ORDER BY code", $direction )
+                $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE direction = %s AND is_active = 1 ORDER BY code", $direction )
             );
         }
         return $wpdb->get_results(
-            $wpdb->prepare( "SELECT * FROM `$table` WHERE direction = %s ORDER BY code", $direction )
+            $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE direction = %s ORDER BY code", $direction )
         );
     }
 
@@ -282,7 +281,6 @@ class ChartOfAccounts {
 
     public static function get_next_sequence( int $parent_id ): string {
         global $wpdb;
-        $table = $wpdb->prefix . 'emeacc_chart_of_accounts';
 
         $parent = self::get( $parent_id );
         if ( ! $parent ) {
@@ -291,7 +289,7 @@ class ChartOfAccounts {
 
         $max_seq = (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT MAX(CAST(SUBSTRING_INDEX(code, '-', -1) AS UNSIGNED)) FROM `$table` WHERE parent_id = %d",
+                "SELECT MAX(CAST(SUBSTRING_INDEX(code, '-', -1) AS UNSIGNED)) FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE parent_id = %d",
                 $parent_id
             )
         );
@@ -375,7 +373,7 @@ class ChartOfAccounts {
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'coa' );
-        $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
+        $result = self::delete( (int) eme_sanitize_request( $_POST['id'] ?? 0 ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
         }
@@ -385,7 +383,7 @@ class ChartOfAccounts {
     public static function ajax_reorder(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'coa' );
-        $items = json_decode( eme_sanitize_request($_POST['items'] ?? '[]'), true );
+        $items = json_decode( eme_sanitize_request( $_POST['items'] ?? '[]' ), true ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         self::reorder( $items );
         wp_send_json_success();
     }
@@ -393,7 +391,7 @@ class ChartOfAccounts {
     public static function ajax_next_seq(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'coa' );
-        $parent_id = (int) ( $_POST['parent_id'] ?? 0 );
+        $parent_id = (int) eme_sanitize_request( $_POST['parent_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( $parent_id <= 0 ) {
             wp_send_json_error( __( 'Ongeldige hoofdrekening.', 'eme-accounting' ) );
         }

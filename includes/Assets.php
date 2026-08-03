@@ -19,15 +19,15 @@ class Assets {
 
         $config =  \EMEVzw\Config::get();
 
-        wp_enqueue_script( 'emeaccounting-select', EME_PLUGIN_URL . 'js/snapselect/snapselect.min.js', [], EME_VERSION );
-        wp_enqueue_style('emeaccounting-select-css', EME_PLUGIN_URL . 'js/snapselect/snapselect.min.css' );
+        wp_enqueue_script( 'emeaccounting-select', EME_PLUGIN_URL . 'js/snapselect/snapselect.min.js', [], EME_VERSION, true );
+        wp_enqueue_style( 'emeaccounting-select-css', EME_PLUGIN_URL . 'js/snapselect/snapselect.min.css', [], EME_VERSION );
         wp_enqueue_script( 'emeaccounting-sortable', EME_PLUGIN_URL . 'js/sortable/sortable.min.js', [ ], EME_VERSION, true );
         wp_enqueue_style( 'emeaccounting-fdatepicker', EME_PLUGIN_URL . 'js/fdatepicker/css/fdatepicker.min.css', [], EME_VERSION );
-        wp_enqueue_script( 'emeaccounting-fdatepicker', EME_PLUGIN_URL . 'js/fdatepicker/js/fdatepicker.min.js', [ ], EME_VERSION );
+        wp_enqueue_script( 'emeaccounting-fdatepicker', EME_PLUGIN_URL . 'js/fdatepicker/js/fdatepicker.min.js', [ ], EME_VERSION, true );
 
-        wp_enqueue_style( 'emeaccounting-ftable-css', EME_PLUGIN_URL . 'js/ftable/themes/lightcolor/gray/ftable.min.css' );
+        wp_enqueue_style( 'emeaccounting-ftable-css', EME_PLUGIN_URL . 'js/ftable/themes/lightcolor/gray/ftable.min.css', [], EME_VERSION );
         wp_enqueue_style( 'emeaccounting-ftables-css', EME_PLUGIN_URL . 'css/ftables.css', [], EME_VERSION );
-        wp_enqueue_script( 'emeaccounting-ftable', EME_PLUGIN_URL . 'js/ftable/ftable.min.js', [ ], EME_VERSION );
+        wp_enqueue_script( 'emeaccounting-ftable', EME_PLUGIN_URL . 'js/ftable/ftable.min.js', [ ], EME_VERSION, true );
         $locale_code     = determine_locale();
         $locale_code     = str_replace( '_', '-', $locale_code );
         // for english, no translation code is needed)
@@ -36,12 +36,12 @@ class Assets {
             $locale_file     = EME_PLUGIN_DIR . "js/ftable/localization/ftable.$locale_code.js";
             if ( file_exists( $locale_file ) ) {
                 $locale_file_url = EME_PLUGIN_URL . "js/ftable/localization/ftable.$locale_code.js";
-                wp_enqueue_script( 'emeaccounting-ftable-locale', $locale_file_url, '', EME_VERSION );
+                wp_enqueue_script( 'emeaccounting-ftable-locale', $locale_file_url, '', EME_VERSION, true );
             }
             $locale_file     = EME_PLUGIN_DIR . "js/fdatepicker/js/i18n/fdatepicker.$locale_code.js";
             if ( file_exists( $locale_file ) ) {
                 $locale_file_url    = EME_PLUGIN_URL . "js/fdatepicker/js/i18n/fdatepicker.$locale_code.js";
-                wp_enqueue_script( 'emeaccounting-fdatepick-locale', $locale_file_url, '', EME_VERSION );
+                wp_enqueue_script( 'emeaccounting-fdatepick-locale', $locale_file_url, '', EME_VERSION, true );
             }
         }
 
@@ -52,7 +52,7 @@ class Assets {
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'i18n'    => [
                 'confirm_delete' => __( 'Zeker verwijderen?', 'eme-accounting' ),
-                'confirm_delete_patrimony' => __( 'Staat van Vermogen verwijderen?', 'eme-vzw-helper' ),
+                'confirm_delete_patrimony' => __( 'Staat van Vermogen verwijderen?', 'eme-accounting' ),
                 'confirm_delete_budget'    => __( 'Begroting van dit boekjaar verwijderen?', 'eme-accounting' ),
                 'save'           => __( 'Opslaan', 'eme-accounting' ),
                 'update'         => __( 'Bijwerken', 'eme-accounting' ),
@@ -72,8 +72,11 @@ class Assets {
                 'noFyFound'      => __( 'Geen boekjaar gevonden', 'eme-accounting' ),
                 'processing'     => __( 'Bezig…', 'eme-accounting' ),
                 'error'          => __( 'Er is een fout opgetreden.', 'eme-accounting' ),
+                // translators: %s is the fiscal year.
                 'confirmClose'   => __( 'Boekjaar %s afsluiten? Dit kan niet ongedaan gemaakt worden.', 'eme-accounting' ),
+                // translators: %s is the fiscal year.
                 'confirmReopen'  => __( 'Boekjaar %s heropenen? De afsluitboekingen worden verwijderd.', 'eme-accounting' ),
+                // translators: %s is the fiscal year.
                 'confirmDelete'   => __( 'Boekjaar %s verwijderen?', 'eme-accounting' ),
                 'translate_fdateformat'        => get_option( 'date_format' ),
                 'translate_fdatetimeformat'    => get_option( 'date_format' ) . ' ' . get_option( 'time_format' ),
@@ -86,7 +89,7 @@ class Assets {
             'col_optional'     => __( 'Optioneel', 'eme-accounting' ),
         ] );
         if ( $plugin_page === 'emeaccounting-reports' ) {
-            wp_enqueue_script( 'emeaccounting-chartjs', 'https://cdn.jsdelivr.net/npm/chart.js@4', [], '4.4.7', true );
+            wp_enqueue_script( 'emeaccounting-chartjs', EME_ACCOUNTING_URL . 'assets/js/chart.umd.min.js', [], '4.4.7', true );
         }
         if ( $plugin_page === 'emeaccounting-journal' ) {
             wp_enqueue_script( 'emeaccounting-journal', EME_ACCOUNTING_URL . 'assets/js/journal.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
@@ -103,10 +106,10 @@ class Assets {
                 $disabled = '';
                 if (empty( $acc->parent_id )) $disabled='disabled';
                 if ( $acc->direction === 'in' )  {
-                    $coa_in_select[] = "<option value='$id' $disabled>". esc_html__( $acc->code . ' - ' . $acc->name )."</option>";
+                    $coa_in_select[] = "<option value='$id' $disabled>". esc_html( $acc->code . ' - ' . $acc->name )."</option>";
                 }
                 if ( $acc->direction === 'out' )  {
-                    $coa_out_select[] = "<option value='$id' $disabled>". esc_html__( $acc->code . ' - ' . $acc->name )."</option>";
+                    $coa_out_select[] = "<option value='$id' $disabled>". esc_html( $acc->code . ' - ' . $acc->name )."</option>";
                 }
             }
             $coa_in_select[] = "</optgroup>";

@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -17,6 +18,9 @@ use EMEAccounting\Capabilities;
  *  - CODA v2 (raw structured Belgian bank format)
  */
 class Import {
+
+    /** Maximum accepted upload size in bytes (10 MB). */
+    const MAX_UPLOAD_SIZE = 10485760;
 
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_import_upload',         [ __CLASS__, 'ajax_upload' ] );
@@ -43,10 +47,10 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
 
-        $action_type = eme_sanitize_request( $_POST['action_type'] ?? '' );
-        $coa_id      = (int) ( $_POST['coa_id'] ?? 0 );
-        $eme_event_id= (int) ( $_POST['eme_event_id'] ?? 0 );
-        $raw_ids     = eme_sanitize_request( $_POST['line_ids'] ?? '' );
+        $action_type = eme_sanitize_request( $_POST['action_type'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $coa_id      = (int) eme_sanitize_request( $_POST['coa_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $eme_event_id= (int) eme_sanitize_request( $_POST['eme_event_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $raw_ids     = eme_sanitize_request( $_POST['line_ids'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 
         if ( ! in_array( $action_type, [ 'ignore', 'create' ], true ) ) {
             wp_send_json_error( 'Ongeldige actie.' );
@@ -116,6 +120,7 @@ class Import {
         }
 
         $message = sprintf(
+            // translators: %d is the number of processed import lines.
             _n( '%d regel verwerkt.', '%d regels verwerkt.', $processed, 'eme-accounting' ),
             $processed
         );
@@ -137,7 +142,7 @@ class Import {
     public static function ajax_get_logline_stats(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
-        $log_id = (int) ( $_POST['import_log_id'] ?? 0 );
+        $log_id = (int) eme_sanitize_request( $_POST['import_log_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( ! $log_id ) {
             wp_send_json_error( 'Missing import_log_id' );
         }
@@ -159,10 +164,10 @@ class Import {
         global $wpdb;
 
         $limit  = eme_get_ftable_limit() ?: 'LIMIT 50';
-        $rows = $wpdb->get_results(
+        $rows = $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
-             ORDER BY il.import_date DESC $limit"
+             ORDER BY il.import_date DESC $limit" //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         );
 
         foreach ( $rows as $row ) {
@@ -185,7 +190,7 @@ class Import {
     public static function ajax_list_lines(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
-        $log_id = (int) ( $_POST['import_log_id'] ?? $_GET['import_log_id'] ?? 0 );
+        $log_id = (int) eme_sanitize_request( $_POST['import_log_id'] ?? $_GET['import_log_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( ! $log_id ) {
             wp_send_json( [ 'Result' => 'ERROR', 'Message' => 'Missing import_log_id' ] );
         }
@@ -206,7 +211,7 @@ class Import {
     public static function ajax_delete_log(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
-        $id = (int) ( $_POST['id'] ?? 0 );
+        $id = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( $id > 0 ) {
             self::delete_log( $id );
         }
@@ -251,7 +256,8 @@ class Import {
         ) );
         if ( $existing ) {
             $warnings[] = sprintf(
-                __( 'Bestand "%s" werd al eerder geïmporteerd voor deze rekening (import #%d).', 'eme-accounting' ),
+                // translators: %1$s is the filename, %2$d is the existing import ID.
+                __( 'Bestand "%1$s" werd al eerder geïmporteerd voor deze rekening (import #%2$d).', 'eme-accounting' ),
                 $filename, $existing
             );
         }
@@ -274,7 +280,8 @@ class Import {
             ) );
             if ( $overlap ) {
                 $warnings[] = sprintf(
-                    __( 'Import #%d ("%s") bevat al transacties in de periode %s – %s.', 'eme-accounting' ),
+                    // translators: %1$d is the import ID, %2$s the filename, %3$s and %4$s the start and end date of the overlap.
+                    __( 'Import #%1$d ("%2$s") bevat al transacties in de periode %3$s – %4$s.', 'eme-accounting' ),
                     $overlap->id, $overlap->filename,
                     $overlap->d_min, $overlap->d_max
                 );
@@ -289,6 +296,11 @@ class Import {
 
         if ( $file['error'] !== UPLOAD_ERR_OK ) {
             return new \WP_Error( 'upload_error', __( 'Fout bij het uploaden van het bestand.', 'eme-accounting' ) );
+        }
+
+        // Guard against oversized files: parsing loads the whole file into memory.
+        if ( ! empty( $file['size'] ) && (int) $file['size'] > self::MAX_UPLOAD_SIZE ) {
+            return new \WP_Error( 'file_too_large', __( 'Bestand is te groot om te importeren.', 'eme-accounting' ) );
         }
 
         $ext     = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
@@ -390,7 +402,7 @@ class Import {
                 $res = $wpdb->update(
                     $wpdb->prefix . 'emeacc_import_lines',
                     [ 'status' => 'matched', 'journal_id' => $journal_id ],
-                    [ 'id' => $line_id, 'status' => 'pending' ],
+                    [ 'id' => $line->id, 'status' => 'pending' ],
                     [ '%s', '%d' ],
                     [ '%d', '%s' ]
                 );
@@ -664,6 +676,7 @@ class Import {
             return new \WP_Error(
                 'no_header',
                 sprintf(
+                    // translators: %s is the comma-separated list of required column names.
                     __( 'Kolomhoofden niet gevonden in bestand. Vereiste kolommen: %s.', 'eme-accounting' ),
                     implode( ', ', array_values( $required_map ) )
                 )
@@ -835,13 +848,13 @@ class Import {
      */
     public static function get_all_lines( int $log_id, string $limit = '' ): array {
         global $wpdb;
-        return $wpdb->get_results(
+        return $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prepare(
                 "SELECT il.*, j.description as journal_description
                  FROM `{$wpdb->prefix}emeacc_import_lines` il
                  LEFT JOIN `{$wpdb->prefix}emeacc_journal` j ON j.id = il.journal_id
                  WHERE il.import_log_id = %d
-                 ORDER BY il.transaction_date $limit",
+                 ORDER BY il.transaction_date $limit", //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $log_id
             )
         );
@@ -854,10 +867,10 @@ class Import {
     public static function ajax_upload(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
-        $account_id = (int) ( $_POST['account_id'] ?? 0 );
-        $format     = eme_sanitize_request( $_POST['format'] ?? 'auto' );
-        $force      = ! empty( $_POST['force'] );
-        $result = self::process_upload( $account_id, $_FILES['import_file'], $format, $force );
+        $account_id = (int) eme_sanitize_request( $_POST['account_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $format     = eme_sanitize_request( $_POST['format'] ?? 'auto' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $force      = (bool) eme_sanitize_request( $_POST['force'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $result = self::process_upload( $account_id, $_FILES['import_file'], $format, $force ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
         }
@@ -873,8 +886,8 @@ class Import {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
-        $line_id    = (int) ( $_POST['line_id'] ?? 0 );
-        $journal_id = (int) ( $_POST['journal_id'] ?? 0 );
+        $line_id    = (int) eme_sanitize_request( $_POST['line_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $journal_id = (int) eme_sanitize_request( $_POST['journal_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $res = $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'matched', 'journal_id' => $journal_id ],
@@ -894,7 +907,7 @@ class Import {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
-        $line_id = (int) ( $_POST['line_id'] ?? 0 );
+        $line_id = (int) eme_sanitize_request( $_POST['line_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $res = $wpdb->update(
             $wpdb->prefix . 'emeacc_import_lines',
             [ 'status' => 'ignored' ],
@@ -912,8 +925,8 @@ class Import {
     public static function ajax_auto_reconcile(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'import' );
-        $log_id     = (int) ( $_POST['log_id'] ?? 0 );
-        $account_id = (int) ( $_POST['account_id'] ?? 0 );
+        $log_id     = (int) eme_sanitize_request( $_POST['log_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $account_id = (int) eme_sanitize_request( $_POST['account_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $matched    = self::auto_match( $log_id, $account_id );
         wp_send_json_success( [ 'matched' => $matched ] );
     }
@@ -923,7 +936,7 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
 
-        $line_id = (int) ( $_POST['line_id'] ?? 0 );
+        $line_id = (int) eme_sanitize_request( $_POST['line_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $line    = $wpdb->get_row( $wpdb->prepare(
             "SELECT * FROM `{$wpdb->prefix}emeacc_import_lines` WHERE id = %d",
             $line_id
@@ -943,8 +956,8 @@ class Import {
 	    'counterparty_name' => $line->counterparty_name ?? '',
             'import_line_id'    => $line->id,
             'is_reconciled'     => 1,
-            'coa_id'            => (int) ( $_POST['coa_id'] ?? 0 ),
-            'eme_event_id'      => (int) ( $_POST['eme_event_id'] ?? 0 ),
+            'coa_id'            => (int) eme_sanitize_request( $_POST['coa_id'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'eme_event_id'      => (int) eme_sanitize_request( $_POST['eme_event_id'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         ] );
 
         if ( is_wp_error( $journal_id ) ) {

@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 $year  = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y' );
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
@@ -30,7 +31,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
         <label><?php esc_html_e( 'Boekjaar', 'eme-accounting' ); ?></label>
         <select id="report_year">
             <?php foreach ( $fiscal_years as $f ): ?>
-            <option value="<?= (int) $f->year ?>" <?= selected( $f->year, $year, false ) ?>>
+            <option value="<?php echo (int) $f->year; ?>" <?php echo selected( $f->year, $year, false ); ?>>
             <?php echo (int) $f->year;
                   if ( $f->status === 'closed' ) esc_html_e( ' (gesloten)', 'eme-accounting' );
             ?>
@@ -40,7 +41,7 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
     </div>
     <div id="report-date-wrap" style="display:none">
         <label><?php esc_html_e( 'Status op datum', 'eme-accounting' ); ?></label>
-        <input type="date" id="report_date" value="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>">
+        <input type="date" id="report_date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>">
     </div>
     <div id="report-cashflow-options" style="display:none">
         <label>

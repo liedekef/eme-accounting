@@ -54,6 +54,15 @@
  */
 class EMEFileAttachments {
 
+    /** Whitelist of allowed file extensions (lowercase, no dot). */
+    const ALLOWED_EXTENSIONS = [
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ods', 'odt',
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv',
+    ];
+
+    /** Maximum accepted attachment size in bytes (10 MB). */
+    const MAX_FILE_SIZE = 10485760;
+
     /** @var string  Absolute path to the upload root. */
     private string $base_dir;
 
@@ -91,8 +100,9 @@ class EMEFileAttachments {
 
         $target = $this->target_dir( $id, $type );
         $this->mkdir_with_index( $target );
+        $this->protect_dir( $this->base_dir );
 
-        $file_entry = $_FILES[ $file_key ];
+        $file_entry = $_FILES[ $file_key ]; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
         // Normalise single-file upload to the same array shape as multi.
         if ( ! is_array( $file_entry['name'] ) ) {
@@ -115,6 +125,16 @@ class EMEFileAttachments {
                 continue;
             }
 
+            // Extension allowlist prevents script uploads (php, phtml, …).
+            $ext = strtolower( pathinfo( $original, PATHINFO_EXTENSION ) );
+            if ( ! in_array( $ext, self::ALLOWED_EXTENSIONS, true ) ) {
+                continue;
+            }
+            // Reject oversized files.
+            if ( (int) $size > self::MAX_FILE_SIZE ) {
+                continue;
+            }
+
             $stored = $this->sanitize_filename( $original, $file_key );
             if ( $stored === false ) {
                 continue;
@@ -125,7 +145,7 @@ class EMEFileAttachments {
                 continue; // already uploaded (same random prefix makes this rare)
             }
 
-            move_uploaded_file( $tmp, $dest );
+            move_uploaded_file( $tmp, $dest ); //phpcs:ignore Generic.PHP.ForbiddenFunctions.Found
         }
     }
 
@@ -152,7 +172,7 @@ class EMEFileAttachments {
     public function delete_one( string $stored_filename, int $id, string $type ): void {
         $path = $this->target_dir( $id, $type ) . '/' . $stored_filename;
         if ( is_file( $path ) ) {
-            unlink( $path );
+            wp_delete_file( $path );
         }
     }
 
@@ -311,9 +331,9 @@ class EMEFileAttachments {
     public function ajax_delete(): void {
         $id        = isset( $_POST['id'] )        ? (int) $_POST['id']                              : 0;
         $type      = isset( $_POST['type'] )      ? sanitize_key( $_POST['type'] )                  : '';
-        $random_id = isset( $_POST['random_id'] ) ? $this->sanitize_filepart( $_POST['random_id'] )  : '';
+        $random_id = isset( $_POST['random_id'] ) ? $this->sanitize_filepart( eme_sanitize_request( $_POST['random_id'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $key       = isset( $_POST['key'] )       ? sanitize_key( $_POST['key'] )                   : '';
-        $raw_name  = isset( $_POST['name'] )      ? trim( $_POST['name'] )                          : '';
+        $raw_name  = isset( $_POST['name'] )      ? trim( eme_sanitize_request( $_POST['name'] ) )   : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 
         if ( ! $id || ! $type || ! $random_id || ! $key || ! $raw_name ) {
             wp_send_json_error( 'Missing parameters.' );
@@ -350,25 +370,40 @@ class EMEFileAttachments {
      * to prevent directory listing.
      */
     private function mkdir_with_index( string $path ): bool {
-        $ok = true;
-        if ( ! is_dir( $path ) ) {
-            $ok = mkdir( $path, 0777, true );
+        return eme_mkdir_with_index( $path );
+    }
+
+    /**
+     * Drop a .htaccess in the given directory to prevent the webserver
+     * from executing scripts (PHP) stored there.
+     */
+    private function protect_dir( string $dir ): void {
+        $dir = rtrim( $dir, '/\\' );
+        if ( ! is_dir( $dir ) || ! is_writable( $dir ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- filesystem check
+            return;
         }
-        if ( $ok && is_writable( $path ) && ! is_file( $path . '/index.html' ) ) {
-            touch( $path . '/index.html' );
+        $file = $dir . '/.htaccess';
+        if ( is_file( $file ) ) {
+            return;
         }
-        return $ok;
+        $rules = "# Disable script execution in this upload directory.\n"
+            . "<FilesMatch \"\\.(php|php[0-9]|phtml|phar|pht)$\">\n"
+            . "    <IfModule mod_authz_core.c>\n"
+            . "        Require all denied\n"
+            . "    </IfModule>\n"
+            . "    <IfModule !mod_authz_core.c>\n"
+            . "        Order deny,allow\n"
+            . "        Deny from all\n"
+            . "    </IfModule>\n"
+            . "</FilesMatch>\n";
+        file_put_contents( $file, $rules );
     }
 
     /**
      * Recursively delete a directory and all its contents.
      */
     private function del_tree( string $dir ): bool {
-        foreach ( array_diff( scandir( $dir ), [ '.', '..' ] ) as $item ) {
-            $full = "$dir/$item";
-            is_dir( $full ) ? $this->del_tree( $full ) : unlink( $full );
-        }
-        return rmdir( $dir );
+        return eme_delTree( $dir);
     }
 
     /**
@@ -433,6 +468,6 @@ class EMEFileAttachments {
         if ( function_exists( 'openssl_random_pseudo_bytes' ) ) {
             return substr( bin2hex( openssl_random_pseudo_bytes( (int) ceil( $length / 2 ) ) ), 0, $length );
         }
-        return substr( uniqid(), 0, 13 ) . '_' . substr( md5( (string) mt_rand() ), 0, 32 );
+        return substr( uniqid(), 0, 13 ) . '_' . substr( md5( (string) wp_rand() ), 0, 32 );
     }
 }

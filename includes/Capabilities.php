@@ -333,7 +333,7 @@ class Capabilities {
             $profile = sanitize_key( $_POST['emeacc_profile'][ $role_slug ] ?? 'none' );
 
             if ( $profile === 'custom' ) {
-                $raw    = $_POST['emeacc_access'][ $role_slug ] ?? [];
+                $raw    = eme_sanitize_request( $_POST['emeacc_access'][ $role_slug ] ?? [] ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
                 $levels = [];
                 foreach ( array_keys( self::PAGES ) as $page ) {
                     $l = sanitize_key( $raw[ $page ] ?? 'none' );

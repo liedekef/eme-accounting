@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -227,7 +228,7 @@ class FiscalYear {
             return $fy;
         }
 
-        $year  = (int) date( 'Y', strtotime( $date ) );
+        $year  = (int) date( 'Y', strtotime( $date ) ); //phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
         $dates = self::calculate_dates( $year );
 
         $fy = self::get( $year );
@@ -425,8 +426,8 @@ class FiscalYear {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'fiscalyears' );
 
-        $id         = (int) ( $_POST['id'] ?? 0 );
-        $year       = (int) ( $_POST['year'] ?? 0 );
+        $id         = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $year       = (int) eme_sanitize_request( $_POST['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 
         if ( $year < 1900 || $year > 2100 ) {
             wp_send_json_error( __( 'Ongeldig boekjaar.', 'eme-accounting' ) );
@@ -456,7 +457,7 @@ class FiscalYear {
         Capabilities::require_manage_ajax( 'fiscalyears' );
 
         $config = \EMEVzw\Config::get();
-        $year = (int) ( $_POST['year'] ?? 0 );
+        $year = (int) eme_sanitize_request( $_POST['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( ! $year ) {
             wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
         }
@@ -469,8 +470,16 @@ class FiscalYear {
         $formatter = new \NumberFormatter( 'nl_BE', \NumberFormatter::CURRENCY );
         $year_result = self::get_year_result( $year );
         $label = $year_result >= 0
-            ? sprintf( __( 'Overschot van %s', 'eme-accounting' ), $formatter->formatCurrency( $year_result, $config->currency ) )
-            : sprintf( __( 'Tekort van %s', 'eme-accounting' ), $formatter->formatCurrency( abs( $year_result ), $config->currency ) );
+            ? sprintf(
+                // translators: %s is the formatted amount of the surplus.
+                __( 'Overschot van %s', 'eme-accounting' ),
+                $formatter->formatCurrency( $year_result, $config->currency )
+            )
+            : sprintf(
+                // translators: %s is the formatted amount of the deficit.
+                __( 'Tekort van %s', 'eme-accounting' ),
+                $formatter->formatCurrency( abs( $year_result ), $config->currency )
+            );
 
         wp_send_json_success( [ 'message' => __( 'Boekjaar afgesloten.', 'eme-accounting' ), 'result' => $label ] );
     }
@@ -479,7 +488,7 @@ class FiscalYear {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'fiscalyears' );
 
-        $year = (int) ( $_POST['year'] ?? 0 );
+        $year = (int) eme_sanitize_request( $_POST['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( ! $year ) {
             wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
         }
@@ -496,7 +505,7 @@ class FiscalYear {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'fiscalyears' );
 
-        $year = (int) ( $_POST['year'] ?? 0 );
+        $year = (int) eme_sanitize_request( $_POST['year'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( ! $year ) {
             wp_send_json_error( __( 'Geen boekjaar geselecteerd.', 'eme-accounting' ) );
         }
@@ -511,7 +520,8 @@ class FiscalYear {
 
     public static function ajax_check(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        $date = sanitize_text_field( $_POST['date'] ?? '' );
+        Capabilities::require_view_ajax( 'fiscalyears' );
+        $date = eme_sanitize_request( $_POST['date'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( empty( $date ) ) {
             wp_send_json_error( __( 'Geen datum opgegeven.', 'eme-accounting' ) );
         }

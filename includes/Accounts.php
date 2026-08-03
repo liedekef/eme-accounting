@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.DB.DirectDatabaseQuery.DirectQuery WordPress.DB.DirectDatabaseQuery.NoCaching
 namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
@@ -26,8 +27,7 @@ class Accounts {
      */
     public static function get_all(): array {
         global $wpdb;
-        $table = $wpdb->prefix . 'emeacc_accounts';
-        return $wpdb->get_results( "SELECT * FROM `$table` ORDER BY sort_order, name" );
+        return $wpdb->get_results( "SELECT * FROM `{$wpdb->prefix}emeacc_accounts` ORDER BY sort_order, name" ); //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
     }
 
     /**
@@ -132,10 +132,12 @@ class Accounts {
         );
 
         if ( false === $result ) {
-            error_log( sprintf(
-                '[EME Accounting] adjust_totals failed (journal_id=%d, account_id=%d, delta=%F, op=%s): %s — rebuild_totals required.',
-                $journal_id, $account_id, $delta, $op, $wpdb->last_error
-            ) );
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( sprintf( //phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+                    '[EME Accounting] adjust_totals failed (journal_id=%d, account_id=%d, delta=%F, op=%s): %s — rebuild_totals required.',
+                    $journal_id, $account_id, $delta, $op, $wpdb->last_error
+                ) );
+            }
             return new \WP_Error( 'db_problem_adjust_totals', __( 'Totalen aanpassen mislukt.', 'eme-accounting' ) );
         }
         return true;
@@ -147,28 +149,27 @@ class Accounts {
      */
     public static function rebuild_totals(): bool|\WP_Error {
         global $wpdb;
-        $totals_table  = "{$wpdb->prefix}emeacc_account_totals";
-        $journal_table = "{$wpdb->prefix}emeacc_journal";
 
         $wpdb->query( 'START TRANSACTION' );
 
-        $r1 = $wpdb->query( "DELETE FROM `{$totals_table}`" );
+        $r1 = $wpdb->query( "DELETE FROM `{$wpdb->prefix}emeacc_account_totals`" );
         $r2 = ( false === $r1 ) ? false : $wpdb->query(
-            "INSERT INTO `{$totals_table}` (account_id, delta)
+            "INSERT INTO `{$wpdb->prefix}emeacc_account_totals` (account_id, delta)
             SELECT account_id,
             SUM( CASE WHEN direction = 'in' THEN amount ELSE -amount END )
-            FROM `{$journal_table}`
+            FROM `{$wpdb->prefix}emeacc_journal`
             GROUP BY account_id"
         );
 
         if ( false === $r1 || false === $r2 ) {
             $wpdb->query( 'ROLLBACK' );
-            error_log( sprintf( '[EME Accounting] rebuild_totals FAILED: %s — totals table may now be inconsistent!', $wpdb->last_error ) );
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( sprintf( '[EME Accounting] rebuild_totals FAILED: %s — totals table may now be inconsistent!', $wpdb->last_error ) ); //phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            }
             return new \WP_Error( 'db_rebuild_failed', $wpdb->last_error );
         }
 
         $wpdb->query( 'COMMIT' );
-        error_log( '[EME Accounting] rebuild_totals succeeded.' );
         return true;
     }
 
@@ -229,6 +230,7 @@ class Accounts {
             return new \WP_Error(
                 'has_entries',
                 sprintf(
+                    // translators: %d is the number of journal entries linked to the account.
                     __( 'Rekening kan niet verwijderd worden: er zijn %d boekingen gekoppeld. Deactiveer de rekening in de plaats.', 'eme-accounting' ),
                     $count
                 )
@@ -256,7 +258,7 @@ class Accounts {
     public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'accounts' );
-        $result = self::delete( (int) ( $_POST['id'] ?? 0 ) );
+        $result = self::delete( (int) eme_sanitize_request( $_POST['id'] ?? 0 ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( $result->get_error_message() );
         }
@@ -266,7 +268,9 @@ class Accounts {
     public static function scheduled_rebuild_totals(): void {
         $result = self::rebuild_totals();
         if ( is_wp_error( $result ) ) {
-            error_log( '[EME Accounting] Scheduled rebuild_totals failed: ' . $result->get_error_message() );
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( '[EME Accounting] Scheduled rebuild_totals failed: ' . $result->get_error_message() ); //phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            }
         }
     }
 
