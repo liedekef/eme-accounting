@@ -114,10 +114,18 @@ class Assets {
             }
             $coa_in_select[] = "</optgroup>";
             $coa_out_select[] = "</optgroup>";
+            // Account options for creating transfers (other leg): active accounts only.
+            $account_options = [];
+            foreach ( Accounts::get_all() as $acc ) {
+                if ( ! $acc->is_active ) continue;
+                $label = $acc->name . ( $acc->iban ? ' (' . $acc->iban . ')' : '' );
+                $account_options[] = "<option value='".(int)$acc->id."'>". esc_html( $label )."</option>";
+            }
             wp_enqueue_script( 'emeaccounting-import', EME_ACCOUNTING_URL . 'assets/js/import.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
             wp_localize_script( 'emeaccounting-import', 'emeAccountingImport', [
                 'coaSelectIn'  => $coa_in_select,
                 'coaSelectOut' => $coa_out_select,
+                'accountOptions' => $account_options,
                 'columnSchema' => \EMEAccounting\Import::get_column_schema(),
             ] );
         }

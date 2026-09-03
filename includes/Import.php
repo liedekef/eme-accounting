@@ -33,6 +33,8 @@ class Import {
         add_action( 'wp_ajax_eme_accounting_list_import_logs',     [ __CLASS__, 'ajax_list_logs' ] );
         add_action( 'wp_ajax_eme_accounting_get_logline_stats',    [ __CLASS__, 'ajax_get_logline_stats' ] );
         add_action( 'wp_ajax_eme_accounting_bulk_action_lines',     [ __CLASS__, 'ajax_bulk_action_lines' ] );
+        add_action( 'wp_ajax_eme_accounting_check_transfer_exists', [ __CLASS__, 'ajax_check_transfer_exists' ] );
+        add_action( 'wp_ajax_eme_accounting_create_transfer_from_line', [ __CLASS__, 'ajax_create_transfer_from_line' ] );
     }
 
     /**
@@ -860,6 +862,65 @@ class Import {
         );
     }
 
+    /**
+     * Resolve the two legs of a transfer for an import line.
+     *
+     * The import line belongs to a fixed account ($line->account_id). Depending
+     * on the sign of the amount, that account is either the target (money in,
+     * "+") or the source (money out, "–") of the transfer. The user supplies
+     * the "other" account; this method returns [ source_account_id, target_account_id ].
+     *
+     * @param  object $line
+     * @param  int    $other_account_id  The account chosen to be the other leg.
+     * @return array{0:int,1:int}
+     */
+    private static function transfer_legs( object $line, int $other_account_id ): array {
+        $other = (int) $other_account_id;
+        if ( (float) $line->amount >= 0 ) {
+            // Money in → import account is the target, other account is the source.
+            return [ $other, (int) $line->account_id ];
+        }
+        // Money out → import account is the source, other account is the target.
+        return [ (int) $line->account_id, $other ];
+    }
+
+    /**
+     * Find existing transfers between two accounts for a given amount/date.
+     *
+     * Used to warn the user before creating a transfer from an import line in
+     * case that transfer has already been booked (e.g. from the counterparty
+     * account's own import).
+     *
+     * @param  int    $source_account_id
+     * @param  int    $target_account_id
+     * @param  float  $amount
+     * @param  string $entry_date
+     * @return object[]
+     */
+    public static function find_existing_transfers( int $source_account_id, int $target_account_id, float $amount, string $entry_date ): array {
+        global $wpdb;
+        return $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT j.*, a.name AS account_name, ca.name AS contra_account_name
+                 FROM `{$wpdb->prefix}emeacc_journal` j
+                 LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a  ON a.id = j.account_id
+                 LEFT JOIN `{$wpdb->prefix}emeacc_accounts` ca ON ca.id = j.contra_account_id
+                 WHERE j.direction = 'out' AND j.transfer_id IS NOT NULL
+                   AND j.account_id = %d AND j.contra_account_id = %d
+                   AND j.amount = %f
+                   AND j.entry_date BETWEEN DATE_SUB(%s, INTERVAL 7 DAY) AND DATE_ADD(%s, INTERVAL 7 DAY)
+                 ORDER BY ABS(DATEDIFF(j.entry_date, %s))
+                 LIMIT 5",
+                $source_account_id,
+                $target_account_id,
+                abs( $amount ),
+                $entry_date,
+                $entry_date,
+                $entry_date
+            )
+        );
+    }
+
     /* ------------------------------------------------------------------
      * AJAX
      * ------------------------------------------------------------------ */
@@ -958,6 +1019,107 @@ class Import {
             'is_reconciled'     => 1,
             'coa_id'            => (int) eme_sanitize_request( $_POST['coa_id'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
             'eme_event_id'      => (int) eme_sanitize_request( $_POST['eme_event_id'] ?? 0 ), //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        ] );
+
+        if ( is_wp_error( $journal_id ) ) {
+            wp_send_json_error( $journal_id->get_error_message() );
+        }
+
+        $wpdb->update(
+            $wpdb->prefix . 'emeacc_import_lines',
+            [ 'status' => 'manual', 'journal_id' => $journal_id ],
+            [ 'id' => $line_id, 'status' => 'pending' ],
+            [ '%s', '%d' ],
+            [ '%d', '%s' ]
+        );
+
+        wp_send_json_success( [ 'journal_id' => $journal_id, 'Record' => self::get_line( $line_id ) ] );
+    }
+
+    /**
+     * Check whether a transfer between the import account and the chosen
+     * "other" account already exists for this line's amount/date.
+     *
+     * POST params: line_id, other_account_id
+     */
+    public static function ajax_check_transfer_exists(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'import' );
+        global $wpdb;
+
+        $line_id          = (int) eme_sanitize_request( $_POST['line_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $other_account_id = (int) eme_sanitize_request( $_POST['other_account_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+
+        $line = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM `{$wpdb->prefix}emeacc_import_lines` WHERE id = %d",
+            $line_id
+        ) );
+        if ( ! $line || ! $other_account_id ) {
+            wp_send_json_error( __( 'Regel niet gevonden.', 'eme-accounting' ) );
+        }
+
+        [ $source, $target ] = self::transfer_legs( $line, $other_account_id );
+        $existing = self::find_existing_transfers( $source, $target, (float) $line->amount, $line->transaction_date );
+
+        $records = [];
+        foreach ( $existing as $e ) {
+            $records[] = [
+                'id'          => (int) $e->id,
+                'entry_date'  => eme_localized_date( $e->entry_date, EME_TIMEZONE ),
+                'amount'      => (float) $e->amount,
+                'account_name'=> $e->account_name ?? '',
+                'contra_account_name' => $e->contra_account_name ?? '',
+                'description' => $e->description,
+            ];
+        }
+
+        wp_send_json_success( [ 'existing' => $records ] );
+    }
+
+    /**
+     * Create a transfer from an import line.
+     *
+     * The import account is fixed; the other leg is chosen by the user. The
+     * source/target is derived from the sign of the amount ("+" → money in to
+     * the import account, "–" → money out of it).
+     *
+     * POST params: line_id, other_account_id, eme_event_id
+     */
+    public static function ajax_create_transfer_from_line(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'import' );
+        global $wpdb;
+
+        $line_id          = (int) eme_sanitize_request( $_POST['line_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $other_account_id = (int) eme_sanitize_request( $_POST['other_account_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $eme_event_id     = (int) eme_sanitize_request( $_POST['eme_event_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+
+        $line = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM `{$wpdb->prefix}emeacc_import_lines` WHERE id = %d AND status = 'pending'",
+            $line_id
+        ) );
+        if ( ! $line ) {
+            wp_send_json_error( __( 'Regel niet gevonden.', 'eme-accounting' ) );
+        }
+        if ( ! $other_account_id || (int) $other_account_id === (int) $line->account_id ) {
+            wp_send_json_error( __( 'Kies een geldige tegenrekening voor de transfer.', 'eme-accounting' ) );
+        }
+
+        [ $source, $target ] = self::transfer_legs( $line, $other_account_id );
+
+        $journal_id = Journal::save( [
+            'entry_date'        => $line->transaction_date,
+            'booking_date'      => $line->value_date,
+            'description'       => $line->description,
+            'amount'            => abs( (float) $line->amount ),
+            'direction'         => 'transfer',
+            'account_id'        => $source,
+            'contra_account_id' => $target,
+            'bank_statement_ref'=> $line->bank_ref ?: $line->structured_ref,
+            'counterparty_name' => $line->counterparty_name ?? '',
+            'import_line_id'    => $line->id,
+            'is_reconciled'     => 1,
+            'eme_event_id'      => $eme_event_id,
         ] );
 
         if ( is_wp_error( $journal_id ) ) {

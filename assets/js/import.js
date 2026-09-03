@@ -119,18 +119,36 @@
                     const opts = ( n >= 0 ? emeAccountingImport.coaSelectIn : emeAccountingImport.coaSelectOut )
                     return `
 <div class="eme-import-actions" data-line="${record.id}">
-  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
-    <button class="button button-small btn-ignore-line">Negeer</button>
-    <input type="number" class="journal-id-input" placeholder="Dagboek ID" style="width:80px;padding:2px 4px">
-    <button class="button button-small btn-reconcile-manual">Link</button>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px;align-items:center">
+    <span style="font-size:12px;color:#646970">${esc('Kies hoe je dit wil afhandelen:')}</span>
+    <select class="type-select">
+      <option value="booking">Boeking</option>
+      <option value="transfer">Transfer</option>
+      <option value="link">Link naar bestaande boeking</option>
+      <option value="ignore">Negeer</option>
+    </select>
   </div>
-  <div style="display:flex;gap:4px;flex-wrap:wrap">
+  <div class="eme-import-booking" style="display:flex;gap:4px;flex-wrap:wrap">
     <select class="coa-select eme_snapselect" style="min-width:180px" data-live-search="true">
       <option value="">\u2014 Kies categorie \u2014</option>
       ${opts}
     </select>
     <select name="eme_event_id" class="eme_snapselect_events_class"></select>
     <button class="button button-small btn-create-from-line">Nieuwe boeking</button>
+  </div>
+  <div class="eme-import-transfer" style="display:none;gap:4px;flex-wrap:wrap">
+    <select class="transfer-account-select eme_snapselect" style="min-width:180px" data-live-search="true" title="${esc('Kies de andere rekening')}">
+      <option value="">\u2014 Kies tegenrekening \u2014</option>
+      ${emeAccountingImport.accountOptions ? emeAccountingImport.accountOptions.join('') : ''}
+    </select>
+    <button class="button button-small btn-create-transfer" title="${esc('Maak een transfer tussen dit en de tegenrekening')}">Transfer</button>
+  </div>
+  <div class="eme-import-link" style="display:none;gap:4px;flex-wrap:wrap">
+    <input type="number" class="journal-id-input" placeholder="Dagboek ID" style="width:80px;padding:2px 4px">
+    <button class="button button-small btn-reconcile-manual">Link</button>
+  </div>
+  <div class="eme-import-ignore" style="display:none;gap:4px;flex-wrap:wrap">
+    <button class="button button-small btn-ignore-line">Negeer</button>
   </div>
 </div>`;
                 },
@@ -492,7 +510,70 @@
             }
             return;
         }
+        if ( wrap && e.target.classList.contains( 'btn-create-transfer' ) ) {
+            const line = linesTableInst.getRowByKey( lineId )?.recordData;
+            const otherAccountId = wrap.querySelector( '.transfer-account-select' )?.value;
+            if ( ! otherAccountId ) { linesTableInst.showInfo( 'Kies eerst een tegenrekening.' ); return; }
+            if ( line && otherAccountId === String( line.account_id ) ) {
+                linesTableInst.showInfo( 'De tegenrekening mag niet dezelfde zijn als de importrekening.' );
+                return;
+            }
+            const eventId = wrap.querySelector( '[name=eme_event_id]' )?.value;
 
+            // Check whether this transfer may already exist before creating it.
+            let proceed = true;
+            const check = await post( 'eme_accounting_check_transfer_exists',
+                { line_id: lineId, other_account_id: otherAccountId } );
+            if ( check.success && check.data.existing?.length ) {
+                const rows = check.data.existing.map( t =>
+                    `<li>#${t.id} \u00b7 ${t.entry_date} \u00b7 ${t.account_name} \u2192 ${t.contra_account_name} \u00b7 ${fmtCur(t.amount)} \u00b7 ${esc(t.description)}</li>`
+                ).join( '' );
+                proceed = await FTable.confirm(
+                    'Mogelijke bestaande transfer',
+                    `<p>Er lijken al <strong>${check.data.existing.length}</strong> transfer(s) te bestaan tussen deze rekeningen met een vergelijkbaar bedrag/datum:</p><ul>${rows}</ul><p><strong>Toch aanmaken?</strong></p>`
+                );
+            }
+            if ( ! proceed ) return;
+
+            e.target.disabled = true;
+            const r = await post( 'eme_accounting_create_transfer_from_line',
+                { line_id: lineId, other_account_id: otherAccountId, eme_event_id: eventId || '' } );
+            if ( r.success ) {
+                linesTableInst.updateFullRowData( linesTableInst.getRowByKey( lineId ), r.data.Record );
+                refreshLogCounters();
+            } else {
+                linesTableInst.showError( r.data || 'Fout' );
+                e.target.disabled = false;
+            }
+            return;
+        }
+
+    } );
+
+    /* Toggle between "Boeking" and "Transfer" mode per line (delegated change
+       handler – ftable rebuilds the tbody, so we listen on the container). */
+    document.addEventListener( 'change', ( e ) => {
+        const sel = e.target.closest( '.type-select' );
+        if ( ! sel ) return;
+        const wrap     = sel.closest( '.eme-import-actions' );
+        const booking  = wrap?.querySelector( '.eme-import-booking' );
+        const transfer = wrap?.querySelector( '.eme-import-transfer' );
+        const link     = wrap?.querySelector( '.eme-import-link' );
+        const ignore   = wrap?.querySelector( '.eme-import-ignore' );
+        const show = name => {
+            if ( name === 'booking'  && booking )  booking.style.display  = 'flex';
+            if ( name === 'transfer' && transfer ) transfer.style.display = 'flex';
+            if ( name === 'link'     && link )     link.style.display     = 'flex';
+            if ( name === 'ignore'   && ignore )   ignore.style.display   = 'flex';
+        };
+        const hide = name => {
+            if ( name !== 'booking'  && booking )  booking.style.display  = 'none';
+            if ( name !== 'transfer' && transfer ) transfer.style.display = 'none';
+            if ( name !== 'link'     && link )     link.style.display     = 'none';
+            if ( name !== 'ignore'   && ignore )   ignore.style.display   = 'none';
+        };
+        hide();
+        show( sel.value );
     } );
 
     /* ================================================================

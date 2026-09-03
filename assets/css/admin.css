@@ -1,10 +1,6 @@
 /* eme-accounting/assets/css/admin.css */
 
 /* ── Layout ───────────────────────────────────────────────────────── */
-.eme-acc-wrap {
-    max-width: 1200px;
-    margin: 0;
-}
 .eme-acc-wrap h1 {
     display: flex;
     align-items: center;
