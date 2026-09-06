@@ -350,7 +350,7 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 
 <script>
 (function () {
-    const descs   = <?php echo json_encode( array_map( fn($p) => $p['description'], Capabilities::PROFILES ) ); ?>;
+    const descs   = <?php echo wp_json_encode( array_map( fn($p) => $p['description'], Capabilities::PROFILES ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); ?>;
 
     document.querySelectorAll('.eme-acc-profile-select').forEach(function (sel) {
         sel.addEventListener('change', function () {

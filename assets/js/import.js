@@ -353,6 +353,7 @@
             },
             account_name: {
                 title: 'Rekening', list: true, create: false, edit: false,
+                display: ( { value } ) => value ? esc( value ) : '',
             },
             filename: {
                 title: 'Bestand', list: true, create: false, edit: false,
@@ -526,7 +527,7 @@
                 { line_id: lineId, other_account_id: otherAccountId } );
             if ( check.success && check.data.existing?.length ) {
                 const rows = check.data.existing.map( t =>
-                    `<li>#${t.id} \u00b7 ${t.entry_date} \u00b7 ${t.account_name} \u2192 ${t.contra_account_name} \u00b7 ${fmtCur(t.amount)} \u00b7 ${esc(t.description)}</li>`
+                    `<li>#${t.id} \u00b7 ${esc(t.entry_date)} \u00b7 ${esc(t.account_name)} \u2192 ${esc(t.contra_account_name)} \u00b7 ${fmtCur(t.amount)} \u00b7 ${esc(t.description)}</li>`
                 ).join( '' );
                 proceed = await FTable.confirm(
                     'Mogelijke bestaande transfer',

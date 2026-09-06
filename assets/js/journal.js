@@ -163,7 +163,10 @@
                 },
                 entry_date: {
                     title: emeAccounting.i18n.date || 'Datum',
-                    sortable: true
+                    sortable: true,
+                    display: function(data) {
+                        return data.value ? esc(data.value) : '';
+                    }
                 },
                 description: {
                     title: emeAccounting.i18n.description || 'Omschrijving',
@@ -213,12 +216,18 @@
                 eme_event: {
                     title: emeAccounting.i18n.event || 'Event',
                     sortable: false,
-                    visibility: 'hidden'
+                    visibility: 'hidden',
+                    display: function(data) {
+                        return data.value ? esc(data.value) : '';
+                    }
                 },
                 account_name: {
                     title: emeAccounting.i18n.account || 'Rekening',
                     sortable: false,
-                    searchable: false
+                    searchable: false,
+                    display: function(data) {
+                        return data.value ? esc(data.value) : '';
+                    }
                 },
                 amount: {
                     title: emeAccounting.i18n.amount || 'Bedrag',

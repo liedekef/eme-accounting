@@ -624,11 +624,11 @@ class Journal {
                 $entry->direction,
             ];
             if ( $vat_liable ) {
-                $row[] = $entry->vat_code ?? '';
+                $row[] = self::csv_safe_text( $entry->vat_code ?? '' );
                 $row[] = $entry->vat_amount > 0
                     ? $formatter->formatCurrency( (float) $entry->vat_amount, $currency )
                     : '';
-                $row[] = $entry->counterparty_vat_number ?? '';
+                $row[] = self::csv_safe_text( $entry->counterparty_vat_number ?? '' );
             }
             $row[] = (int) $entry->is_reconciled;
             self::fputcsv($output, $row);

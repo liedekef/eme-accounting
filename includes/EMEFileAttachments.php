@@ -63,6 +63,9 @@ class EMEFileAttachments {
     /** Maximum accepted attachment size in bytes (10 MB). */
     const MAX_FILE_SIZE = 10485760;
 
+    /** Admin-ajax action used by the authenticated download proxy. */
+    const DOWNLOAD_ACTION = 'eme_accounting_download_attachment';
+
     /** @var string  Absolute path to the upload root. */
     private string $base_dir;
 
@@ -227,13 +230,43 @@ class EMEFileAttachments {
                 'key'        => $info[1],
                 'field_name' => $entry,
                 'name'       => $info[2],
-                'url'        => $this->base_url . "/$type/$id/$entry",
+                'url'        => $this->download_url( $id, $type, $entry ),
                 'mimetype'   => mime_content_type( $dir . '/' . $entry ),
             ];
         }
         closedir( $handle );
 
         return $res;
+    }
+
+    /**
+     * Build the authenticated download-proxy URL for a stored file.
+     *
+     * Files are never linked directly; every download goes through the
+     * admin-ajax proxy which enforces nonce + capability checks.
+     *
+     * @param  int    $id
+     * @param  string $type
+     * @param  string $stored  Stored filename, e.g. "abc…-files-invoice.pdf".
+     * @return string
+     */
+    public function download_url( int $id, string $type, string $stored ): string {
+        $parts = explode( '-', $stored, 3 );
+        if ( count( $parts ) !== 3 ) {
+            return '';
+        }
+        return add_query_arg(
+            [
+                'action'    => self::DOWNLOAD_ACTION,
+                'nonce'     => wp_create_nonce( 'eme_accounting_nonce' ),
+                'id'        => $id,
+                'type'      => $type,
+                'random_id' => $parts[0],
+                'key'       => $parts[1],
+                'name'      => $parts[2],
+            ],
+            admin_url( 'admin-ajax.php' )
+        );
     }
 
     /**

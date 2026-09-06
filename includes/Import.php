@@ -300,6 +300,10 @@ class Import {
             return new \WP_Error( 'upload_error', __( 'Fout bij het uploaden van het bestand.', 'eme-accounting' ) );
         }
 
+        if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
+            return new \WP_Error( 'invalid_upload', __( 'Ongeldig uploadbestand.', 'eme-accounting' ) );
+        }
+
         // Guard against oversized files: parsing loads the whole file into memory.
         if ( ! empty( $file['size'] ) && (int) $file['size'] > self::MAX_UPLOAD_SIZE ) {
             return new \WP_Error( 'file_too_large', __( 'Bestand is te groot om te importeren.', 'eme-accounting' ) );

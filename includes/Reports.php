@@ -476,7 +476,11 @@ class Reports {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_view_ajax( 'reports' );
 
-        $type              = eme_sanitize_request( $_GET['type'] ?? 'financial_diary' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $type    = eme_sanitize_request( $_GET['type'] ?? 'financial_diary' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $allowed = [ 'income_expenditure', 'patrimony', 'events', 'financial_year', 'vat_report', 'cashflow' ];
+        if ( ! in_array( $type, $allowed, true ) ) {
+            $type = 'financial_diary';
+        }
         $year              = (int) eme_sanitize_request( $_GET['year'] ?? gmdate( 'Y' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $event_id          = (int) eme_sanitize_request( $_GET['event_id'] ?? 0 ) ?: null; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $format            = eme_sanitize_request( $_GET['format'] ?? 'csv' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
