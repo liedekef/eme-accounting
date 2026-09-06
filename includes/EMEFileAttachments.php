@@ -179,6 +179,13 @@ class EMEFileAttachments {
         }
     }
 
+    /**
+     * Make sure the upload root denies direct web access.
+     */
+    public function protect(): void {
+        $this->protect_dir( $this->base_dir );
+    }
+
     /* ------------------------------------------------------------------
      * Read
      * ------------------------------------------------------------------ */
@@ -390,6 +397,75 @@ class EMEFileAttachments {
         wp_send_json_success();
     }
 
+    /**
+     * Stream a stored attachment through the authenticated proxy.
+     *
+     * Expected GET params: id, type, random_id, key, name.
+     * The stored filename is rebuilt purely from sanitized components (same
+     * approach as ajax_delete), so the resolved path always stays inside the
+     * target directory. Wire this up from your plugin with the correct nonce
+     * and capability check, e.g.:
+     *
+     *   add_action( 'wp_ajax_my_plugin_download_attachment', function() {
+     *       check_ajax_referer( 'my_nonce', 'nonce' );
+     *       current_user_can( 'manage_options' ) || wp_die( 'Forbidden', 403 );
+     *       $attachments->ajax_download();
+     *   } );
+     */
+    public function ajax_download(): void {
+        $id        = isset( $_GET['id'] )        ? (int) $_GET['id']                              : 0;
+        $type      = isset( $_GET['type'] )      ? sanitize_key( $_GET['type'] )                  : '';
+        $random_id = isset( $_GET['random_id'] ) ? $this->sanitize_filepart( eme_sanitize_request( $_GET['random_id'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $key       = isset( $_GET['key'] )       ? sanitize_key( $_GET['key'] )                   : '';
+        $raw_name  = isset( $_GET['name'] )      ? trim( eme_sanitize_request( $_GET['name'] ) )   : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+
+        if ( ! $id || ! $type || ! $random_id || ! $key || ! $raw_name ) {
+            wp_die( 'Missing parameters.', '', [ 'response' => 400 ] );
+        }
+
+        // All stored files start with a hex random prefix; reject anything else.
+        if ( ! preg_match( '/^[0-9a-f_]{46}$/', $random_id ) ) {
+            wp_die( 'Invalid file reference.', '', [ 'response' => 400 ] );
+        }
+
+        $dot      = strrpos( $raw_name, '.' );
+        $namepart = $dot !== false ? substr( $raw_name, 0, $dot ) : $raw_name;
+        $ext      = $dot !== false ? substr( $raw_name, $dot + 1 ) : 'none';
+
+        $clean_name = $this->sanitize_filepart( $namepart );
+        $clean_ext  = $this->sanitize_filepart( $ext );
+
+        if ( ! $clean_name || ! $clean_ext ) {
+            wp_die( 'Invalid filename.', '', [ 'response' => 400 ] );
+        }
+
+        $stored = "{$random_id}-{$key}-{$clean_name}.{$clean_ext}";
+        $path   = $this->target_dir( $id, $type ) . '/' . $stored;
+
+        // Belt & suspenders: the file must resolve inside the target directory.
+        $real = realpath( $path );
+        $dir  = realpath( $this->target_dir( $id, $type ) );
+        if ( $real === false || $dir === false || ! str_starts_with( $real, $dir . DIRECTORY_SEPARATOR ) ) {
+            wp_die( 'File not found.', '', [ 'response' => 404 ] );
+        }
+
+        while ( ob_get_level() > 0 ) {
+            ob_end_clean();
+        }
+        $mime = mime_content_type( $real ) ?: 'application/octet-stream';
+
+        status_header( 200 );
+        header( 'Content-Type: ' . $mime );
+        header( 'X-Content-Type-Options: nosniff' );
+        header( 'Content-Disposition: attachment; filename="' . $clean_name . '.' . $clean_ext . '"' );
+        header( 'Content-Length: ' . (string) filesize( $real ) );
+        header( 'Cache-Control: no-store, no-cache, must-revalidate' );
+        header( 'Pragma: no-cache' );
+
+        readfile( $real );
+        exit;
+    }
+
     /* ------------------------------------------------------------------
      * Internal helpers
      * ------------------------------------------------------------------ */
@@ -416,28 +492,28 @@ class EMEFileAttachments {
     }
 
     /**
-     * Drop a .htaccess in the given directory to prevent the webserver
-     * from executing scripts (PHP) stored there.
+     * Drop a .htaccess in the given directory that denies ALL direct web
+     * access (files are served via the authenticated download proxy).
+     * Existing installs with the old script-blocking file are upgraded.
      */
     private function protect_dir( string $dir ): void {
         $dir = rtrim( $dir, '/\\' );
         if ( ! is_dir( $dir ) || ! is_writable( $dir ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable -- filesystem check
             return;
         }
-        $file = $dir . '/.htaccess';
-        if ( is_file( $file ) ) {
+        $file  = $dir . '/.htaccess';
+        $rules = "# Deny direct web access: files are served via the authenticated download proxy.\n"
+            . "<IfModule mod_authz_core.c>\n"
+            . "    Require all denied\n"
+            . "</IfModule>\n"
+            . "<IfModule !mod_authz_core.c>\n"
+            . "    Order deny,allow\n"
+            . "    Deny from all\n"
+            . "</IfModule>\n";
+        if ( is_file( $file ) && file_get_contents( $file ) === $rules ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents -- content comparison
             return;
         }
-        $rules = "# Disable script execution in this upload directory.\n"
-            . "<FilesMatch \"\\.(php|php[0-9]|phtml|phar|pht)$\">\n"
-            . "    <IfModule mod_authz_core.c>\n"
-            . "        Require all denied\n"
-            . "    </IfModule>\n"
-            . "    <IfModule !mod_authz_core.c>\n"
-            . "        Order deny,allow\n"
-            . "        Deny from all\n"
-            . "    </IfModule>\n"
-            . "</FilesMatch>\n";
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- .htaccess setup
         file_put_contents( $file, $rules );
     }
 

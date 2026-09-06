@@ -27,6 +27,8 @@ class Journal {
         add_action( 'wp_ajax_eme_accounting_events_list',             [ __CLASS__, 'ajax_events_snapselect' ] );
         add_action( 'wp_ajax_eme_accounting_del_journal_attachment',  [ __CLASS__, 'ajax_delete_attachment' ] );
 
+        add_action( 'wp_ajax_' . \EMEFileAttachments::DOWNLOAD_ACTION, [ __CLASS__, 'ajax_download_attachment' ] );
+
         // Auto-delete attachment files when a journal entry is removed.
         add_action( 'eme_accounting_journal_deleted',                 [ __CLASS__, 'on_entry_deleted' ] );
 
@@ -36,6 +38,8 @@ class Journal {
             $upload['basedir'] . '/eme-accounting',
             $upload['baseurl'] . '/eme-accounting'
         );
+        // Attachments are served via the authenticated proxy, not directly.
+        self::$attachments->protect();
     }
 
     /* ------------------------------------------------------------------
@@ -431,6 +435,22 @@ class Journal {
         }
 
         self::$attachments->ajax_delete();
+    }
+
+    /**
+     * AJAX: authenticated download of a journal attachment file.
+     * Expected GET params: id, type, random_id, key, name (+ nonce).
+     */
+    public static function ajax_download_attachment(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_view_ajax( 'journal' );
+
+        $type = isset( $_GET['type'] ) ? sanitize_key( $_GET['type'] ) : '';
+        if ( $type !== 'journal' ) {
+            wp_die( 'Invalid attachment type.', '', [ 'response' => 400 ] );
+        }
+
+        self::$attachments->ajax_download();
     }
 
     /**
