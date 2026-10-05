@@ -89,7 +89,7 @@ class Assets {
             'col_optional'     => __( 'Optioneel', 'eme-accounting' ),
         ] );
         if ( $plugin_page === 'emeaccounting-reports' ) {
-            wp_enqueue_script( 'emeaccounting-chartjs', EME_ACCOUNTING_URL . 'assets/js/chart.umd.min.js', [], '4.4.7', true );
+            wp_enqueue_script( 'emeaccounting-chartjs', EME_ACCOUNTING_URL . 'assets/js/chart.umd.min.js', [], '4.5.1', true );
         }
         if ( $plugin_page === 'emeaccounting-journal' ) {
             wp_enqueue_script( 'emeaccounting-journal', EME_ACCOUNTING_URL . 'assets/js/journal.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
