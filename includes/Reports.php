@@ -423,7 +423,7 @@ class Reports {
                         ON j.account_id = a.id
                        AND j.fiscal_year = %d
                        AND j.is_closing_entry = 0
-                       {$extra} //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                       {$extra}
                  WHERE a.is_active = 1
                  GROUP BY a.id, MONTH(j.entry_date)
                  ORDER BY a.id, month",
