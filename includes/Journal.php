@@ -230,6 +230,11 @@ class Journal {
         if ( empty( $id) && empty($direction) ) {
             return new \WP_Error( 'invalid_direction', __( 'Ongeldige betaalrichting.', 'eme-accounting' ) );
         }
+        if ( $vat_liable && $row['vat_code'] !== '' && $row['vat_code'] !== 'exempt'
+            && ! in_array( $row['vat_code'], Vat::rates(), true )
+            && $row['vat_code'] !== ( $old_entry->vat_code ?? null ) ) {
+            return new \WP_Error( 'invalid_vat_code', __( 'Ongeldig BTW-tarief.', 'eme-accounting' ) );
+        }
 
         // Transfer requires both account_id and contra_account_id
         if ( $direction === 'transfer' ) {

@@ -166,12 +166,19 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
             <div class="eme-acc-row-3" id="vat-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'BTW-tarief', 'eme-accounting' ); ?></label>
+                    <?php
+                        $current = (string) ( $edit_entry->vat_code ?? '' );
+                        $rates   = \EMEAccounting\Vat::rates();
+                        if ( $current !== '' && $current !== 'exempt' && ! in_array( $current, $rates, true ) ) {
+                            $rates[] = $current;   // legacy tarief: blijft zichtbaar/selecteerbaar bij bewerken
+                        }
+                    ?>
                     <select name="vat_code" id="vat_code">
                         <option value=""><?php esc_html_e( '— geen BTW —', 'eme-accounting' ); ?></option>
-                        <option value="6"      <?php echo selected( $edit_entry->vat_code  ?? '', '6',      false ); ?>>6%</option>
-                        <option value="12"     <?php echo selected( $edit_entry->vat_code  ?? '', '12',     false ); ?>>12%</option>
-                        <option value="21"     <?php echo selected( $edit_entry->vat_code  ?? '', '21',     false ); ?>>21%</option>
-                        <option value="exempt" <?php echo selected( $edit_entry->vat_code  ?? '', 'exempt', false ); ?>><?php esc_html_e( 'Vrijgesteld', 'eme-accounting' ); ?></option>
+                        <?php foreach ( $rates as $r ): ?>
+                        <option value="<?php echo esc_attr( $r ); ?>" <?php echo selected( $current, $r, false ); ?>><?php echo esc_html( $r ); ?>%</option>
+                        <?php endforeach; ?>
+                        <option value="exempt" <?php echo selected( $current, 'exempt', false ); ?>><?php esc_html_e( 'Vrijgesteld', 'eme-accounting' ); ?></option>
                     </select>
                 </div>
                 <div class="eme-acc-field">
