@@ -7,6 +7,7 @@ use EMEAccounting\Vat;
 
 $config = \EMEVzw\Config::get();
 $eme_categories = eme_get_categories();
+$vat_liable = (bool) ( $config->vat_liable ?? false );
 
 // ── Handle: general settings ────────────────────────────────────────────────
 if ( isset( $_POST['eme_accounting_settings_nonce'] )
@@ -69,8 +70,12 @@ if ( isset( $_POST['emeacc_rebuild_totals_nonce'] )
 if ( isset( $_POST['emeacc_vat_nonce'] )
     && Capabilities::can_manage( 'settings' )
     && check_admin_referer( 'emeacc_vat_rates', 'emeacc_vat_nonce' ) ) {
-    Vat::save_custom( sanitize_text_field( wp_unslash( $_POST['vat_rates_custom'] ?? '' ) ) );
-    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'BTW-tarieven opgeslagen.', 'eme-accounting' ) . '</p></div>';
+    if ( ! $vat_liable ) {
+        echo '<div class="notice notice-error"><p>' . esc_html__( 'Deze VZW is niet BTW-plichtig; tarieven kunnen niet aangepast worden.', 'eme-accounting' ) . '</p></div>';
+    } else {
+        Vat::save_custom( sanitize_text_field( wp_unslash( $_POST['vat_rates_custom'] ?? '' ) ) );
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'BTW-tarieven opgeslagen.', 'eme-accounting' ) . '</p></div>';
+    }
 }
 
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
@@ -99,12 +104,10 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
        class="nav-tab <?php echo $active_tab === 'access' ? 'nav-tab-active' : ''; ?>">
         <?php esc_html_e( 'Toegangsbeheer', 'eme-accounting' ); ?>
     </a>
-    <?php if ( $config->vat_liable ?? false ): ?>
     <a href="<?php echo esc_url( add_query_arg( 'tab', 'vat' ) ); ?>"
         class="nav-tab <?php echo $active_tab === 'vat' ? 'nav-tab-active' : ''; ?>">
         <?php esc_html_e( 'BTW', 'eme-accounting' ); ?>
     </a>
-    <?php endif; ?>
     <a href="<?php echo esc_url( add_query_arg( 'tab', 'advanced' ) ); ?>"
        class="nav-tab <?php echo $active_tab === 'advanced' ? 'nav-tab-active' : ''; ?>">
         <?php esc_html_e( 'Advanced', 'eme-accounting' ); ?>
@@ -383,30 +386,37 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 </script>
 
 <?php elseif ( $active_tab === 'vat' ): ?>
-<form method="post">
-<?php wp_nonce_field( 'emeacc_vat_rates', 'emeacc_vat_nonce' ); ?>
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'BTW-tarieven', 'eme-accounting' ); ?></h2>
-<table class="form-table">
-<tr>
-    <th><?php esc_html_e( 'Officiële tarieven', 'eme-accounting' ); ?></th>
-    <td><b><?php echo esc_html( implode( '%, ', Vat::OFFICIAL_RATES ) . '%' ); ?></b>
-        <br><span class="description"><?php esc_html_e( 'Deel van de plugin; wordt bij updates bijgewerkt.', 'eme-accounting' ); ?></span></td>
-</tr>
-<tr>
-    <th><?php esc_html_e( 'Eigen tarieven', 'eme-accounting' ); ?></th>
-    <td><input type="text" name="vat_rates_custom" value="<?php echo esc_attr( implode( ', ', Vat::custom() ) ); ?>">
-        <br><span class="description"><?php esc_html_e( 'Kommagescheiden, decimalen met punt (bv. 5.5, 25). Tarieven die al officieel zijn worden genegeerd.', 'eme-accounting' ); ?></span></td>
-</tr>
-<tr>
-    <th><?php esc_html_e( 'Beschikbaar bij nieuwe boekingen', 'eme-accounting' ); ?></th>
-    <td><b><?php echo esc_html( implode( '%, ', Vat::rates() ) . '%' ); ?></b>
-        + <?php esc_html_e( 'Vrijgesteld', 'eme-accounting' ); ?></td>
-</tr>
-</table>
-<?php submit_button(); ?>
-</div>
-</form>
+   <?php if ( ! $vat_liable ): ?>
+   <div class="notice notice-info inline">
+       <p><?php esc_html_e( 'Deze VZW is niet BTW-plichtig (aan te passen in de VZW instellingen). De tarieven hieronder zijn enkel ter info.', 'eme-accounting' ); ?></p>
+   </div>
+   <?php endif; ?>
+   <form method="post">
+   <?php wp_nonce_field( 'emeacc_vat_rates', 'emeacc_vat_nonce' ); ?>
+   <fieldset <?php disabled( ! $vat_liable ); ?> <?php echo $vat_liable ? '' : 'inert'; ?>>
+       <div class="eme-acc-form-box">
+       <h2><?php esc_html_e( 'BTW-tarieven', 'eme-accounting' ); ?></h2>
+       <table class="form-table">
+       <tr>
+           <th><?php esc_html_e( 'Officiële tarieven', 'eme-accounting' ); ?></th>
+           <td><b><?php echo esc_html( implode( '%, ', Vat::OFFICIAL_RATES ) . '%' ); ?></b>
+               <br><span class="description"><?php esc_html_e( 'Deel van de plugin; wordt bij updates bijgewerkt.', 'eme-accounting' ); ?></span></td>
+       </tr>
+       <tr>
+           <th><?php esc_html_e( 'Eigen tarieven', 'eme-accounting' ); ?></th>
+           <td><input type="text" name="vat_rates_custom" value="<?php echo esc_attr( implode( ', ', Vat::custom() ) ); ?>">
+               <br><span class="description"><?php esc_html_e( 'Kommagescheiden, decimalen met punt (bv. 5.5, 25). Tarieven die al officieel zijn worden genegeerd.', 'eme-accounting' ); ?></span></td>
+       </tr>
+       <tr>
+           <th><?php esc_html_e( 'Beschikbaar bij nieuwe boekingen', 'eme-accounting' ); ?></th>
+           <td><b><?php echo esc_html( implode( '%, ', Vat::rates() ) . '%' ); ?></b>
+               + <?php esc_html_e( 'Vrijgesteld', 'eme-accounting' ); ?></td>
+       </tr>
+       </table>
+       <?php submit_button(); ?>
+       </div>
+   </fieldset>
+   </form>
 
 <?php else: ?> <!-- tab advanced -->
 <div class="eme-acc-form-box">

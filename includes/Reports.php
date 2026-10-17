@@ -481,6 +481,9 @@ class Reports {
         if ( ! in_array( $type, $allowed, true ) ) {
             $type = 'financial_diary';
         }
+        if ( $type === 'vat_report' && ! (bool) ( \EMEVzw\Config::get()->vat_liable ?? false ) ) {
+            $type = 'financial_diary';
+        }
         $year              = (int) eme_sanitize_request( $_GET['year'] ?? gmdate( 'Y' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $event_id          = (int) eme_sanitize_request( $_GET['event_id'] ?? 0 ) ?: null; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $format            = eme_sanitize_request( $_GET['format'] ?? 'csv' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput

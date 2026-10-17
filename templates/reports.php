@@ -8,15 +8,13 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
 <fieldset>
 <h1><?php esc_html_e( 'Financiële Rapporten', 'eme-accounting' ); ?></h1>
 <div class="eme-acc-form-box">
-<div class="eme-acc-row" "align-items:flex-end">
+<div class="eme-acc-row" stye="align-items:flex-end">
     <div>
         <label><?php esc_html_e( 'Rapporttype', 'eme-accounting' ); ?></label>
         <select id="report_type">
             <optgroup label="Extern">
                 <option value="income_expenditure"><?php esc_html_e( 'Staat van Ontvangsten en Uitgaven', 'eme-accounting' ); ?></option>
-                <?php if ( (bool) ( \EMEVzw\Config::get()->vat_liable ?? false ) ): ?>
-                <option value="vat_report"><?php esc_html_e( 'BTW-aangifte overzicht', 'eme-accounting' ); ?></option>
-                <?php endif; ?>
+                <option value="vat_report" <?php disabled( ! (bool) ( \EMEVzw\Config::get()->vat_liable ?? false ) ); ?>><?php esc_html_e( 'BTW-aangifte overzicht', 'eme-accounting' ); ?></option>
             </optgroup>
             <optgroup label="Intern">
                 <option value="patrimony"><?php esc_html_e( 'Financiële status vermogen', 'eme-accounting' ); ?></option>

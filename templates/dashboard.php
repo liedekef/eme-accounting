@@ -57,6 +57,8 @@ $fiscal_years = EMEAccounting\FiscalYear::get_all();
                 <?php echo esc_html( $formatter->formatCurrency( $totals['net'], $currency ) ); ?>
             </div>
         </div>
+    </div>
+    <div class="eme-acc-cards">
         <?php $balances = EMEAccounting\Accounts::get_all_balances(); ?>
         <?php foreach ( $accounts as $acc ): ?>
         <div class="eme-acc-card">
