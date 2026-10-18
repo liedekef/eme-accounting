@@ -2,6 +2,7 @@
 /**
  * Plugin Name:       EME Accounting
  * Plugin URI:        https://github.com/liedekef/eme-accounting
+ * Update URI:        https://github.com/liedekef/eme-accounting
  * Description:       Enkelvoudige boekhouding als uitbreiding op Events Made Easy. Financiële rekeningen, dagboek, import/reconciliatie, stock, afschrijvingen, begroting en financiële rapporten.
  * Version:           1.0.0
  * Author:            Your Name
@@ -74,3 +75,26 @@ add_action( 'plugins_loaded', 'eme_accounting_init' );
 register_activation_hook( __FILE__, [ 'EMEAccounting\\Installer', 'activate' ] );
 register_deactivation_hook( __FILE__, [ 'EMEAccounting\\Installer', 'deactivate' ] );
 register_uninstall_hook( __FILE__, [ 'EMEAccounting\\Installer', 'uninstall' ] );
+
+/* ------------------------------------------------------------------
+ * Extra links on the plugins overview page
+ * ------------------------------------------------------------------ */
+function eme_accounting_plugin_row_meta( $links, $file ) {
+    if ( strpos( $file, 'eme-accounting.php' ) !== false ) {
+        $new_links = [
+            'donate Paypal'     => '<a href="https://www.paypal.com/donate/?business=SMGDS4GLCYWNG&no_recurring=0&currency_code=EUR">Donate (Paypal)</a>',
+            'Github Sponsoring' => '<a href="https://github.com/sponsors/liedekef">Github sponsoring</a>',
+            'Support'           => '<a href="https://github.com/liedekef/eme-accounting">Support</a>',
+        ];
+        $links = array_merge( $links, $new_links );
+    }
+    return $links;
+}
+add_filter( 'plugin_row_meta', 'eme_accounting_plugin_row_meta', 10, 2 );
+
+// BEGIN NOT FOR WP
+if ( ! class_exists( 'EME_GitHub_Updater' ) ) {
+    require_once __DIR__ . '/includes/class-eme-updater.php';
+    new EME_GitHub_Updater( __FILE__, 'liedekef', 'eme-accounting' );
+}
+// END NOT FOR WP
