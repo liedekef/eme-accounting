@@ -540,6 +540,15 @@ class FiscalYear {
         ] );
     }
 
+    /** Vroegste datum waarop nog geboekt kan worden (start van het vroegste open boekjaar), of null. */
+    public static function get_min_booking_date(): ?string {
+        global $wpdb;
+        $date = $wpdb->get_var(
+            "SELECT MIN(start_date) FROM `{$wpdb->prefix}emeacc_fiscal_years` WHERE status = 'open'"
+        );
+        return $date ?: null;
+    }
+
     public static function get_closed_years(): array {
         global $wpdb;
         $rows = $wpdb->get_col(

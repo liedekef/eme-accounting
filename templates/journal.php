@@ -12,9 +12,10 @@ $filter_account_id  = isset( $_GET['account_id'] ) ? (int) $_GET['account_id']  
 $filter_direction   = isset( $_GET['direction'] )  ? sanitize_key( $_GET['direction'] ) : '';
 $edit_entry         = !empty( $_GET['edit'] )      ? EMEAccounting\Journal::get( (int) $_GET['edit'] ) : null;
 
-$accounts    = EMEAccounting\Accounts::get_dropdown();
+$accounts     = EMEAccounting\Accounts::get_dropdown();
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
+$min_date     = EMEAccounting\FiscalYear::get_min_booking_date();
 
 // $form_disabled may already be set by Menu.php (read-only access profile).
 // Journal can only further restrict it (e.g. closed fiscal year, transfer entry, inactive account).
@@ -62,6 +63,7 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Datum', 'eme-accounting' ); ?> *</label>
                     <input type="date" name="entry_date" id="entry_date" required
+                           <?php echo $min_date ? 'min="' . esc_attr( $min_date ) . '"' : ''; ?>
                            value="<?php echo esc_attr( $edit_entry->entry_date ?? current_time( 'Y-m-d' )); ?>">
                 </div>
                 <div class="eme-acc-field">
