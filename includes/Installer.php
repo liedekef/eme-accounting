@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class Installer {
 
-    const DB_VERSION_OPTION = 'emeacc_accounting_db_version';
+    const DB_VERSION_OPTION = 'eme_accounting_db_version';
     const DB_VERSION        = '21';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
@@ -80,64 +80,8 @@ class Installer {
     private static function migrate(): void {
         global $wpdb;
         $current_version = (int) get_option( self::DB_VERSION_OPTION, '0' );
-        if ( $current_version && $current_version < 12 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS transfer_id BIGINT UNSIGNED DEFAULT NULL AFTER contra_account_id" );
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_transfer (transfer_id)" );
-        }
-        if ( $current_version && $current_version < 13 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS is_closing_entry TINYINT(1) NOT NULL DEFAULT 0 AFTER fiscal_year" );
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing (is_closing_entry)" );
-        }
-        if ( (int) $current_version < 14 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS updated_by BIGINT UNSIGNED DEFAULT NULL" );
-        }
-        if ( (int) $current_version < 15 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_depreciation ADD COLUMN asset_type VARCHAR(150) NOT NULL DEFAULT 'machines'" );
-        }
-        if ( (int) $current_version < 16 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_accounts ADD COLUMN opening_date DATE DEFAULT NULL" );
-        }
-        if ( (int) $current_version < 17 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN counterparty_vat_number VARCHAR(100) NOT NULL DEFAULT ''" );
-        }
-        if ( (int) $current_version < 18 ) {
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD COLUMN IF NOT EXISTS counterparty_name VARCHAR(150) NOT NULL DEFAULT '' AFTER counterparty_vat_number" );
-        }
-        if ( (int) $current_version < 19 ) {
-            // Composite index for reconciliation status queries on import lines
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_import_lines ADD INDEX IF NOT EXISTS idx_status_log (status, import_log_id)" );
-            // Composite index for cashflow and totals queries on journal
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_account (fiscal_year, account_id)" );
-        }
-        if ( (int) $current_version < 20 ) {
-            // Aggregated account totals table for O(1) balance lookups
-            $wpdb->query( "INSERT IGNORE INTO {$wpdb->prefix}emeacc_account_totals (account_id, fiscal_year, total_in, total_out)
-                SELECT
-                    j.account_id,
-                    j.fiscal_year,
-                    COALESCE(SUM(CASE WHEN j.direction = 'in' THEN j.amount ELSE 0 END), 0) AS total_in,
-                    COALESCE(SUM(CASE WHEN j.direction = 'out' THEN j.amount ELSE 0 END), 0) AS total_out
-                FROM {$wpdb->prefix}emeacc_journal j
-                GROUP BY j.account_id, j.fiscal_year" );
-            // Missing composite indexes for report queries
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_coa (fiscal_year, coa_id)" );
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_dir_transfer (fiscal_year, direction, transfer_id)" );
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_fiscal_event (fiscal_year, eme_event_id)" );
-            $wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_closing_fiscal (is_closing_entry, fiscal_year)" );
-        }
-        if ( (int) $current_version < 21 ) {
-            // Collapse per-year totals into single row per account with net delta
-            $wpdb->query( "CREATE TABLE {$wpdb->prefix}emeacc_account_totals_new (
-                account_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
-                delta      DECIMAL(14,2)   NOT NULL DEFAULT 0.00
-            )" );
-            $wpdb->query( "INSERT INTO {$wpdb->prefix}emeacc_account_totals_new (account_id, delta)
-                SELECT account_id, SUM(total_in) - SUM(total_out)
-                FROM {$wpdb->prefix}emeacc_account_totals
-                GROUP BY account_id" );
-            $wpdb->query( "RENAME TABLE {$wpdb->prefix}emeacc_account_totals TO {$wpdb->prefix}emeacc_account_totals_old,
-                                         {$wpdb->prefix}emeacc_account_totals_new TO {$wpdb->prefix}emeacc_account_totals" );
-            $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}emeacc_account_totals_old" );
+        if ( $current_version && $current_version < 21 ) {
+            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_transfer (transfer_id)" );
         }
     }
 
@@ -156,13 +100,13 @@ class Installer {
         // Always clean up capabilities, regardless of the delete_on_uninstall setting.
         \EMEAccounting\Capabilities::remove_all_caps();
 
-        if ( get_option( 'emeacc_accounting_delete_on_uninstall' ) !== 'yes' ) {
+        if ( get_option( 'eme_accounting_delete_on_uninstall' ) !== 'yes' ) {
             return;
         }
         self::drop_tables();
         delete_option( self::DB_VERSION_OPTION );
-        delete_option( 'emeacc_accounting_delete_on_uninstall' );
-        delete_option( 'emeacc_accounting_settings' );
+        delete_option( 'eme_accounting_delete_on_uninstall' );
+        delete_option( 'eme_accounting_settings' );
     }
 
     /* ------------------------------------------------------------------
