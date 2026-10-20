@@ -1,4 +1,6 @@
 <?php
+namespace EmeAccounting;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
