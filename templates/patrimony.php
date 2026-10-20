@@ -6,6 +6,10 @@ $year         = isset( $_GET['year'] ) ? (int) $_GET['year'] : (int) gmdate( 'Y'
 $p            = EMEAccounting\Patrimony::get( $year );
 $all_records  = EMEAccounting\Patrimony::get_all();
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
+if (empty($fiscal_years)) {
+    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst een boekjaar aan.', 'eme-accounting' ) . '</p></div>';
+    return;
+}
 
 // Helper: waarde tonen met decimalen
 $val = fn( string $field ) => $p && property_exists($p, $field) ? number_format( (float) $p->$field, 2, ',', '.' ) : '0,00';

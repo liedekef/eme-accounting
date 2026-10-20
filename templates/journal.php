@@ -13,6 +13,10 @@ $filter_direction   = isset( $_GET['direction'] )  ? sanitize_key( $_GET['direct
 $edit_entry         = !empty( $_GET['edit'] )      ? EMEAccounting\Journal::get( (int) $_GET['edit'] ) : null;
 
 $accounts     = EMEAccounting\Accounts::get_dropdown();
+if (empty($accounts)) {
+    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst financiële rekeningen aan.', 'eme-accounting' ) . '</p></div>';
+    return;
+}
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 $min_date     = EMEAccounting\FiscalYear::get_min_booking_date();
@@ -36,11 +40,6 @@ if ( $edit_entry ) {
         $form_disabled           = 'disabled="disabled"';
         $inactive_contra_account = $contra_account;
     }
-}
-
-if (empty($accounts)) {
-    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst financiële rekeningen aan.', 'eme-accounting' ) . '</p></div>';
-    return;
 }
 
 $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {

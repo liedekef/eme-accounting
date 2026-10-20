@@ -2,8 +2,12 @@
 // phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
+$accounts = EMEAccounting\Accounts::get_dropdown();
+if (empty($accounts)) {
+    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst financiële rekeningen aan.', 'eme-accounting' ) . '</p></div>';
+    return;
+}
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();
-$accounts = EMEAccounting\Accounts::get_dropdown( 'asset' );
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Import & Reconciliatie', 'eme-accounting' ); ?></h1>

@@ -12,6 +12,10 @@ $budget_data  = EMEAccounting\Budget::get_budget_data( $year );
 $fy           = EMEAccounting\FiscalYear::get( $year );
 $is_closed    = $fy && $fy->status === 'closed';
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
+if (empty($fiscal_years)) {
+    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst een boekjaar aan.', 'eme-accounting' ) . '</p></div>';
+    return;
+}
 
 $income_rows  = $budget_data['income'];
 $expense_rows = $budget_data['expenses'];

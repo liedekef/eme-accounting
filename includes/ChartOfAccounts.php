@@ -187,6 +187,7 @@ class ChartOfAccounts {
         );
     }
 
+    /*
     public static function get_by_direction( string $direction, bool $active_only = true ): array {
         global $wpdb;
         if ( $active_only ) {
@@ -198,9 +199,12 @@ class ChartOfAccounts {
             $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}emeacc_chart_of_accounts` WHERE direction = %s ORDER BY code", $direction )
         );
     }
-
     public static function get_dropdown( ?string $direction = null, bool $active_only = true ): array {
         $accounts = $direction ? self::get_by_direction( $direction, $active_only ) : self::get_all();
+     */
+
+    public static function get_dropdown( ): array {
+        $accounts = self::get_all();
         $out = [];
         foreach ( $accounts as $a ) {
             $out[ (int) $a->id ] = $a;
