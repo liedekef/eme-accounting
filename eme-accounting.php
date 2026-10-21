@@ -70,6 +70,16 @@ function eme_accounting_init(): void {
 add_action( 'plugins_loaded', 'eme_accounting_init' );
 
 /* ------------------------------------------------------------------
+ * DB schema upgrades.
+ *
+ * The activation hook does not fire on silent plugin updates, so the DB
+ * version is checked on every request and the schema is upgraded when it
+ * lags behind. Priority 5 => before the rest of the plugin is loaded.
+ * ------------------------------------------------------------------ */
+add_action( 'plugins_loaded', [ 'EMEAccounting\\Installer', 'maybe_upgrade' ], 5 );
+add_action( 'wp_initialize_site', [ 'EMEAccounting\\Installer', 'new_site' ], 900, 2 );
+
+/* ------------------------------------------------------------------
  * Activation / deactivation / uninstall
  * ------------------------------------------------------------------ */
 register_activation_hook( __FILE__, [ 'EMEAccounting\\Installer', 'activate' ] );
