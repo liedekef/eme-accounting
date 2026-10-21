@@ -11,7 +11,7 @@ $current_year = (int) gmdate( 'Y' );
 
 if ( empty( $fiscal_years ) ) {
     EMEAccounting\FiscalYear::ensure_current_year_exists();
-    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Huidig boekjaar succesvol aangemaakt.', 'eme-accounting' ) . '</p></div>';
+    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Er waren nog geen boekjaren, het huidig boekjaar is daarom automatisch aangemaakt.', 'eme-accounting' ) . '</p></div>';
     $fiscal_years = EMEAccounting\FiscalYear::get_all();
 }
 
