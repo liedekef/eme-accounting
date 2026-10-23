@@ -4,7 +4,7 @@
  * Plugin URI:        https://github.com/liedekef/eme-accounting
  * Update URI:        https://github.com/liedekef/eme-accounting
  * Description:       Enkelvoudige boekhouding als uitbreiding op Events Made Easy. Financiële rekeningen, dagboek, import/reconciliatie, stock, afschrijvingen, begroting en financiële rapporten.
- * Version:           1.0.5
+ * Version:           1.0.6
  * Author:            Your Name
  * Author URI:        https://www.e-dynamics.be
  * License:           GPL-2.0-or-later
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'EME_ACCOUNTING_VERSION', '1.0.5' );
+define( 'EME_ACCOUNTING_VERSION', '1.0.6' );
 define( 'EME_ACCOUNTING_FILE',    __FILE__ );
 define( 'EME_ACCOUNTING_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'EME_ACCOUNTING_URL',     plugin_dir_url( __FILE__ ) );
