@@ -53,18 +53,13 @@ $suggested_year      = $missing_current
         <h2><?php esc_html_e( 'Boekjaar toevoegen of bewerken', 'eme-accounting' ); ?></h2>
         <form id="eme-acc-fiscal-year-form">
             <input type="hidden" name="id" id="fy_id" value="">
-            <div class="eme-acc-row">
-                <div class="eme-acc-field">
-                    <label><?php esc_html_e( 'Jaar', 'eme-accounting' ); ?></label>
-                    <input type="number" name="year" id="fy_year_input" min="2015" max="2100" placeholder="<?php echo esc_attr( $current_year ); ?>" value="<?php echo $missing_current ? esc_attr( $suggested_year ) : ''; ?>" required>
-                    <?php if ( ! empty( $config->fiscal_year_start_mm ) && ! empty( $config->fiscal_year_end_mm ) ): ?>
-                    <p>
-                        <button type="submit" class="button button-primary submit-btn" id="fy_submit">
-                            <?php esc_html_e( 'Toevoegen', 'eme-accounting' ); ?>
-                        </button>
-                    </p>
-                    <?php endif; ?>
-            </div>
+            <label for="fy_year_input"><?php esc_html_e( 'Jaar', 'eme-accounting' ); ?></label>
+            <input type="number" name="year" id="fy_year_input" min="2015" max="2100" placeholder="<?php echo esc_attr( $current_year ); ?>" value="<?php echo $missing_current ? esc_attr( $suggested_year ) : ''; ?>" required>
+            <?php if ( ! empty( $config->fiscal_year_start_mm ) && ! empty( $config->fiscal_year_end_mm ) ): ?>
+                  <button type="submit" class="button button-primary submit-btn" id="fy_submit">
+                      <?php esc_html_e( 'Toevoegen', 'eme-accounting' ); ?>
+                  </button>
+            <?php endif; ?>
         </form>
     </div>
 
