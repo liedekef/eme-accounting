@@ -50,7 +50,7 @@ $suggested_year      = $missing_current
     <?php endif; ?>
 
     <div class="eme-acc-form-box">
-        <h2><?php esc_html_e( 'Boekjaar toevoegen of bewerken', 'eme-accounting' ); ?></h2>
+        <h2><?php esc_html_e( 'Boekjaar toevoegen', 'eme-accounting' ); ?></h2>
         <form id="eme-acc-fiscal-year-form">
             <input type="hidden" name="id" id="fy_id" value="">
             <label for="fy_year_input"><?php esc_html_e( 'Jaar', 'eme-accounting' ); ?></label>
