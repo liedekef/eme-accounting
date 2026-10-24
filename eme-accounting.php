@@ -103,8 +103,6 @@ function eme_accounting_plugin_row_meta( $links, $file ) {
 add_filter( 'plugin_row_meta', 'eme_accounting_plugin_row_meta', 10, 2 );
 
 // BEGIN NOT FOR WP
-if ( ! class_exists( '\EmeAccounting\EME_GitHub_Updater' ) ) {
-    require_once __DIR__ . '/includes/class-eme-updater.php';
-}
+require_once __DIR__ . '/includes/class-eme-updater.php';
 new \EmeAccounting\EME_GitHub_Updater( __FILE__, 'liedekef', 'eme-accounting' );
 // END NOT FOR WP
