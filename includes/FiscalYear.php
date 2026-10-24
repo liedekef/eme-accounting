@@ -572,6 +572,14 @@ class FiscalYear {
         return (int) gmdate( 'Y' );
     }
 
+    /** Label (start year) of the fiscal year that would contain $date, per the configured boundaries. */
+    public static function get_year_for_date( string $date ): int {
+        $calendar_year = (int) gmdate( 'Y', strtotime( $date ) );
+        $dates         = self::calculate_dates( $calendar_year );
+        return $date < $dates['start_date'] ? $calendar_year - 1 : $calendar_year;
+    }
+
+    /*
     public static function ensure_current_year_exists(): void {
         global $wpdb;
         $current = (int) gmdate( 'Y' );
@@ -595,4 +603,5 @@ class FiscalYear {
             );
         }
     }
+    */
 }

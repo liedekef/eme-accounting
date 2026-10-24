@@ -1,6 +1,12 @@
 /**
  * Journal page: fiscal year auto-detection
  */
+function emeAccEscapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
 (function() {
     var entryDateInput = document.getElementById('entry_date');
     var fyInfoDiv = document.getElementById('fiscal-year-info');
@@ -29,7 +35,7 @@
                 }
             },
             (errorMsg) => {  // Error callback met message
-                alert(errorMsg);
+                FTable.alert('Fout', emeAccEscapeHtml(errorMsg));
                 btn.disabled = false;
                 btn.textContent = originalText;
             }

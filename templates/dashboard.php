@@ -12,7 +12,11 @@ $accounts   = EMEAccounting\Accounts::get_all();
 $recent     = EMEAccounting\Journal::get_entries( [ 'fiscal_year' => $year ], '', 'LIMIT 10' );
 $fiscal_years = EMEAccounting\FiscalYear::get_all();
 if (empty($fiscal_years)) {
-    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst een boekjaar aan.', 'eme-accounting' ) . '</p></div>';
+    echo '<div class="notice notice-error"><p>'
+        . esc_html__( 'Maak eerst een boekjaar aan.', 'eme-accounting' )
+        . ' <a href="' . esc_url( admin_url( 'admin.php?page=emeaccounting-fiscal-years' ) ) . '">'
+        . esc_html__( 'Ga naar Boekjaren', 'eme-accounting' )
+        . '</a></p></div>';
     return;
 }
 

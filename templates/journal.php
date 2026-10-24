@@ -14,7 +14,11 @@ $edit_entry         = !empty( $_GET['edit'] )      ? EMEAccounting\Journal::get(
 
 $accounts     = EMEAccounting\Accounts::get_dropdown();
 if (empty($accounts)) {
-    echo '<div class="notice notice-error"><p>' . esc_html__( 'Maak eerst financiële rekeningen aan.', 'eme-accounting' ) . '</p></div>';
+    echo '<div class="notice notice-error"><p>'
+        . esc_html__( 'Maak eerst financiële rekeningen aan.', 'eme-accounting' )
+        . ' <a href="' . esc_url( admin_url( 'admin.php?page=emeaccounting-accounts' ) ) . '">'
+        . esc_html__( 'Ga naar Financiële rekeningen', 'eme-accounting' )
+        . '</a></p></div>';
     return;
 }
 $coa_accounts = EMEAccounting\ChartOfAccounts::get_dropdown();

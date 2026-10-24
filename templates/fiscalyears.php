@@ -9,16 +9,33 @@ $currency  = $config->currency;
 
 $current_year = (int) gmdate( 'Y' );
 
-if ( empty( $fiscal_years ) ) {
-    EMEAccounting\FiscalYear::ensure_current_year_exists();
-    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Er waren nog geen boekjaren, het huidig boekjaar is daarom automatisch aangemaakt.', 'eme-accounting' ) . '</p></div>';
-    $fiscal_years = EMEAccounting\FiscalYear::get_all();
-}
+$config_ready = ! empty( $config->fiscal_year_start_mm ) && ! empty( $config->fiscal_year_end_mm );
+$today        = gmdate( 'Y-m-d' );
+
+$current_fiscal_year = EMEAccounting\FiscalYear::get_for_date( $today );
+$missing_current     = $config_ready && ! $current_fiscal_year;
+$suggested_year      = $missing_current
+    ? EMEAccounting\FiscalYear::get_year_for_date( $today )
+    : $current_year;
 
 ?>
 <div class="wrap eme-acc-wrap">
 <fieldset <?php echo $form_disabled; //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
     <h1><?php esc_html_e( 'Boekjaren', 'eme-accounting' ); ?></h1>
+
+    <?php if ( $missing_current ): ?>
+    <div class="notice notice-info">
+        <p>
+            <?php
+            printf(
+                /* translators: %d is the suggested fiscal year label. */
+                esc_html__( 'Er bestaat nog geen boekjaar voor de huidige periode (boekjaar %d). Gebruik het formulier hieronder om het aan te maken.', 'eme-accounting' ),
+                (int) $suggested_year
+            );
+            ?>
+        </p>
+    </div>
+    <?php endif; ?>
 
     <?php if ( empty( $config->fiscal_year_start_mm) || empty( $config->fiscal_year_end_mm ) ): ?>
     <div class="notice notice-warning">
@@ -39,7 +56,7 @@ if ( empty( $fiscal_years ) ) {
             <div class="eme-acc-row">
                 <div class="eme-acc-field">
                     <label><?php esc_html_e( 'Jaar', 'eme-accounting' ); ?></label>
-                    <input type="number" name="year" id="fy_year_input" min="2015" max="2100" placeholder="<?php echo esc_attr( $current_year ); ?>" required>
+                    <input type="number" name="year" id="fy_year_input" min="2015" max="2100" placeholder="<?php echo esc_attr( $current_year ); ?>" value="<?php echo $missing_current ? esc_attr( $suggested_year ) : ''; ?>" required>
                     <?php if ( ! empty( $config->fiscal_year_start_mm ) && ! empty( $config->fiscal_year_end_mm ) ): ?>
                     <p>
                         <button type="submit" class="button button-primary submit-btn" id="fy_submit">
@@ -48,7 +65,6 @@ if ( empty( $fiscal_years ) ) {
                     </p>
                     <?php endif; ?>
             </div>
-            <div id="fy-message" style="margin-top:10px"></div>
         </form>
     </div>
 

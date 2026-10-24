@@ -1,26 +1,30 @@
 /**
  * Fiscal Years page: CRUD operations
  */
+function emeAccEscapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
 (function() {
     var form = document.getElementById('eme-acc-fiscal-year-form');
     var idHidden = document.getElementById('fy_id');
     var yearInput = document.getElementById('fy_year_input');
     var submitBtn = document.getElementById('fy_submit');
-    var messageDiv = document.getElementById('fy-message');
 
-    function showMessage(msg, isError) {
-        messageDiv.innerHTML = '<div class="notice notice-' + (isError ? 'error' : 'success') + '"><p>' + msg + '</p></div>';
-    }
+    // Pin the page URL at load time, so an async continuation always reloads
+    // the current admin page instead of whatever URL the last fetch used.
+    var pageUrl = window.location.href;
 
-    function clearMessage() {
-        messageDiv.innerHTML = '';
+    function reloadPage() {
+        window.location.href = pageUrl;
     }
 
     function clearForm() {
         idHidden.value = '';
         yearInput.value = '';
         yearInput.readOnly = false;
-        clearMessage();
     }
 
     form.addEventListener('submit', function(e) {
@@ -29,7 +33,6 @@
         submitBtn.disabled = true;
         const originalText = submitBtn.textContent;
         submitBtn.textContent = emeAccounting.i18n.saving;
-        clearMessage();
 
         var data = new FormData();
         data.append('action', 'eme_accounting_save_fiscal_year');
@@ -39,21 +42,17 @@
 
         fetch(emeAccounting.ajaxUrl, { method: 'POST', body: data })
             .then(function(r) { return r.json(); })
-            .then(function(r) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
+            .then(async function(r) {
                 if (r.success) {
-                    showMessage(r.data.message, false);
-                    clearForm();
-                    setTimeout(function() { location.reload(); }, 1000);
+                    await FTable.alert('Opslaan boekjaar gelukt', emeAccEscapeHtml(r.data.message + ' ' + (r.data.result || '')));
                 } else {
-                    showMessage(r.data, true);
+                    await FTable.alert('Fout', emeAccEscapeHtml(r.data));
                 }
+                reloadPage();
             })
-            .catch(function() {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-                showMessage(emeAccounting.i18n.error, true);
+            .catch(async function() {
+                await FTable.alert('Fout', emeAccounting.i18n.error);
+                reloadPage();
             });
     });
 
@@ -72,18 +71,17 @@
 
             fetch(emeAccounting.ajaxUrl, { method: 'POST', body: data })
                 .then(function(r) { return r.json(); })
-                .then(function(r) {
+                .then(async function(r) {
                     if (r.success) {
-                        alert(r.data.message + ' ' + (r.data.result || ''));
-                        location.reload();
+                        await FTable.alert('Afsluiten', emeAccEscapeHtml(r.data.message + ' ' + (r.data.result || '')));
                     } else {
-                        alert(r.data);
-                        location.reload();
+                        await FTable.alert('Fout', emeAccEscapeHtml(r.data));
                     }
+                    reloadPage();
                 })
-                .catch(function() {
-                    alert(emeAccounting.i18n.error);
-                    location.reload();
+                .catch(async function() {
+                    await FTable.alert('Fout', emeAccounting.i18n.error);
+                    reloadPage();
                 });
         });
     });
@@ -103,18 +101,17 @@
 
             fetch(emeAccounting.ajaxUrl, { method: 'POST', body: data })
                 .then(function(r) { return r.json(); })
-                .then(function(r) {
+                .then(async function(r) {
                     if (r.success) {
-                        alert(r.data.message);
-                        location.reload();
+                        await FTable.alert('Heropenen', emeAccEscapeHtml(r.data.message));
                     } else {
-                        alert(r.data);
-                        location.reload();
+                        await FTable.alert('Fout', emeAccEscapeHtml(r.data));
                     }
+                    reloadPage();
                 })
-                .catch(function() {
-                    alert(emeAccounting.i18n.error);
-                    location.reload();
+                .catch(async function() {
+                    await FTable.alert('Fout', emeAccounting.i18n.error);
+                    reloadPage();
                 });
         });
     });
@@ -134,21 +131,18 @@
 
             fetch(emeAccounting.ajaxUrl, { method: 'POST', body: data })
                 .then(function(r) { return r.json(); })
-                .then(function(r) {
+                .then(async function(r) {
                     if (r.success) {
-                        alert(r.data.message);
-                        location.reload();
+                        await FTable.alert('Verwijderen', emeAccEscapeHtml(r.data.message));
                     } else {
-                        alert(r.data);
-                        location.reload();
+                        await FTable.alert('Fout', emeAccEscapeHtml(r.data));
                     }
+                    reloadPage();
                 })
-                .catch(function() {
-                    alert(emeAccounting.i18n.error);
-                    location.reload();
+                .catch(async function() {
+                    await FTable.alert('Fout', emeAccounting.i18n.error);
+                    reloadPage();
                 });
         });
     });
-
-    clearForm();
 })();
