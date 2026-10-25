@@ -7,17 +7,17 @@
  */
 defined( 'ABSPATH' ) || exit;
 
-$vzw_name   = esc_html( $config->vzw_name ?? '' );
-$vzw_form   = esc_html( $config->vzw_legal_form ?? 'VZW' );
-$vzw_number = esc_html( $config->vzw_number ?? '' );
-$street     = esc_html( trim( ( $config->street ?? '' ) . ' ' . ( $config->house_number ?? '' ) ) );
+$vzw_name   = $config->vzw_name ?? '';
+$vzw_form   = $config->vzw_legal_short_form ?? 'VZW';
+$vzw_number = $config->vzw_number ?? '';
+$street     = trim( ( $config->street ?? '' ) . ' ' . ( $config->house_number ?? '' ) );
 if (!empty($config->bus)) {
-    $street .= esc_html('bus '.$config->bus);
+    $street .= ' bus ' . $config->house_bus;
 }
-$postal     = esc_html( trim( ( $config->postal_code ?? '' ) . ' ' . ( $config->city ?? '' ) ) );
-$website    = esc_html( $config->website  ?? '' );
-$email      = esc_html( $config->email ?? '' );
-$court      = esc_html( $config->court ?? '' );
+$postal     = trim( ( $config->postal_code ?? '' ) . ' ' . ( $config->city ?? '' ) );
+$website    = $config->website  ?? '';
+$email      = $config->email ?? '';
+$court      = $config->court ?? '';
 $currency   = $config->currency;
 
 $formatter = new NumberFormatter('nl_BE',  NumberFormatter::CURRENCY);

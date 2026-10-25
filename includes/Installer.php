@@ -126,7 +126,9 @@ class Installer {
         try {
             $current_version = (int) get_option( self::DB_VERSION_OPTION, '0' );
             self::create_tables();
-            self::migrate( $current_version );
+            if ( $current_version < (int) self::DB_VERSION ) {
+                self::migrate( $current_version );
+            }
             update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
         } finally {
             $wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
@@ -163,7 +165,7 @@ class Installer {
     private static function migrate( int $current_version ): void {
         global $wpdb;
         if ( $current_version && $current_version < 21 ) {
-            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX IF NOT EXISTS idx_transfer (transfer_id)" );
+            //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_transfer (transfer_id)" );
         }
     }
 
@@ -228,8 +230,6 @@ class Installer {
      * ------------------------------------------------------------------ */
     public static function create_tables(): void {
         global $wpdb;
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
         $charset = $wpdb->get_charset_collate();
 
         // ── Financial accounts ──────────────────────────────────────────

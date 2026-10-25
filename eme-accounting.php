@@ -11,7 +11,7 @@
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       eme-accounting
  * Requires at least: 6.0
- * Requires PHP:      8.0
+ * Requires PHP:      8.2
  * Requires Plugins:  events-made-easy
  */
 

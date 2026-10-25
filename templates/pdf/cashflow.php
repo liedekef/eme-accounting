@@ -9,8 +9,8 @@ defined( 'ABSPATH' ) || exit;
 
 $formatter  = new NumberFormatter( 'nl_BE', NumberFormatter::CURRENCY );
 $currency   = $config->currency;
-$vzw_name   = esc_html( $config->vzw_name ?? '' );
-$vzw_form   = esc_html( $config->vzw_legal_form ?? 'VZW' );
+$vzw_name   = $config->vzw_name ?? '';
+$vzw_form   = $config->vzw_legal_short_form ?? 'VZW';
 
 $month_names = [ '', 'Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec' ];
