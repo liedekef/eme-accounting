@@ -126,7 +126,7 @@ class Installer {
         try {
             $current_version = (int) get_option( self::DB_VERSION_OPTION, '0' );
             self::create_tables();
-            if ( $current_version < (int) self::DB_VERSION ) {
+            if ( $current_version && $current_version < (int) self::DB_VERSION ) {
                 self::migrate( $current_version );
             }
             update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
