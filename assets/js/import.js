@@ -391,6 +391,8 @@
             /* Bekijk – opens the lines section below */
             _view: {
                 title: ' ', list: true, create: false, edit: false, sorting: false,
+                listClass: 'ftable-command-column',
+                visibility: 'fixed',
                 display: ( { record } ) =>
                     `<button class="button button-small btn-view-log" data-log="${record.id}">Bekijk</button>`,
             },

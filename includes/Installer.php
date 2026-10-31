@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'eme_accounting_db_version';
-    const DB_VERSION        = '21';
+    const DB_VERSION        = '22';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
     /**
@@ -166,6 +166,13 @@ class Installer {
         global $wpdb;
         if ( $current_version && $current_version < 21 ) {
             //$wpdb->query( "ALTER TABLE {$wpdb->prefix}emeacc_journal ADD INDEX idx_transfer (transfer_id)" );
+        }
+        if ( $current_version && $current_version < 22 ) {
+            // find_match() in Import.php looks up import lines by journal_id
+            $table = $wpdb->prefix . 'emeacc_import_lines';
+            if ( ! $wpdb->get_var( "SHOW INDEX FROM {$table} WHERE Key_name = 'idx_journal'" ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $wpdb->query( "ALTER TABLE {$table} ADD INDEX idx_journal (journal_id)" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            }
         }
     }
 
@@ -480,6 +487,9 @@ class Installer {
             import_date     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             filename        VARCHAR(255)    NOT NULL DEFAULT '',
             format          VARCHAR(20)     NOT NULL DEFAULT 'csv',
+            total_lines     INT(11)         NOT NULL DEFAULT 0,
+            matched_lines   INT(11)         NOT NULL DEFAULT 0,
+            unmatched_lines INT(11)         NOT NULL DEFAULT 0,
             imported_by     BIGINT UNSIGNED          DEFAULT NULL,
             notes           VARCHAR(255)    NOT NULL DEFAULT '',
             PRIMARY KEY (id),
@@ -508,7 +518,8 @@ class Installer {
             KEY idx_account (account_id),
             KEY idx_status (status),
             KEY idx_date (transaction_date),
-            KEY idx_status_log (status, import_log_id)
+            KEY idx_status_log (status, import_log_id),
+            KEY idx_journal (journal_id)
         ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
     }
 

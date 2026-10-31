@@ -165,11 +165,11 @@ class Import {
         Capabilities::require_manage_ajax( 'import' );
         global $wpdb;
 
-        $limit  = eme_get_ftable_limit() ?: 'LIMIT 50';
+        $limit  = eme_get_ftable_limit() ?: '';
         $rows = $wpdb->get_results( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
             "SELECT il.*, a.name as account_name FROM `{$wpdb->prefix}emeacc_import_log` il
              LEFT JOIN `{$wpdb->prefix}emeacc_accounts` a ON a.id = il.account_id
-             ORDER BY il.import_date DESC $limit" //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+             ORDER BY il.import_date DESC, il.id DESC $limit" //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         );
 
         foreach ( $rows as $row ) {
@@ -182,7 +182,8 @@ class Import {
             $row->is_complete  = ( $row->cnt_pending === 0 ) ? 1 : 0;
         }
 
-        wp_send_json( [ 'Result' => 'OK', 'Records' => $rows, 'TotalRecordCount' => count( $rows ) ] );
+        $total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_import_log`" ); //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        wp_send_json( [ 'Result' => 'OK', 'Records' => $rows, 'TotalRecordCount' => $total ] );
     }
 
     /**
@@ -196,9 +197,10 @@ class Import {
         if ( ! $log_id ) {
             wp_send_json( [ 'Result' => 'ERROR', 'Message' => 'Missing import_log_id' ] );
         }
-        $limit  = eme_get_ftable_limit() ?: 'LIMIT 50';
+        $limit  = eme_get_ftable_limit() ?: '';
         $lines = self::get_all_lines( $log_id, $limit );
-        wp_send_json( [ 'Result' => 'OK', 'Records' => $lines, 'TotalRecordCount' => count( $lines ) ] );
+        $total = self::count_lines( $log_id );
+        wp_send_json( [ 'Result' => 'OK', 'Records' => $lines, 'TotalRecordCount' => $total ] );
     }
 
     /**
@@ -432,11 +434,11 @@ class Import {
         if ( ! empty( $line->structured_ref ) ) {
             $id = (int) $wpdb->get_var(
                 $wpdb->prepare(
-                    "SELECT id FROM `{$wpdb->prefix}emeacc_journal`
-                     WHERE account_id = %d
-                       AND amount     = %f
-                       AND is_reconciled = 0
-                       AND (bank_statement_ref = %s OR bank_statement_seq = %s)
+                    "SELECT j.id FROM `{$wpdb->prefix}emeacc_journal` j
+                     WHERE j.account_id = %d
+                       AND j.amount     = %f
+                       AND NOT EXISTS ( SELECT 1 FROM `{$wpdb->prefix}emeacc_import_lines` il WHERE il.journal_id = j.id )
+                       AND (j.bank_statement_ref = %s OR j.bank_statement_seq = %s)
                      LIMIT 1",
                     $account_id,
                     abs( (float) $line->amount ),
@@ -450,13 +452,13 @@ class Import {
         // Try date + amount within ±3 days
         $id = (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT id FROM `{$wpdb->prefix}emeacc_journal`
-                 WHERE account_id    = %d
-                   AND amount        = %f
-                   AND direction     = %s
-                   AND is_reconciled = 0
-                   AND entry_date BETWEEN DATE_SUB(%s, INTERVAL 3 DAY) AND DATE_ADD(%s, INTERVAL 3 DAY)
-                 ORDER BY ABS(DATEDIFF(entry_date, %s))
+                "SELECT j.id FROM `{$wpdb->prefix}emeacc_journal` j
+                 WHERE j.account_id = %d
+                   AND j.amount     = %f
+                   AND j.direction  = %s
+                   AND NOT EXISTS ( SELECT 1 FROM `{$wpdb->prefix}emeacc_import_lines` il WHERE il.journal_id = j.id )
+                   AND j.entry_date BETWEEN DATE_SUB(%s, INTERVAL 3 DAY) AND DATE_ADD(%s, INTERVAL 3 DAY)
+                 ORDER BY ABS(DATEDIFF(j.entry_date, %s))
                  LIMIT 1",
                 $account_id,
                 abs( (float) $line->amount ),
@@ -849,6 +851,16 @@ class Import {
         );
     }
 
+    public static function count_lines( int $log_id ): int {
+        global $wpdb;
+        return (int) $wpdb->get_var( //phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$wpdb->prefix}emeacc_import_lines` WHERE import_log_id = %d", //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $log_id
+            )
+        );
+    }
+
     /**
      * @return object[]
      */
@@ -860,7 +872,7 @@ class Import {
                  FROM `{$wpdb->prefix}emeacc_import_lines` il
                  LEFT JOIN `{$wpdb->prefix}emeacc_journal` j ON j.id = il.journal_id
                  WHERE il.import_log_id = %d
-                 ORDER BY il.transaction_date $limit", //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                 ORDER BY il.transaction_date, il.id $limit", //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $log_id
             )
         );
