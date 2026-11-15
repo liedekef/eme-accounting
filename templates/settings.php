@@ -83,7 +83,9 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
     && Capabilities::can_manage( 'settings' )
     && check_admin_referer( 'emeacc_peppol', 'emeacc_peppol_nonce' ) ) {
     $peppol  = EMEAccounting\Peppol::get_settings();
-    $new_key = trim( sanitize_text_field( wp_unslash( $_POST['peppol_api_key'] ?? '' ) ) );
+    // API keys are printable ASCII; drop anything else instead of sanitize_text_field() (which mangles %xx).
+    $raw_key = $_POST['peppol_api_key'] ?? ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $new_key = is_string( $raw_key ) ? preg_replace( '/[^\x21-\x7E]/', '', wp_unslash( $raw_key ) ) : '';
 
     if ( ! empty( $_POST['peppol_clear_api_key'] ) ) {
         $peppol['api_key'] = '';
@@ -94,29 +96,33 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
     $peppol['poll_enabled'] = (int) ! empty( $_POST['peppol_poll_enabled'] );
 
     $mode = sanitize_key( $_POST['peppol_initial_sync_mode'] ?? 'now' );
-    $peppol['initial_sync_mode'] = in_array( $mode, [ 'now', 'full' ], true ) ? $mode : 'now';
+    $mode = in_array( $mode, [ 'now', 'full' ], true ) ? $mode : 'now';
+    $peppol['initial_sync_mode'] = $mode;
 
-    $peppol['webhook_url_override'] = esc_url_raw( wp_unslash( $_POST['peppol_webhook_url_override'] ?? '' ) );
+    // https only: e-invoice.be delivers signed document events to this URL.
+    $webhook_input = trim( (string) wp_unslash( $_POST['peppol_webhook_url_override'] ?? '' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $peppol['webhook_url_override'] = esc_url_raw( $webhook_input, [ 'https' ] );
+    $webhook_rejected = $webhook_input !== '' && $peppol['webhook_url_override'] === '';
 
-    // Apply the first-sync choice only on the first configuration or when the
-    // user explicitly asks to reset the sync position.
-    if ( ! empty( $_POST['peppol_reset_sync'] ) || empty( $peppol['cursor_created_at'] ) ) {
-        if ( $peppol['initial_sync_mode'] === 'full' ) {
-            $peppol['cursor_created_at'] = '';
-            $peppol['cursor_ids']        = [];
-            $peppol['backfill_page']     = 1;
-            $peppol['backfill_done']     = 0;
-        } else {
-            $peppol['cursor_created_at'] = gmdate( 'Y-m-d\TH:i:s\Z' );
-            $peppol['cursor_ids']        = [];
-            $peppol['backfill_page']     = 0;
-            $peppol['backfill_done']     = 1;
-        }
+    // Apply the first-sync choice once a key is configured and no position exists
+    // yet, or when the user explicitly asks to reset the sync position. Without
+    // a key the reset would only store a cursor for a sync that cannot run.
+    $reset_requested     = ! empty( $_POST['peppol_reset_sync'] );
+    $can_reset           = $peppol['api_key'] !== '';
+    $sync_reset_rejected = $reset_requested && ! $can_reset;
+    if ( $can_reset && ( $reset_requested || empty( $peppol['cursor_created_at'] ) ) ) {
+        $peppol = EMEAccounting\Peppol::reset_sync_position( $peppol, $mode );
     }
 
     EMEAccounting\Peppol::update_settings( $peppol );
     EMEAccounting\Peppol::sync_poll_cron();
     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Peppol-instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
+    if ( $webhook_rejected ) {
+        echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'De webhook-URL moet met https:// beginnen en is niet opgeslagen.', 'eme-accounting' ) . '</p></div>';
+    }
+    if ( $sync_reset_rejected ) {
+        echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'De synchronisatiepositie is niet gereset: stel eerst een API-key in.', 'eme-accounting' ) . '</p></div>';
+    }
 }
 
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
@@ -500,7 +506,7 @@ $masked_secret = $pp['webhook_secret'] !== '' ? str_repeat( '•', 8 ) . substr(
     <th><?php esc_html_e( 'Automatisch synchroniseren', 'eme-accounting' ); ?></th>
     <td>
         <label>
-            <input type="checkbox" name="peppol_poll_enabled" value="1" <?php echo checked( 1, (int) $pp['poll_enabled'] ); ?>>
+            <input type="checkbox" name="peppol_poll_enabled" value="1" <?php echo checked( 1, (int) $pp['poll_enabled'], false ); ?>>
             <?php esc_html_e( 'Elk uur de inbox van e-invoice.be ophalen', 'eme-accounting' ); ?>
         </label>
         <p class="description"><?php esc_html_e( 'De webhook levert documenten bijna onmiddellijk; de uurlijkse poll is een vangnet.', 'eme-accounting' ); ?></p>

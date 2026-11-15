@@ -31,6 +31,10 @@ class Peppol {
     const MAX_POLL_PAGES     = 3;
     const MAX_BACKFILL_PAGES = 10;
     const MAX_DOCS_PER_RUN   = 50;
+    const MAX_DOCS_MANUAL    = 25;     // "sync now" runs inside an AJAX request
+    const CURSOR_LAG         = 86400;  // re-scan a day behind the cursor; dedupe is a cheap DB lookup
+    const RETRY_BACKOFF      = 3600;   // seconds before an errored document is retried by cron
+    const LOCK_NAME          = 'emeacc_peppol_poll_';
 
     const EVENTS = [ 'document.received', 'document.received.failed' ];
 
@@ -57,8 +61,6 @@ class Peppol {
 
         add_action( self::CRON_POLL, [ __CLASS__, 'poll' ] );
         add_action( self::CRON_FETCH, [ __CLASS__, 'fetch_document_cron' ], 10, 1 );
-
-        self::get_attachments()->protect();
 
         // Re-arm the hourly poll when it got lost (activation, manual option
         // import, ...). Only on admin/cron requests, so front-end traffic does
@@ -93,7 +95,6 @@ class Peppol {
             'poll_enabled'        => 1,
             'initial_sync_mode'   => 'now',
             'cursor_created_at'   => '',
-            'cursor_ids'          => [],
             'backfill_page'       => 0,
             'backfill_done'       => 1,
             'webhook_id'          => '',
@@ -105,7 +106,65 @@ class Peppol {
     }
 
     public static function update_settings( array $settings ): void {
+        $old     = get_option( self::OPTION, [] );
+        $old_key = is_array( $old ) ? (string) ( $old['api_key'] ?? '' ) : '';
+        if ( $old_key !== (string) ( $settings['api_key'] ?? '' ) ) {
+            // The webhook (id + secret) belongs to the account of the old key.
+            $settings['webhook_id']     = '';
+            $settings['webhook_secret'] = '';
+        }
+        unset( $settings['cursor_ids'] ); // legacy key
         update_option( self::OPTION, $settings, false );
+    }
+
+    /**
+     * Persist only what poll() owns (cursor, backfill, last run), on top of a
+     * fresh copy of the settings. poll() can run for minutes; writing back the
+     * array it read at the start would overwrite an API key, webhook id/secret
+     * or poll toggle saved in the meantime.
+     *
+     * The sync position itself is only written when it still matches the
+     * snapshot taken at the start of the run: a reset performed while the poll
+     * was running must not be reverted by the poll's stale cursor.
+     */
+    private static function save_runtime_state( array $local, array $original ): void {
+        $fresh   = self::get_settings();
+        $runtime = [ 'cursor_created_at', 'backfill_page', 'backfill_done' ];
+
+        $changed = false;
+        foreach ( $runtime as $key ) {
+            if ( (string) ( $fresh[ $key ] ?? '' ) !== (string) ( $original[ $key ] ?? '' ) ) {
+                $changed = true;
+                break;
+            }
+        }
+        if ( ! $changed ) {
+            foreach ( $runtime as $key ) {
+                $fresh[ $key ] = $local[ $key ];
+            }
+        }
+
+        $fresh['last_poll_at']     = $local['last_poll_at'];
+        $fresh['last_poll_status'] = $local['last_poll_status'];
+        self::update_settings( $fresh );
+    }
+
+    /**
+     * Apply the first-sync choice. The cursor is always "now"; a full sync
+     * additionally walks the history via backfill_page. 'now' mode gets a
+     * floor (sync_from) so the poll's look-behind never imports older documents.
+     */
+    public static function reset_sync_position( array $settings, string $mode ): array {
+        $mode = $mode === 'full' ? 'full' : 'now';
+        $now  = gmdate( 'Y-m-d\TH:i:s\Z' );
+
+        $settings['initial_sync_mode'] = $mode;
+        $settings['cursor_created_at'] = $now;
+        $settings['sync_from']         = $mode === 'full' ? '' : $now;
+        $settings['backfill_page']     = $mode === 'full' ? 1 : 0;
+        $settings['backfill_done']     = $mode === 'full' ? 0 : 1;
+        unset( $settings['cursor_ids'] );
+        return $settings;
     }
 
     public static function sync_poll_cron(): void {
@@ -140,7 +199,7 @@ class Peppol {
             'backfill_page'      => (int) $s['backfill_page'],
             'backfill_done'      => (int) $s['backfill_done'],
             'has_cursor'         => ! empty( $s['cursor_created_at'] ),
-            'webhook_configured' => ! empty( $s['webhook_id'] ),
+            'webhook_configured' => ! empty( $s['webhook_id'] ) && ! empty( $s['webhook_secret'] ),
             'webhook_url'        => self::webhook_url(),
         ];
     }
@@ -347,6 +406,21 @@ class Peppol {
             }
         }
 
+        // The secret is normally only returned when a webhook is created. A hook
+        // we have no secret for can never be verified (every delivery would get
+        // a 503), so replace it instead of adopting it.
+        if ( $hook !== null && empty( $hook['secret'] ) && empty( $settings['webhook_secret'] ) ) {
+            $stale_id = (string) ( $hook['id'] ?? $settings['webhook_id'] );
+            if ( $stale_id !== '' ) {
+                $del = $api->delete_webhook( $stale_id );
+                if ( is_wp_error( $del ) && $del->get_error_code() !== 'peppol_404' ) {
+                    wp_send_json_error( $del->get_error_message() );
+                }
+            }
+            $hook                   = null;
+            $settings['webhook_id'] = '';
+        }
+
         if ( $hook === null ) {
             $res = $api->create_webhook( $url, self::EVENTS );
             if ( is_wp_error( $res ) ) {
@@ -358,6 +432,10 @@ class Peppol {
         $settings['webhook_id']     = self::s( $hook['id'] ?? $settings['webhook_id'], 64 );
         $settings['webhook_secret'] = self::s( $hook['secret'] ?? $settings['webhook_secret'], 128 );
         self::update_settings( $settings );
+
+        if ( $settings['webhook_secret'] === '' ) {
+            wp_send_json_error( __( 'e-invoice.be gaf geen webhook-secret terug; inkomende meldingen kunnen niet gecontroleerd worden.', 'eme-accounting' ) );
+        }
 
         wp_send_json_success( [
             'webhook_id' => $settings['webhook_id'],
@@ -396,11 +474,9 @@ class Peppol {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'peppol' );
 
-        $type = isset( $_POST['type'] ) ? sanitize_key( $_POST['type'] ) : '';
-        if ( $type !== self::TYPE ) {
-            wp_send_json_error( 'Invalid attachment type.' );
-        }
-        self::get_attachments()->ajax_delete();
+        // Received invoices are part of the bookkeeping archive: not deletable
+        // from the UI (use "negeren" to hide a document instead).
+        wp_send_json_error( __( 'Ontvangen Peppol-documenten kunnen niet verwijderd worden.', 'eme-accounting' ) );
     }
 
     public static function ajax_download_attachment(): void {
@@ -463,6 +539,10 @@ class Peppol {
             // Keep the webhook response fast: downloading UBL + attachments
             // easily exceeds the 10 second delivery window.
             wp_schedule_single_event( time(), self::CRON_FETCH, [ $document_id ] );
+            // wp-cron normally only fires on the next page view; kick it now.
+            if ( function_exists( 'spawn_cron' ) ) {
+                spawn_cron();
+            }
         }
 
         return new \WP_REST_Response( [ 'ok' => true ], 200 );
@@ -506,17 +586,47 @@ class Peppol {
             return [];
         }
 
-        $api      = self::api();
-        $processed = 0;
-        $skipped   = 0;
-        $errors    = 0;
+        // Cron and "sync now" must not run side by side. A MySQL named lock is
+        // atomic (unlike a transient), so two requests cannot both acquire it.
+        global $wpdb;
+        $lock_name = self::LOCK_NAME . $wpdb->prefix;
+        $got_lock  = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_name ) );
+        if ( $got_lock != 1 ) {
+            return $manual ? new \WP_Error( 'peppol_busy', __( 'Er loopt al een synchronisatie, probeer het zo opnieuw.', 'eme-accounting' ) ) : [];
+        }
 
-        // ── 1. Normal poll: everything newer than the cursor ─────────────
-        $cursor_ts  = ! empty( $settings['cursor_created_at'] ) ? (int) strtotime( $settings['cursor_created_at'] ) : 0;
-        $cursor_ids = array_map( 'strval', (array) $settings['cursor_ids'] );
-        $newest     = '';
-        $newest_ids = [];
-        $page       = 1;
+        try {
+            return self::run_poll( $settings, $manual );
+        } finally {
+            $wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+        }
+    }
+
+    private static function run_poll( array $settings, bool $manual ): array {
+        $original_settings = $settings;
+        $api        = self::api();
+        $limit      = $manual ? self::MAX_DOCS_MANUAL : self::MAX_DOCS_PER_RUN;
+        $processed  = 0;
+        $skipped    = 0;
+        $errors     = 0;
+        $poll_error = '';
+
+        // ── 1. Normal poll: everything newer than the cursor (minus a lag) ──
+        $cursor_ts = ! empty( $settings['cursor_created_at'] ) ? (int) strtotime( $settings['cursor_created_at'] ) : 0;
+
+        // sync_from: null = settings from before this field existed (no lag),
+        // '' = no floor (full history), otherwise nothing older is imported.
+        $sync_from = $settings['sync_from'] ?? null;
+        if ( $sync_from === null ) {
+            $floor_ts = $cursor_ts;
+        } else {
+            $floor_ts = $sync_from !== '' ? (int) strtotime( (string) $sync_from ) : 0;
+        }
+        $stop_ts = $cursor_ts ? max( $floor_ts, $cursor_ts - self::CURSOR_LAG ) : $floor_ts;
+
+        $opts            = [ 'limit' => $limit, 'retry_errors' => true, 'backoff' => ! $manual ];
+        $newest          = '';
+        $page            = 1;
         $normal_complete = true;
 
         for ( $i = 0; $i < self::MAX_POLL_PAGES; $i++ ) {
@@ -529,41 +639,32 @@ class Peppol {
             if ( is_wp_error( $res ) ) {
                 $errors++;
                 $normal_complete = false;
-                $settings['last_poll_status'] = $res->get_error_message();
+                $poll_error      = $res->get_error_message();
                 break;
             }
 
             $items = is_array( $res['items'] ?? null ) ? $res['items'] : [];
             if ( $i === 0 && $items ) {
                 $newest = (string) ( $items[0]['created_at'] ?? '' );
-                foreach ( $items as $item ) {
-                    if ( (string) ( $item['created_at'] ?? '' ) === $newest && ! empty( $item['id'] ) ) {
-                        $newest_ids[] = (string) $item['id'];
-                    }
-                }
             }
 
             $eligible = [];
             $stop     = false;
             foreach ( $items as $item ) {
-                $id = (string) ( $item['id'] ?? '' );
-                if ( $id === '' ) {
+                if ( empty( $item['id'] ) ) {
                     continue;
                 }
                 $ts = ! empty( $item['created_at'] ) ? (int) strtotime( (string) $item['created_at'] ) : 0;
-                if ( $cursor_ts && $ts && $ts < $cursor_ts ) {
+                if ( $stop_ts && $ts && $ts < $stop_ts ) {
                     $stop = true;
                     break;
-                }
-                if ( $cursor_ts && $ts === $cursor_ts && in_array( $id, $cursor_ids, true ) ) {
-                    continue;
                 }
                 $eligible[] = $item;
             }
 
             $limit_hit = false;
-            if ( $eligible && ! self::process_items( $eligible, $processed, $skipped, $errors ) ) {
-                $limit_hit      = true;
+            if ( $eligible && ! self::process_items( $eligible, $processed, $skipped, $errors, $opts ) ) {
+                $limit_hit       = true;
                 $normal_complete = false;
             }
 
@@ -580,24 +681,17 @@ class Peppol {
         }
 
         // Only move the cursor when the scan finished without errors or a
-        // per-run limit. Otherwise the next poll would skip the documents
-        // that this run did not get to (they are older than the new cursor).
-        if ( $newest !== '' && $normal_complete ) {
-            $newest_ts = (int) strtotime( $newest );
-            if ( ! $cursor_ts || $newest_ts > $cursor_ts ) {
-                $settings['cursor_created_at'] = $newest;
-                $settings['cursor_ids']        = $newest_ids;
-            } elseif ( $newest_ts === $cursor_ts ) {
-                // Same instant as the stored cursor: remember the extra ids so
-                // they are not fetched again on the next poll.
-                $settings['cursor_ids'] = array_values( array_unique( array_merge( $cursor_ids, $newest_ids ) ) );
-            }
+        // per-run limit. Otherwise the next poll could skip documents that
+        // this run did not get to.
+        if ( $newest !== '' && $normal_complete && (int) strtotime( $newest ) > $cursor_ts ) {
+            $settings['cursor_created_at'] = $newest;
         }
 
         // ── 2. One-time backfill of older documents ──────────────────────
         if ( empty( $settings['backfill_done'] ) && (int) $settings['backfill_page'] > 0 ) {
-            $page    = (int) $settings['backfill_page'];
-            $pages   = 0;
+            $opts      = [ 'limit' => $limit, 'retry_errors' => false, 'backoff' => true ];
+            $page      = (int) $settings['backfill_page'];
+            $pages     = 0;
             $exhausted = false;
             $limit_hit = false;
 
@@ -610,11 +704,14 @@ class Peppol {
                 ] );
                 if ( is_wp_error( $res ) ) {
                     $errors++;
+                    if ( $poll_error === '' ) {
+                        $poll_error = $res->get_error_message();
+                    }
                     break;
                 }
 
                 $items = is_array( $res['items'] ?? null ) ? $res['items'] : [];
-                if ( $items && ! self::process_items( $items, $processed, $skipped, $errors ) ) {
+                if ( $items && ! self::process_items( $items, $processed, $skipped, $errors, $opts ) ) {
                     $limit_hit = true;
                     break;
                 }
@@ -636,16 +733,14 @@ class Peppol {
         }
 
         $settings['last_poll_at']     = gmdate( 'Y-m-d H:i:s' );
-        if ( empty( $settings['last_poll_status'] ) || $errors === 0 ) {
-            $settings['last_poll_status'] = sprintf(
-                /* translators: 1: processed, 2: skipped, 3: errors */
-                __( 'Verwerkt: %1$d, overgeslagen: %2$d, fouten: %3$d', 'eme-accounting' ),
-                $processed,
-                $skipped,
-                $errors
-            );
-        }
-        self::update_settings( $settings );
+        $settings['last_poll_status'] = $poll_error !== '' ? $poll_error : sprintf(
+            /* translators: 1: processed, 2: skipped, 3: errors */
+            __( 'Verwerkt: %1$d, overgeslagen: %2$d, fouten: %3$d', 'eme-accounting' ),
+            $processed,
+            $skipped,
+            $errors
+        );
+        self::save_runtime_state( $settings, $original_settings );
 
         return [
             'processed' => $processed,
@@ -655,29 +750,31 @@ class Peppol {
     }
 
     /**
-     * Fetch metadata/files for each inbox item that is not yet in the DB.
+     * Fetch metadata/files for each inbox item that is not yet in the DB
+     * (and, for the normal poll, retry rows that ended in an error).
      *
+     * @param array $opts limit (int), retry_errors (bool), backoff (bool).
      * @return bool False when the per-run document limit was reached.
      */
-    private static function process_items( array $items, int &$processed, int &$skipped, int &$errors ): bool {
+    private static function process_items( array $items, int &$processed, int &$skipped, int &$errors, array $opts ): bool {
         $ids = [];
         foreach ( $items as $item ) {
             if ( ! empty( $item['id'] ) ) {
                 $ids[] = (string) $item['id'];
             }
         }
-        $existing = self::existing_ids( $ids );
+        $existing = self::existing_docs( $ids );
 
         foreach ( $items as $item ) {
             $id = (string) ( $item['id'] ?? '' );
             if ( $id === '' ) {
                 continue;
             }
-            if ( isset( $existing[ $id ] ) ) {
+            if ( isset( $existing[ $id ] ) && ! self::should_retry( $existing[ $id ], $opts ) ) {
                 $skipped++;
                 continue;
             }
-            if ( $processed >= self::MAX_DOCS_PER_RUN ) {
+            if ( $processed >= (int) $opts['limit'] ) {
                 return false;
             }
             $result = self::fetch_document( $id );
@@ -690,7 +787,23 @@ class Peppol {
         return true;
     }
 
-    private static function existing_ids( array $ids ): array {
+    private static function should_retry( array $row, array $opts ): bool {
+        if ( empty( $opts['retry_errors'] ) || $row['status'] !== 'error' ) {
+            return false;
+        }
+        // e-invoice.be permanently rejected this document; retrying cannot help.
+        if ( ( $row['state'] ?? '' ) === 'FAILED' ) {
+            return false;
+        }
+        if ( empty( $opts['backoff'] ) ) {
+            return true;
+        }
+        $fetched = $row['fetched_at'] ? (int) strtotime( $row['fetched_at'] . ' UTC' ) : 0;
+        return $fetched < time() - self::RETRY_BACKOFF;
+    }
+
+    /** @return array<string, array{status:string, state:string, fetched_at:?string}> keyed by document_id */
+    private static function existing_docs( array $ids ): array {
         global $wpdb;
         $ids = array_values( array_unique( array_filter( array_map( 'strval', $ids ) ) ) );
         if ( ! $ids ) {
@@ -698,10 +811,14 @@ class Peppol {
         }
         $placeholders = implode( ',', array_fill( 0, count( $ids ), '%s' ) );
         $table        = $wpdb->prefix . self::TABLE;
-        $found        = $wpdb->get_col( $wpdb->prepare( "SELECT document_id FROM `{$table}` WHERE document_id IN ({$placeholders})", ...$ids ) ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $found        = $wpdb->get_results( $wpdb->prepare( "SELECT document_id, processing_status, state, fetched_at FROM `{$table}` WHERE document_id IN ({$placeholders})", ...$ids ), ARRAY_A ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $map          = [];
-        foreach ( (array) $found as $document_id ) {
-            $map[ (string) $document_id ] = true;
+        foreach ( (array) $found as $row ) {
+            $map[ (string) $row['document_id'] ] = [
+                'status'     => (string) $row['processing_status'],
+                'state'      => (string) $row['state'],
+                'fetched_at' => $row['fetched_at'] ?: null,
+            ];
         }
         return $map;
     }
@@ -728,7 +845,7 @@ class Peppol {
 
         $doc = $api->document( $document_id );
         if ( is_wp_error( $doc ) ) {
-            self::mark_failed( $document_id, $doc->get_error_message() );
+            self::mark_failed( $document_id, $doc->get_error_message(), false );
             return $doc;
         }
 
@@ -810,6 +927,11 @@ class Peppol {
         $data['processing_status'] = 'new';
         $inserted                  = $wpdb->insert( $table, $data );
         if ( ! $inserted ) {
+            // A parallel fetch (webhook cron vs poll) may have inserted it first.
+            $winner = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE document_id = %s", $document_id ) );
+            if ( $winner ) {
+                return (int) $winner;
+            }
             return new \WP_Error( 'peppol_db', __( 'Kon het Peppol-document niet opslaan.', 'eme-accounting' ) );
         }
         return (int) $wpdb->insert_id;
@@ -843,7 +965,7 @@ class Peppol {
             return;
         }
 
-        if ( self::get_attachments()->store_bytes( $row_id, self::TYPE, 'ubl', $name, $bytes ) === false ) {
+        if ( self::get_attachments()->store_bytes( $row_id, self::TYPE, 'ubl', $name, $bytes, [ 'xml' ] ) === false ) {
             self::set_row_error( $row_id, __( 'UBL kon niet op schijf worden bewaard.', 'eme-accounting' ) );
         }
     }
@@ -934,35 +1056,41 @@ class Peppol {
         );
     }
 
-    public static function mark_failed( string $document_id, string $message ): void {
+    /**
+     * @param bool $set_state True for the "document.received.failed" event
+     *                        (e-invoice.be could not process it). False for a
+     *                        failed fetch on our side, which must not overwrite
+     *                        the state of a document we already have.
+     */
+    public static function mark_failed( string $document_id, string $message, bool $set_state = true ): void {
         global $wpdb;
         $table = $wpdb->prefix . self::TABLE;
 
         $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE document_id = %s", $document_id ) );
         if ( $existing ) {
-            $wpdb->update(
-                $table,
-                [
-                    'state'             => 'FAILED',
-                    'processing_status' => 'error',
-                    'last_error'        => $message,
-                    'fetched_at'        => gmdate( 'Y-m-d H:i:s' ),
-                ],
-                [ 'id' => (int) $existing ]
-            );
+            $update = [
+                'processing_status' => 'error',
+                'last_error'        => $message,
+                'fetched_at'        => gmdate( 'Y-m-d H:i:s' ),
+            ];
+            if ( $set_state ) {
+                $update['state'] = 'FAILED';
+            }
+            $wpdb->update( $table, $update, [ 'id' => (int) $existing ] );
             return;
         }
 
-        $wpdb->insert( $table, [
+        $row = [
             'document_id'       => self::s( $document_id, 64 ),
             'direction'         => 'INBOUND',
-            'state'             => 'FAILED',
+            'state'             => $set_state ? 'FAILED' : '',
             'currency'          => 'EUR',
             'processing_status' => 'error',
             'last_error'        => $message,
             'received_at'       => gmdate( 'Y-m-d H:i:s' ),
             'fetched_at'        => gmdate( 'Y-m-d H:i:s' ),
-        ] );
+        ];
+        $wpdb->insert( $table, $row );
     }
 
     /* ------------------------------------------------------------------

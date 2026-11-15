@@ -16,6 +16,9 @@ class PeppolApi {
 
     const BASE_URL = 'https://api.e-invoice.be';
 
+    /** Keep in sync with EMEFileAttachments::MAX_FILE_SIZE (+1 so oversize is detectable). */
+    const MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024 + 1;
+
     private string $api_key;
 
     public function __construct( string $api_key = '' ) {
@@ -75,13 +78,6 @@ class PeppolApi {
         return $this->request( 'DELETE', '/api/webhooks/' . rawurlencode( $webhook_id ) );
     }
 
-    public function test_webhook( string $webhook_id, string $event_type, array $data ) {
-        return $this->request( 'POST', '/api/webhooks/' . rawurlencode( $webhook_id ) . '/test', [], [
-            'event_type' => $event_type,
-            'data'       => $data,
-        ] );
-    }
-
     /**
      * Download a (signed) file URL. These URLs carry their own signature
      * and must be fetched without the Authorization header.
@@ -89,9 +85,15 @@ class PeppolApi {
      * @return string|WP_Error Raw bytes on success.
      */
     public function download_file( string $url ) {
-        $response = wp_remote_get( $url, [
-            'timeout'     => 60,
-            'redirection' => 5,
+        if ( stripos( $url, 'https://' ) !== 0 ) {
+            return new \WP_Error( 'peppol_download', __( 'Download geweigerd: geen https-URL.', 'eme-accounting' ) );
+        }
+        // wp_safe_*: refuses private/loopback targets. limit_response_size
+        // stops an oversized file from being pulled into memory.
+        $response = wp_safe_remote_get( $url, [
+            'timeout'             => 60,
+            'redirection'         => 3,
+            'limit_response_size' => self::MAX_DOWNLOAD_BYTES,
         ] );
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -100,7 +102,23 @@ class PeppolApi {
         if ( $code < 200 || $code >= 300 ) {
             return new \WP_Error( 'peppol_download', sprintf( 'Download mislukt (HTTP %d).', $code ) );
         }
-        return (string) wp_remote_retrieve_body( $response );
+
+        $body            = (string) wp_remote_retrieve_body( $response );
+        $declared_header = wp_remote_retrieve_header( $response, 'content-length' );
+        $declared        = is_array( $declared_header ) ? (int) ( $declared_header[0] ?? 0 ) : (int) $declared_header;
+
+        if ( strlen( $body ) > self::MAX_DOWNLOAD_BYTES - 1 || $declared > self::MAX_DOWNLOAD_BYTES - 1 ) {
+            return new \WP_Error( 'peppol_download', __( 'Download geweigerd: bestand is te groot.', 'eme-accounting' ) );
+        }
+
+        // A short read can otherwise store a truncated PDF/UBL. Skip the check
+        // for compressed responses, where Content-Length is the encoded size.
+        $encoding = (string) wp_remote_retrieve_header( $response, 'content-encoding' );
+        if ( $declared > 0 && $encoding === '' && strlen( $body ) !== $declared ) {
+            return new \WP_Error( 'peppol_download', __( 'Download onvolledig: ontvangen bestand heeft niet de verwachte grootte.', 'eme-accounting' ) );
+        }
+
+        return $body;
     }
 
     /* ------------------------------------------------------------------

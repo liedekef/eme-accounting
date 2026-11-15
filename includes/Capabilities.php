@@ -263,6 +263,48 @@ class Capabilities {
         self::apply_profile_to_role( 'administrator', 'manager' );
     }
 
+    /**
+     * Fill access for a newly added page from the named profile each role matches.
+     *
+     * Roles that already have an explicit cap for the page are left untouched, so
+     * a manual configuration is never overwritten. For the others, the levels on
+     * all *other* pages are compared with the named profiles (viewer/bookkeeper/
+     * manager): only an exact match receives the profile's level for the new page.
+     */
+    public static function ensure_page_caps_from_profile( string $page ): void {
+        if ( ! isset( self::PAGES[ $page ] ) ) {
+            return;
+        }
+        foreach ( wp_roles()->roles as $role_slug => $role_data ) {
+            $role = get_role( $role_slug );
+            if ( ! $role ) {
+                continue;
+            }
+
+            $caps = $role_data['capabilities'] ?? [];
+            if ( ! empty( $caps[ self::cap_view( $page ) ] ) || ! empty( $caps[ self::cap_manage( $page ) ] ) ) {
+                continue;
+            }
+
+            $levels = self::caps_to_page_levels( $caps );
+            unset( $levels[ $page ] );
+
+            $level = 'none';
+            foreach ( self::PROFILES as $profile_slug => $profile ) {
+                if ( $profile_slug === 'custom' ) {
+                    continue;
+                }
+                $profile_levels = self::profile_to_page_levels( $profile_slug );
+                unset( $profile_levels[ $page ] );
+                if ( $levels === $profile_levels ) {
+                    $level = $profile['caps'][ $page ] ?? 'none';
+                    break;
+                }
+            }
+            self::apply_level( $role, $page, $level );
+        }
+    }
+
     /** On uninstall: strip all plugin caps from every role. */
     public static function remove_all_caps(): void {
         global $wp_roles;

@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'eme_accounting_db_version';
-    const DB_VERSION        = '23';
+    const DB_VERSION        = '24';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
     /**
@@ -176,6 +176,14 @@ class Installer {
                 $wpdb->query( "ALTER TABLE {$table} ADD INDEX idx_journal (journal_id)" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             }
         }
+        if ( $current_version && $current_version < 24 ) {
+            // The 'peppol' page was added in v23, but some installs already ran
+            // that version without the role sync. Fill the new page from the
+            // matching named profile (viewer/bookkeeper/manager) so existing
+            // roles keep their profile instead of turning 'custom'. Roles that
+            // already have an explicit peppol cap are left untouched.
+            \EMEAccounting\Capabilities::ensure_page_caps_from_profile( 'peppol' );
+        }
     }
 
     private static function seed_data(): void {
@@ -203,7 +211,7 @@ class Installer {
         // survives a deactivation (re-activation will reschedule if enabled).
         wp_clear_scheduled_hook( self::CRON_HOOK );
         wp_clear_scheduled_hook( 'eme_accounting_peppol_poll' );
-        wp_clear_scheduled_hook( 'eme_accounting_peppol_fetch_document' );
+        wp_unschedule_hook( 'eme_accounting_peppol_fetch_document' ); // per-document events carry args; clear_scheduled_hook() would miss them
     }
 
     public static function uninstall(): void {
@@ -236,7 +244,7 @@ class Installer {
         delete_option( 'eme_accounting_settings' );
         delete_option( 'eme_accounting_peppol_settings' );
         wp_clear_scheduled_hook( 'eme_accounting_peppol_poll' );
-        wp_clear_scheduled_hook( 'eme_accounting_peppol_fetch_document' );
+        wp_unschedule_hook( 'eme_accounting_peppol_fetch_document' ); // per-document events carry args; clear_scheduled_hook() would miss them
     }
 
     /* ------------------------------------------------------------------

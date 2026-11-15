@@ -7,12 +7,17 @@
     const ajaxUrl = cfg.ajaxUrl || emeAccounting.ajaxUrl;
     const nonce   = cfg.nonce || emeAccounting.nonce;
 
+    // esc() expects a string; JSON values can be numbers, null or undefined.
+    function E(value) { return esc(value === null || value === undefined ? '' : String(value)); }
+
     function post(action, data) {
         const fd = new FormData();
         fd.append('action', action);
         fd.append('nonce', nonce);
         Object.entries(data || {}).forEach(([k, v]) => fd.append(k, v));
-        return fetch(ajaxUrl, { method: 'POST', body: fd }).then(r => r.json());
+        return fetch(ajaxUrl, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .catch(function () { return { success: false, data: 'Netwerk- of serverfout' }; });
     }
 
     function isoRange(value) {
@@ -42,11 +47,16 @@
     };
 
     function fmtCur(value, currency) {
-        return new Intl.NumberFormat('nl-BE', {
-            style: 'currency',
-            currency: currency || emeAccounting.i18n.currency || 'EUR',
-            minimumFractionDigits: 2
-        }).format(Number(value) || 0);
+        const amount = Number(value) || 0;
+        try {
+            return new Intl.NumberFormat('nl-BE', {
+                style: 'currency',
+                currency: currency || emeAccounting.i18n.currency || 'EUR',
+                minimumFractionDigits: 2
+            }).format(amount);
+        } catch (e) { // malformed currency code from external data
+            return amount.toFixed(2) + ' ' + (currency || '');
+        }
     }
 
     /* ── Inbox table ──────────────────────────────────────────────── */
@@ -80,23 +90,23 @@
                     title: 'Factuurdatum', sortable: true, create: false, edit: false,
                     display: function (data) {
                         return data.record.invoice_date_display
-                            ? esc(data.record.invoice_date_display)
-                            : esc(data.value || '');
+                            ? E(data.record.invoice_date_display)
+                            : E(data.value || '');
                     }
                 },
                 invoice_id: {
                     title: 'Factuurnummer', sortable: true, create: false, edit: false,
                     display: function (data) {
-                        return data.value ? '<strong>' + esc(data.value) + '</strong>' : '<span style="color:#a7aaad">—</span>';
+                        return data.value ? '<strong>' + E(data.value) + '</strong>' : '<span style="color:#a7aaad">—</span>';
                     }
                 },
                 vendor_name: {
                     title: 'Leverancier', sortable: true, create: false, edit: false,
                     display: function (data) {
                         if (!data.value && !data.record.vendor_tax_id) return '';
-                        return '<span style="font-size:12px">' + esc(data.value || '') +
+                        return '<span style="font-size:12px">' + E(data.value || '') +
                             (data.record.vendor_tax_id
-                                ? '<br><span style="color:#646970">' + esc(data.record.vendor_tax_id) + '</span>'
+                                ? '<br><span style="color:#646970">' + E(data.record.vendor_tax_id) + '</span>'
                                 : '') +
                             '</span>';
                     }
@@ -105,7 +115,7 @@
                     title: 'Type', sortable: true, create: false, edit: false,
                     display: function (data) {
                         if (!data.value) return '';
-                        return '<span class="eme-acc-tag">' + esc(typeLabels[data.value] || data.value) + '</span>';
+                        return '<span class="eme-acc-tag">' + E(typeLabels[data.value] || data.value) + '</span>';
                     }
                 },
                 invoice_total: {
@@ -127,7 +137,7 @@
                     display: function (data) {
                         if (!data.value) return '';
                         const cls = data.value === 'FAILED' ? 'eme-acc-pending' : 'eme-acc-reconciled';
-                        return '<span class="eme-acc-tag ' + cls + '">' + esc(data.value) + '</span>';
+                        return '<span class="eme-acc-tag ' + cls + '">' + E(data.value) + '</span>';
                     }
                 },
                 processing_status: {
@@ -140,7 +150,7 @@
                     title: 'Ontvangen', sortable: true, create: false, edit: false,
                     display: function (data) {
                         return '<span style="font-size:11px;color:#646970">' +
-                            esc(data.record.received_at_display || data.value || '') + '</span>';
+                            E(data.record.received_at_display || data.value || '') + '</span>';
                     }
                 },
                 files: {
@@ -152,17 +162,17 @@
                 _actions: {
                     title: 'Acties', sortable: false, create: false, edit: false,
                     display: function (data) {
-                        let html = '<button type="button" class="button button-small peppol-view" data-id="' + esc(data.record.id) + '">Details</button>';
+                        let html = '<button type="button" class="button button-small peppol-view" data-id="' + E(data.record.id) + '">Details</button>';
                         if (data.record.processing_status === 'ignored') {
                             html += ' <button type="button" class="button button-small peppol-ignore" data-id="' +
-                                esc(data.record.id) + '" data-ignored="0">Terugzetten</button>';
+                                E(data.record.id) + '" data-ignored="0">Terugzetten</button>';
                         } else {
                             html += ' <button type="button" class="button button-small peppol-ignore" data-id="' +
-                                esc(data.record.id) + '" data-ignored="1">Negeren</button>';
+                                E(data.record.id) + '" data-ignored="1">Negeren</button>';
                         }
                         if (data.record.processing_status === 'error') {
                             html += ' <button type="button" class="button button-small peppol-retry" data-id="' +
-                                esc(data.record.id) + '">Opnieuw</button>';
+                                E(data.record.id) + '">Opnieuw</button>';
                         }
                         return html;
                     }
@@ -205,7 +215,7 @@
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
-        return '<tr><th style="width:220px">' + esc(label) + '</th><td>' + value + '</td></tr>';
+        return '<tr><th style="width:220px">' + E(label) + '</th><td>' + value + '</td></tr>';
     }
 
     function renderDetail(data) {
@@ -214,29 +224,29 @@
         const atts  = Array.isArray(data.attachments) ? data.attachments : [];
 
         let html = '<table class="eme-acc-table"><tbody>';
-        html += row('Factuurnummer', esc(data.invoice_id || ''));
-        html += row('Type', esc(typeLabels[data.document_type] || data.document_type || ''));
-        html += row('Factuurdatum', esc(data.invoice_date_display || data.invoice_date || ''));
-        html += row('Vervaldatum', esc(data.due_date || ''));
-        html += row('Leverancier', esc(data.vendor_name || '') +
-            (data.vendor_tax_id ? '<br><span style="color:#646970">' + esc(data.vendor_tax_id) + '</span>' : '') +
-            (data.vendor_email ? '<br><span style="color:#646970">' + esc(data.vendor_email) + '</span>' : ''));
-        html += row('Klant', esc(data.customer_name || '') +
-            (data.customer_tax_id ? '<br><span style="color:#646970">' + esc(data.customer_tax_id) + '</span>' : ''));
+        html += row('Factuurnummer', E(data.invoice_id || ''));
+        html += row('Type', E(typeLabels[data.document_type] || data.document_type || ''));
+        html += row('Factuurdatum', E(data.invoice_date_display || data.invoice_date || ''));
+        html += row('Vervaldatum', E(data.due_date || ''));
+        html += row('Leverancier', E(data.vendor_name || '') +
+            (data.vendor_tax_id ? '<br><span style="color:#646970">' + E(data.vendor_tax_id) + '</span>' : '') +
+            (data.vendor_email ? '<br><span style="color:#646970">' + E(data.vendor_email) + '</span>' : ''));
+        html += row('Klant', E(data.customer_name || '') +
+            (data.customer_tax_id ? '<br><span style="color:#646970">' + E(data.customer_tax_id) + '</span>' : ''));
         html += row('Subtotaal', fmtCur(data.subtotal, data.currency));
         html += row('BTW', fmtCur(data.total_tax, data.currency));
         html += row('Totaal', '<strong>' + fmtCur(data.invoice_total, data.currency) + '</strong>');
         html += row('Openstaand', fmtCur(data.amount_due, data.currency));
-        html += row('IBAN', esc(data.payment_iban || ''));
-        html += row('Betalingsreferentie', esc(data.payment_reference || ''));
-        html += row('Aankooporder', esc(data.purchase_order || ''));
-        html += row('Nota', esc(data.note || ''));
-        html += row('Toestand', esc(data.state || ''));
+        html += row('IBAN', E(data.payment_iban || ''));
+        html += row('Betalingsreferentie', E(data.payment_reference || ''));
+        html += row('Aankooporder', E(data.purchase_order || ''));
+        html += row('Nota', E(data.note || ''));
+        html += row('Toestand', E(data.state || ''));
         html += row('Verwerking', statusBadge(data.processing_status));
-        html += row('Ontvangen', esc(data.received_at || ''));
-        html += row('Opgehaald', esc(data.fetched_at || ''));
+        html += row('Ontvangen', E(data.received_at || ''));
+        html += row('Opgehaald', E(data.fetched_at || ''));
         if (data.last_error) {
-            html += row('Laatste fout', '<span style="color:#d63638">' + esc(data.last_error) + '</span>');
+            html += row('Laatste fout', '<span style="color:#d63638">' + E(data.last_error) + '</span>');
         }
         html += '</tbody></table>';
 
@@ -253,10 +263,10 @@
                     : (item.amount !== undefined ? item.amount : ''));
                 const vat   = item.vat_rate !== undefined ? item.vat_rate
                     : (item.tax_rate !== undefined ? item.tax_rate : '');
-                html += '<tr><td>' + esc(desc) + '</td><td>' + esc(qty) + '</td>' +
+                html += '<tr><td>' + E(desc) + '</td><td>' + E(qty) + '</td>' +
                     '<td class="amount">' + (price !== '' ? fmtCur(price, data.currency) : '') + '</td>' +
                     '<td class="amount">' + (total !== '' ? fmtCur(total, data.currency) : '') + '</td>' +
-                    '<td>' + esc(vat !== '' ? vat + '%' : '') + '</td></tr>';
+                    '<td>' + E(vat !== '' ? vat + '%' : '') + '</td></tr>';
             });
             html += '</tbody></table>';
         }
@@ -272,7 +282,7 @@
                     : (tax.base !== undefined ? tax.base : (tax.amount_base !== undefined ? tax.amount_base : ''));
                 const amt   = tax.tax_amount !== undefined ? tax.tax_amount
                     : (tax.amount !== undefined ? tax.amount : '');
-                html += '<tr><td>' + esc(cat) + '</td><td>' + esc(rate !== '' ? rate + '%' : '') + '</td>' +
+                html += '<tr><td>' + E(cat) + '</td><td>' + E(rate !== '' ? rate + '%' : '') + '</td>' +
                     '<td class="amount">' + (base !== '' ? fmtCur(base, data.currency) : '') + '</td>' +
                     '<td class="amount">' + (amt !== '' ? fmtCur(amt, data.currency) : '') + '</td></tr>';
             });
@@ -282,8 +292,8 @@
         if (atts.length) {
             html += '<h3>Bijlagen (e-invoice.be)</h3><ul style="font-size:12px">';
             atts.forEach(function (att) {
-                html += '<li>' + esc(att.file_name || att.name || att.id || '') +
-                    (att.file_type ? ' <span style="color:#646970">(' + esc(att.file_type) + ')</span>' : '') + '</li>';
+                html += '<li>' + E(att.file_name || att.name || att.id || '') +
+                    (att.file_type ? ' <span style="color:#646970">(' + E(att.file_type) + ')</span>' : '') + '</li>';
             });
             html += '</ul>';
         }
@@ -309,7 +319,7 @@
         detail.style.display = '';
         post('eme_accounting_peppol_get', { id: id }).then(function (r) {
             if (!r.success) {
-                detailBody.innerHTML = '<p style="color:#d63638">' + esc(r.data || 'Fout') + '</p>';
+                detailBody.innerHTML = '<p style="color:#d63638">' + E(r.data || 'Fout') + '</p>';
                 return;
             }
             detailRow = r.data;

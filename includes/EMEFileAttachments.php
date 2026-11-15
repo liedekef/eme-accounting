@@ -57,7 +57,7 @@ class EMEFileAttachments {
     /** Whitelist of allowed file extensions (lowercase, no dot). */
     const ALLOWED_EXTENSIONS = [
         'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ods', 'odt',
-        'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'xml',
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv',
     ];
 
     /** Maximum accepted attachment size in bytes (10 MB). */
@@ -161,15 +161,18 @@ class EMEFileAttachments {
      * @param string $key            Logical key, e.g. 'ubl', 'pdf', 'att'.
      * @param string $original_name  Original filename (used for the extension).
      * @param string $contents       Raw file bytes.
+     * @param string[] $extra_ext    Extra extensions allowed for THIS call only
+     *                               (e.g. ['xml'] for a downloaded UBL), on top of
+     *                               ALLOWED_EXTENSIONS which governs browser uploads.
      * @return string|false          Stored filename, or false on failure.
      */
-    public function store_bytes( int $id, string $type, string $key, string $original_name, string $contents ) {
+    public function store_bytes( int $id, string $type, string $key, string $original_name, string $contents, array $extra_ext = [] ) {
         if ( $contents === '' || strlen( $contents ) > self::MAX_FILE_SIZE ) {
             return false;
         }
 
         $ext = strtolower( pathinfo( $original_name, PATHINFO_EXTENSION ) );
-        if ( ! in_array( $ext, self::ALLOWED_EXTENSIONS, true ) ) {
+        if ( ! in_array( $ext, array_merge( self::ALLOWED_EXTENSIONS, $extra_ext ), true ) ) {
             return false;
         }
 
@@ -182,14 +185,16 @@ class EMEFileAttachments {
         $this->mkdir_with_index( $target );
         $this->protect_dir( $this->base_dir );
 
+        // Write to a temp name that get_files() ignores (no "-" separators), then
+        // rename, so a half-written file is never picked up as a stored attachment.
+        // (A file_exists() shortcut would be pointless: $stored embeds a fresh random id.)
         $dest = $target . '/' . $stored;
-        if ( file_exists( $dest ) ) {
-            return $stored;
-        }
+        $tmp  = $target . '/.part' . $this->random_id();
 
         // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- remote download storage
-        $written = file_put_contents( $dest, $contents );
-        if ( $written === false ) {
+        $written = file_put_contents( $tmp, $contents );
+        if ( $written !== strlen( $contents ) || ! rename( $tmp, $dest ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- same-directory atomic move
+            wp_delete_file( $tmp );
             return false;
         }
 

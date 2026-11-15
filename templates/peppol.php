@@ -3,7 +3,6 @@
 defined( 'ABSPATH' ) || exit;
 
 $peppol_status = EMEAccounting\Peppol::get_public_status();
-$peppol_settings = EMEAccounting\Peppol::get_settings();
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Peppol inbox', 'eme-accounting' ); ?></h1>
@@ -114,13 +113,13 @@ $peppol_settings = EMEAccounting\Peppol::get_settings();
     <div id="peppol-detail-body"></div>
 </div>
 
-<?php if ( ! empty( $peppol_settings['company_name'] ) ): ?>
+<?php if ( ! empty( $peppol_status['company_name'] ) ): ?>
 <p class="description">
     <?php
     printf(
         /* translators: %s: company name */
         esc_html__( 'Gekoppeld e-invoice.be bedrijf: %s', 'eme-accounting' ),
-        esc_html( $peppol_settings['company_name'] )
+        esc_html( $peppol_status['company_name'] )
     );
     ?>
 </p>
