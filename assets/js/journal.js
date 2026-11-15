@@ -128,6 +128,7 @@ function emeAccEscapeHtml(str) {
             selecting: false,
             multiselect: false,
             columnSelectButton: true,
+            csvExport: true,
             actions: {
                 listAction: emeAccounting.ajaxUrl + '?action=eme_accounting_journal_list&nonce=' + emeAccounting.nonce,
                 deleteAction: emeAccounting.ajaxUrl + '?action=eme_accounting_delete_entry&nonce=' + emeAccounting.nonce
@@ -146,7 +147,7 @@ function emeAccEscapeHtml(str) {
             toolbar: {
                 items: [
                     {
-                        text: "Export CSV",
+                        text: "Exporteer boekjaar CSV",
                         click: function(e) {
                             const link = document.createElement('a');
                             link.href = emeAccounting.ajaxUrl + '?action=eme_accounting_journal_csv&nonce=' + emeAccounting.nonce;

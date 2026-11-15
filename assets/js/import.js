@@ -65,27 +65,27 @@
             transaction_date: {
                 type: 'date',
                 dateFormat: i18n.translate_fdateformat,
-                title: 'Datum', list: true, create: false, edit: false,
+                title: i18n.date, list: true, create: false, edit: false,
             },
             description: {
-                title: 'Omschrijving', list: true, create: false, edit: false,
+                title: i18n.description, list: true, create: false, edit: false,
                 display: ( { value, record } ) =>
                 `<span title="${esc(value)}">${esc( String( value || '' ).substring( 0, 60 ) )}</span>`,
             },
             counterparty_name: {
-                title: 'Tegenpartij', list: true, create: false, edit: false,
+                title: i18n.counterparty_name, list: true, create: false, edit: false,
                 display: ( { value, record } ) =>
                 `<span style="font-size:11px">${esc(record.counterparty_name)}<br>` +
                 `<span style="color:#646970">${esc(record.counterparty_iban)}</span></span>`,
             },
             bank_ref: {
-                title: 'Ref.', list: true, create: false, edit: false,
+                title: i18n.bankref, list: true, create: false, edit: false,
                 width: '2%',
                 display: ( { value, record } ) =>
                 `<span style="font-size:11px">${esc(record.bank_ref || record.structured_ref)}</span>`,
             },
             amount: {
-                title: 'Bedrag', list: true, create: false, edit: false,
+                title: i18n.amount, list: true, create: false, edit: false,
                 listClass: 'amount',
                 width: '2%',
                 display: ( { value, record } ) => {
@@ -98,7 +98,7 @@
                 }
             },
             status: {
-                title: 'Status', list: true, create: false, edit: false,
+                title: i18n.status, list: true, create: false, edit: false,
                 width: '5%',
                 display: ( { value, record } ) => {
                     let html = statusBadge[ value ] ||
@@ -112,7 +112,7 @@
 
             /* Reconciliation action controls – only shown for pending lines */
             _actions: {
-                title: 'Acties', list: true, create: false, edit: false, sorting: false,
+                title: i18n.actions, list: true, create: false, edit: false, sorting: false,
                 display: ( { value, record } ) => {
                     if ( record.status !== 'pending' ) return '';
                     const n    = parseFloat( record.amount );
@@ -159,7 +159,7 @@
             updateBulkBar();
             initSnapSelect('select.eme_snapselect');
             initSnapSelectRemote('select.eme_snapselect_events_class', {
-                placeholder: 'Selecteer event',
+                placeholder: i18n.select_event,
                 showClearButton: true,
                 data: function(search, page) {
                     return {
@@ -347,16 +347,16 @@
                 key: true, title: '#', list: true, create: false, edit: false,
             },
             import_date: {
-                title: 'Datum', list: true, create: false, edit: false,
+                title: i18n.date, list: true, create: false, edit: false,
                 type: 'datetime',
                 dateFormat: i18n.translate_fdatetimeformat
             },
             account_name: {
-                title: 'Rekening', list: true, create: false, edit: false,
+                title: i18n.account, list: true, create: false, edit: false,
                 display: ( { value } ) => value ? esc( value ) : '',
             },
             filename: {
-                title: 'Bestand', list: true, create: false, edit: false,
+                title: i18n.filename, list: true, create: false, edit: false,
                 display: ( { record } ) => {
                     const completeBadge = record.is_complete
                         ? ' <span class="eme-acc-tag eme-acc-reconciled" title="Alle regels verwerkt">✓ Afgerond</span>'
@@ -365,33 +365,32 @@
                 },
             },
             total_lines: {
-                title: 'Totaal', list: true, create: false, edit: false,
+                title: i18n.total_lines, list: true, create: false, edit: false,
             },
             cnt_matched: {
-                title: 'Gematcht', list: true, create: false, edit: false,
+                title: i18n.cnt_matched, list: true, create: false, edit: false,
                 display: ( { value } ) =>
                     `<span class="eme-acc-tag eme-acc-reconciled">${parseInt(value)||0}</span>`,
             },
             cnt_manual: {
-                title: 'Manueel', list: true, create: false, edit: false,
+                title: i18n.cnt_manual, list: true, create: false, edit: false,
                 display: ( { value } ) =>
                     `<span class="eme-acc-tag eme-acc-manual">${parseInt(value)||0}</span>`,
             },
             cnt_pending: {
-                title: 'Open', list: true, create: false, edit: false,
+                title: i18n.cnt_pending, list: true, create: false, edit: false,
                 display: ( { value } ) =>
                     `<span class="eme-acc-tag eme-acc-pending">${parseInt(value)||0}</span>`,
             },
             cnt_ignored: {
-                title: 'Genegeerd', list: true, create: false, edit: false,
+                title: i18n.cnt_ignored, list: true, create: false, edit: false,
                 display: ( { value } ) =>
                     `<span class="eme-acc-tag eme-acc-ignored">${parseInt(value)||0}</span>`,
             },
 
             /* Bekijk – opens the lines section below */
             _view: {
-                title: ' ', list: true, create: false, edit: false, sorting: false,
-                listClass: 'ftable-command-column',
+                title: i18n.action, list: true, create: false, edit: false, sorting: false,
                 visibility: 'fixed',
                 display: ( { record } ) =>
                     `<button class="button button-small btn-view-log" data-log="${record.id}">Bekijk</button>`,
