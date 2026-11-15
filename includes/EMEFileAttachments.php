@@ -57,7 +57,7 @@ class EMEFileAttachments {
     /** Whitelist of allowed file extensions (lowercase, no dot). */
     const ALLOWED_EXTENSIONS = [
         'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ods', 'odt',
-        'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv',
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'xml',
     ];
 
     /** Maximum accepted attachment size in bytes (10 MB). */
@@ -150,6 +150,50 @@ class EMEFileAttachments {
 
             move_uploaded_file( $tmp, $dest ); //phpcs:ignore Generic.PHP.ForbiddenFunctions.Found
         }
+    }
+
+    /**
+     * Store file contents that did not come from a browser upload
+     * (for example a file downloaded from a remote API).
+     *
+     * @param int    $id             Record ID.
+     * @param string $type           Subdirectory name, e.g. 'peppol'.
+     * @param string $key            Logical key, e.g. 'ubl', 'pdf', 'att'.
+     * @param string $original_name  Original filename (used for the extension).
+     * @param string $contents       Raw file bytes.
+     * @return string|false          Stored filename, or false on failure.
+     */
+    public function store_bytes( int $id, string $type, string $key, string $original_name, string $contents ) {
+        if ( $contents === '' || strlen( $contents ) > self::MAX_FILE_SIZE ) {
+            return false;
+        }
+
+        $ext = strtolower( pathinfo( $original_name, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, self::ALLOWED_EXTENSIONS, true ) ) {
+            return false;
+        }
+
+        $stored = $this->sanitize_filename( $original_name, $key );
+        if ( $stored === false ) {
+            return false;
+        }
+
+        $target = $this->target_dir( $id, $type );
+        $this->mkdir_with_index( $target );
+        $this->protect_dir( $this->base_dir );
+
+        $dest = $target . '/' . $stored;
+        if ( file_exists( $dest ) ) {
+            return $stored;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- remote download storage
+        $written = file_put_contents( $dest, $contents );
+        if ( $written === false ) {
+            return false;
+        }
+
+        return $stored;
     }
 
     /**

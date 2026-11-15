@@ -141,6 +141,15 @@ class Assets {
             ] );
         }
 
+        if ( $plugin_page === 'emeaccounting-peppol'
+            || ( $plugin_page === 'emeaccounting-settings' && sanitize_key( $_GET['tab'] ?? '' ) === 'peppol' ) ) { //phpcs:ignore WordPress.Security.NonceVerification.Recommended -- tab switch only
+            wp_enqueue_script( 'emeaccounting-peppol', EME_ACCOUNTING_URL . 'assets/js/peppol.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
+            wp_localize_script( 'emeaccounting-peppol', 'emeAccountingPeppol', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'eme_accounting_nonce' ),
+            ] );
+        }
+
         if ( $plugin_page === 'emeaccounting-fiscal-years' ) {
             $current_year = (int) gmdate( 'Y' );
             $dates = FiscalYear::calculate_dates($current_year);

@@ -59,6 +59,7 @@ function eme_accounting_init(): void {
     EMEAccounting\FiscalYear::init();
     EMEAccounting\Journal::init();
     EMEAccounting\Import::init();
+    EMEAccounting\Peppol::init();
     EMEAccounting\Stock::init();
     EMEAccounting\Depreciation::init();
     EMEAccounting\Budget::init();

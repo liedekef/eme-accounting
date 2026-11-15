@@ -78,6 +78,47 @@ if ( isset( $_POST['emeacc_vat_nonce'] )
     }
 }
 
+// ── Handle: Peppol inbox ────────────────────────────────────────────────────
+if ( isset( $_POST['emeacc_peppol_nonce'] )
+    && Capabilities::can_manage( 'settings' )
+    && check_admin_referer( 'emeacc_peppol', 'emeacc_peppol_nonce' ) ) {
+    $peppol  = EMEAccounting\Peppol::get_settings();
+    $new_key = trim( sanitize_text_field( wp_unslash( $_POST['peppol_api_key'] ?? '' ) ) );
+
+    if ( ! empty( $_POST['peppol_clear_api_key'] ) ) {
+        $peppol['api_key'] = '';
+    } elseif ( $new_key !== '' ) {
+        $peppol['api_key'] = $new_key;
+    }
+
+    $peppol['poll_enabled'] = (int) ! empty( $_POST['peppol_poll_enabled'] );
+
+    $mode = sanitize_key( $_POST['peppol_initial_sync_mode'] ?? 'now' );
+    $peppol['initial_sync_mode'] = in_array( $mode, [ 'now', 'full' ], true ) ? $mode : 'now';
+
+    $peppol['webhook_url_override'] = esc_url_raw( wp_unslash( $_POST['peppol_webhook_url_override'] ?? '' ) );
+
+    // Apply the first-sync choice only on the first configuration or when the
+    // user explicitly asks to reset the sync position.
+    if ( ! empty( $_POST['peppol_reset_sync'] ) || empty( $peppol['cursor_created_at'] ) ) {
+        if ( $peppol['initial_sync_mode'] === 'full' ) {
+            $peppol['cursor_created_at'] = '';
+            $peppol['cursor_ids']        = [];
+            $peppol['backfill_page']     = 1;
+            $peppol['backfill_done']     = 0;
+        } else {
+            $peppol['cursor_created_at'] = gmdate( 'Y-m-d\TH:i:s\Z' );
+            $peppol['cursor_ids']        = [];
+            $peppol['backfill_page']     = 0;
+            $peppol['backfill_done']     = 1;
+        }
+    }
+
+    EMEAccounting\Peppol::update_settings( $peppol );
+    EMEAccounting\Peppol::sync_poll_cron();
+    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Peppol-instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
+}
+
 $settings = wp_parse_args( get_option( 'eme_accounting_settings', [] ), [
     'default_income_account' => 0,
     'delete_on_uninstall'    => 'no',
@@ -107,6 +148,10 @@ $active_tab   = sanitize_key( $_GET['tab'] ?? 'general' );
     <a href="<?php echo esc_url( add_query_arg( 'tab', 'vat' ) ); ?>"
         class="nav-tab <?php echo $active_tab === 'vat' ? 'nav-tab-active' : ''; ?>">
         <?php esc_html_e( 'BTW', 'eme-accounting' ); ?>
+    </a>
+    <a href="<?php echo esc_url( add_query_arg( 'tab', 'peppol' ) ); ?>"
+        class="nav-tab <?php echo $active_tab === 'peppol' ? 'nav-tab-active' : ''; ?>">
+        <?php esc_html_e( 'Peppol', 'eme-accounting' ); ?>
     </a>
     <a href="<?php echo esc_url( add_query_arg( 'tab', 'advanced' ) ); ?>"
        class="nav-tab <?php echo $active_tab === 'advanced' ? 'nav-tab-active' : ''; ?>">
@@ -418,7 +463,152 @@ foreach ( array_keys( $all_roles ) as $slug ) {
    </fieldset>
    </form>
 
-<?php else: ?> <!-- tab advanced -->
+<?php elseif ( $active_tab === 'peppol' ): ?>
+<?php
+$pp            = EMEAccounting\Peppol::get_settings();
+$pp_status     = EMEAccounting\Peppol::get_public_status();
+$masked_key    = $pp['api_key'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['api_key'], -4 ) : '';
+$masked_secret = $pp['webhook_secret'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['webhook_secret'], -4 ) : '';
+?>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     TAB: PEPPOL INBOX
+     ══════════════════════════════════════════════════════════════════════ -->
+<form method="post">
+<?php wp_nonce_field( 'emeacc_peppol', 'emeacc_peppol_nonce' ); ?>
+
+<div class="eme-acc-form-box">
+<h2><?php esc_html_e( 'e-invoice.be koppeling', 'eme-accounting' ); ?></h2>
+<table class="form-table">
+<tr>
+    <th><?php esc_html_e( 'API-key', 'eme-accounting' ); ?></th>
+    <td>
+        <?php if ( $pp['api_key'] !== '' ): ?>
+            <p><code><?php echo esc_html( $masked_key ); ?></code></p>
+            <label>
+                <input type="checkbox" name="peppol_clear_api_key" value="1">
+                <?php esc_html_e( 'API-key verwijderen', 'eme-accounting' ); ?>
+            </label>
+            <p class="description"><?php esc_html_e( 'Laat het veld hieronder leeg om de bestaande key te bewaren.', 'eme-accounting' ); ?></p>
+        <?php endif; ?>
+        <input type="password" name="peppol_api_key" value="" autocomplete="new-password" style="min-width:340px"
+               placeholder="<?php echo $pp['api_key'] !== '' ? esc_attr__( 'Nieuwe key (optioneel)', 'eme-accounting' ) : esc_attr__( 'Plak hier je e-invoice.be API-key', 'eme-accounting' ); ?>">
+        <p class="description"><?php esc_html_e( 'De key wordt niet in de pagina getoond en nooit gelogd.', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Automatisch synchroniseren', 'eme-accounting' ); ?></th>
+    <td>
+        <label>
+            <input type="checkbox" name="peppol_poll_enabled" value="1" <?php echo checked( 1, (int) $pp['poll_enabled'] ); ?>>
+            <?php esc_html_e( 'Elk uur de inbox van e-invoice.be ophalen', 'eme-accounting' ); ?>
+        </label>
+        <p class="description"><?php esc_html_e( 'De webhook levert documenten bijna onmiddellijk; de uurlijkse poll is een vangnet.', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Eerste synchronisatie', 'eme-accounting' ); ?></th>
+    <td>
+        <select name="peppol_initial_sync_mode">
+            <option value="now"  <?php echo selected( $pp['initial_sync_mode'], 'now', false ); ?>><?php esc_html_e( 'Vanaf nu (aanbevolen)', 'eme-accounting' ); ?></option>
+            <option value="full" <?php echo selected( $pp['initial_sync_mode'], 'full', false ); ?>><?php esc_html_e( 'Volledige geschiedenis', 'eme-accounting' ); ?></option>
+        </select>
+        <p class="description"><?php esc_html_e( 'De keuze geldt bij de eerste synchronisatie of wanneer je hieronder de positie reset. De geschiedenis wordt in pagina\'s van 100 opgehaald.', 'eme-accounting' ); ?></p>
+        <p>
+            <label>
+                <input type="checkbox" name="peppol_reset_sync" value="1">
+                <?php esc_html_e( 'Synchronisatiepositie resetten en bovenstaande keuze opnieuw toepassen', 'eme-accounting' ); ?>
+            </label>
+        </p>
+        <p class="description">
+            <?php if ( ! empty( $pp['cursor_created_at'] ) ): ?>
+                <?php
+                printf(
+                    /* translators: %s: cursor date */
+                    esc_html__( 'Huidige positie: documenten vanaf %s.', 'eme-accounting' ),
+                    esc_html( eme_localized_date( $pp['cursor_created_at'], EME_TIMEZONE ) )
+                );
+                ?>
+            <?php else: ?>
+                <?php esc_html_e( 'Nog geen synchronisatiepositie ingesteld.', 'eme-accounting' ); ?>
+            <?php endif; ?>
+            <?php if ( empty( $pp['backfill_done'] ) && (int) $pp['backfill_page'] > 0 ): ?>
+                <br>
+                <?php
+                printf(
+                    /* translators: %d: page number */
+                    esc_html__( 'Geschiedenis wordt opgehaald (volgende pagina: %d).', 'eme-accounting' ),
+                    (int) $pp['backfill_page']
+                );
+                ?>
+            <?php endif; ?>
+        </p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Webhook-URL overschrijven', 'eme-accounting' ); ?></th>
+    <td>
+        <input type="url" name="peppol_webhook_url_override" value="<?php echo esc_attr( $pp['webhook_url_override'] ); ?>" style="min-width:420px"
+               placeholder="<?php echo esc_attr( EMEAccounting\Peppol::webhook_url() ); ?>">
+        <p class="description"><?php esc_html_e( 'Laat leeg om de standaard REST-URL van deze site te gebruiken. Enkel nodig wanneer de site achter een proxy of alternatief domein draait.', 'eme-accounting' ); ?></p>
+        <p><code><?php echo esc_html( EMEAccounting\Peppol::webhook_url() ); ?></code></p>
+    </td>
+</tr>
+</table>
+
+<p>
+    <button type="submit" class="button button-primary"><?php esc_html_e( 'Peppol-instellingen opslaan', 'eme-accounting' ); ?></button>
+    <button type="button" id="peppol-test-connection" class="button"><?php esc_html_e( 'Verbinding testen', 'eme-accounting' ); ?></button>
+    <span id="peppol-test-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+</p>
+</div>
+</form>
+
+<div class="eme-acc-form-box">
+<h2><?php esc_html_e( 'Webhook', 'eme-accounting' ); ?></h2>
+<p>
+    <span id="peppol-webhook-state" class="eme-acc-tag <?php echo ! empty( $pp_status['webhook_configured'] ) ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
+        <?php echo ! empty( $pp_status['webhook_configured'] ) ? esc_html__( 'Actief', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
+    </span>
+    <?php if ( $masked_secret !== '' ): ?>
+        <span style="margin-left:1em;font-size:12px;color:#646970"><?php esc_html_e( 'Secret:', 'eme-accounting' ); ?> <code><?php echo esc_html( $masked_secret ); ?></code></span>
+    <?php endif; ?>
+</p>
+<p><code id="peppol-webhook-url" style="font-size:11px;word-break:break-all"><?php echo esc_html( $pp_status['webhook_url'] ); ?></code></p>
+<p>
+    <button type="button" id="peppol-webhook-sync" class="button button-secondary" <?php echo empty( $pp_status['api_configured'] ) ? 'disabled' : ''; ?>>
+        <?php esc_html_e( 'Webhook aanmaken / bijwerken', 'eme-accounting' ); ?>
+    </button>
+    <button type="button" id="peppol-webhook-delete" class="button button-link-delete" <?php echo empty( $pp_status['webhook_configured'] ) ? 'style="display:none"' : ''; ?>>
+        <?php esc_html_e( 'Webhook verwijderen', 'eme-accounting' ); ?>
+    </button>
+    <span id="peppol-webhook-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+</p>
+<p class="description"><?php esc_html_e( 'De webhook wordt automatisch ondertekend met het secret dat e-invoice.be bij aanmaak teruggeeft.', 'eme-accounting' ); ?></p>
+</div>
+
+<div class="eme-acc-form-box">
+<h2><?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?></h2>
+<p>
+    <button type="button" id="peppol-sync-now" class="button" <?php echo empty( $pp_status['api_configured'] ) ? 'disabled' : ''; ?>>
+        <?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?>
+    </button>
+    <span id="peppol-sync-result" style="margin-left:1em;font-size:13px;color:#646970">
+        <?php if ( ! empty( $pp_status['last_poll_at'] ) ): ?>
+            <?php
+            printf(
+                /* translators: %s: date */
+                esc_html__( 'Laatste synchronisatie: %s', 'eme-accounting' ),
+                esc_html( eme_localized_date( $pp_status['last_poll_at'], EME_TIMEZONE ) )
+            );
+            ?>
+        <?php endif; ?>
+    </span>
+</p>
+<p class="description"><?php esc_html_e( 'Haalt de nieuwste documenten onmiddellijk op, bovenop de uurlijkse poll.', 'eme-accounting' ); ?></p>
+</div>
+
+<?php elseif ( $active_tab === 'advanced' ): ?> <!-- tab advanced -->
 <div class="eme-acc-form-box">
 <h2><?php esc_html_e( 'Herbereken account totals', 'eme-accounting' ); ?></h2>
 <form method="post">

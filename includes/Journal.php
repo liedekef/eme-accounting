@@ -432,9 +432,16 @@ class Journal {
      */
     public static function ajax_delete_attachment(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        Capabilities::require_manage_ajax( 'journal' );
 
         $type = isset( $_POST['type'] ) ? sanitize_key( $_POST['type'] ) : '';
+        // Peppol attachments are stored by the Peppol class but share the
+        // same download/delete proxy action.
+        if ( $type === 'peppol' ) {
+            \EMEAccounting\Peppol::ajax_delete_attachment();
+            return;
+        }
+
+        Capabilities::require_manage_ajax( 'journal' );
         if ( $type !== 'journal' ) {
             wp_send_json_error( 'Invalid attachment type.' );
         }
@@ -448,9 +455,16 @@ class Journal {
      */
     public static function ajax_download_attachment(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        Capabilities::require_view_ajax( 'journal' );
 
         $type = isset( $_GET['type'] ) ? sanitize_key( $_GET['type'] ) : '';
+        // Peppol attachments are stored by the Peppol class but share the
+        // same download/delete proxy action.
+        if ( $type === 'peppol' ) {
+            \EMEAccounting\Peppol::ajax_download_attachment();
+            return;
+        }
+
+        Capabilities::require_view_ajax( 'journal' );
         if ( $type !== 'journal' ) {
             wp_die( 'Invalid attachment type.', '', [ 'response' => 400 ] );
         }

@@ -34,6 +34,7 @@ class Menu {
             [ 'emeaccounting',              __( 'Dashboard', 'eme-accounting' ),              'dashboard',    [ __CLASS__, 'page_dashboard' ] ],
             [ 'emeaccounting-journal',      __( 'Dagboek', 'eme-accounting' ),                'journal',      [ __CLASS__, 'page_journal' ] ],
             [ 'emeaccounting-import',       __( 'Import / Reconciliatie', 'eme-accounting' ), 'import',       [ __CLASS__, 'page_import' ] ],
+            [ 'emeaccounting-peppol',       __( 'Peppol inbox', 'eme-accounting' ),           'peppol',       [ __CLASS__, 'page_peppol' ] ],
             [ 'emeaccounting-stock',        __( 'Stock', 'eme-accounting' ),                  'stock',        [ __CLASS__, 'page_stock' ] ],
             [ 'emeaccounting-depreciation', __( 'Afschrijvingen', 'eme-accounting' ),         'depreciation', [ __CLASS__, 'page_depreciation' ] ],
             [ 'emeaccounting-budget',       __( 'Begroting', 'eme-accounting' ),              'budget',       [ __CLASS__, 'page_budget' ] ],
@@ -78,6 +79,7 @@ class Menu {
     public static function page_dashboard():    void { self::load_template( 'dashboard',    'dashboard' ); }
     public static function page_journal():      void { self::load_template( 'journal',      'journal' ); }
     public static function page_import():       void { self::load_template( 'import',       'import' ); }
+    public static function page_peppol():       void { self::load_template( 'peppol',       'peppol' ); }
     public static function page_stock():        void { self::load_template( 'stock',        'stock' ); }
     public static function page_depreciation(): void { self::load_template( 'depreciation', 'depreciation' ); }
     public static function page_patrimony():    void { self::load_template( 'patrimony',    'patrimony' ); }

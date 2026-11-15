@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'eme_accounting_db_version';
-    const DB_VERSION        = '22';
+    const DB_VERSION        = '23';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
     /**
@@ -88,6 +88,8 @@ class Installer {
         \EMEAccounting\Capabilities::add_caps_to_admin();
         // In case of re-activation with a pre-existing 'yes' setting.
         self::sync_weekly_rebuild_cron();
+        // Re-arm the Peppol poll when it was already configured.
+        \EMEAccounting\Peppol::sync_poll_cron();
         //flush_rewrite_rules();
     }
 
@@ -200,6 +202,8 @@ class Installer {
         // Always clear, regardless of the setting, so no orphaned cron event
         // survives a deactivation (re-activation will reschedule if enabled).
         wp_clear_scheduled_hook( self::CRON_HOOK );
+        wp_clear_scheduled_hook( 'eme_accounting_peppol_poll' );
+        wp_clear_scheduled_hook( 'eme_accounting_peppol_fetch_document' );
     }
 
     public static function uninstall(): void {
@@ -230,6 +234,9 @@ class Installer {
         delete_option( self::DB_VERSION_OPTION );
         delete_option( 'eme_accounting_delete_on_uninstall' );
         delete_option( 'eme_accounting_settings' );
+        delete_option( 'eme_accounting_peppol_settings' );
+        wp_clear_scheduled_hook( 'eme_accounting_peppol_poll' );
+        wp_clear_scheduled_hook( 'eme_accounting_peppol_fetch_document' );
     }
 
     /* ------------------------------------------------------------------
@@ -521,6 +528,50 @@ class Installer {
             KEY idx_status_log (status, import_log_id),
             KEY idx_journal (journal_id)
         ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+        // ── Peppol inbox (e-invoice.be) ─────────────────────────────────
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}emeacc_peppol_documents (
+            id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            document_id          VARCHAR(64)     NOT NULL,
+            direction            VARCHAR(16)     NOT NULL DEFAULT 'INBOUND',
+            state                VARCHAR(20)     NOT NULL DEFAULT 'RECEIVED',
+            document_type        VARCHAR(40)     NOT NULL DEFAULT '',
+            invoice_id           VARCHAR(100)    NOT NULL DEFAULT '',
+            invoice_date         DATE                     DEFAULT NULL,
+            due_date             DATE                     DEFAULT NULL,
+            currency             VARCHAR(3)      NOT NULL DEFAULT 'EUR',
+            purchase_order       VARCHAR(100)    NOT NULL DEFAULT '',
+            vendor_name          VARCHAR(255)    NOT NULL DEFAULT '',
+            vendor_tax_id        VARCHAR(64)     NOT NULL DEFAULT '',
+            vendor_company_id    VARCHAR(64)     NOT NULL DEFAULT '',
+            vendor_email         VARCHAR(190)    NOT NULL DEFAULT '',
+            vendor_address       TEXT,
+            customer_name        VARCHAR(255)    NOT NULL DEFAULT '',
+            customer_tax_id      VARCHAR(64)     NOT NULL DEFAULT '',
+            customer_company_id  VARCHAR(64)     NOT NULL DEFAULT '',
+            subtotal             DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            total_tax            DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            invoice_total        DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            amount_due           DECIMAL(14,2)   NOT NULL DEFAULT 0.00,
+            payment_iban         VARCHAR(34)     NOT NULL DEFAULT '',
+            payment_reference    VARCHAR(140)    NOT NULL DEFAULT '',
+            note                 TEXT,
+            items_json           LONGTEXT,
+            tax_details_json     LONGTEXT,
+            attachments_json     LONGTEXT,
+            raw_json             LONGTEXT,
+            processing_status    VARCHAR(20)     NOT NULL DEFAULT 'new',
+            last_error           TEXT,
+            received_at          DATETIME                 DEFAULT NULL,
+            fetched_at           DATETIME                 DEFAULT NULL,
+            created_at           DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at           DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_document (document_id),
+            KEY idx_state (state),
+            KEY idx_invoice_date (invoice_date),
+            KEY idx_status (processing_status)
+        ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
     }
 
     /* ------------------------------------------------------------------
@@ -529,6 +580,8 @@ class Installer {
     private static function drop_tables(): void {
         global $wpdb;
         $tables = [
+            'emeacc_peppol_documents',
+            'emeacc_patrimony',
             'emeacc_fiscal_years',
             'emeacc_import_lines',
             'emeacc_import_log',
