@@ -21,11 +21,11 @@ if (empty($fiscal_years)) {
     <div>
         <label><?php esc_html_e( 'Rapporttype', 'eme-accounting' ); ?></label>
         <select id="report_type">
-            <optgroup label="Extern">
+            <optgroup label="Officiële rapporten">
                 <option value="income_expenditure"><?php esc_html_e( 'Staat van Ontvangsten en Uitgaven', 'eme-accounting' ); ?></option>
                 <option value="vat_report" <?php disabled( ! (bool) ( \EMEVzw\Config::get()->vat_liable ?? false ) ); ?>><?php esc_html_e( 'BTW-aangifte overzicht', 'eme-accounting' ); ?></option>
             </optgroup>
-            <optgroup label="Intern">
+            <optgroup label="Interne rapporten">
                 <option value="patrimony"><?php esc_html_e( 'Financiële status vermogen', 'eme-accounting' ); ?></option>
                 <option value="cashflow"><?php esc_html_e( 'Cashflow per maand', 'eme-accounting' ); ?></option>
                 <option value="financial_diary"><?php esc_html_e( 'Financieel Dagboek', 'eme-accounting' ); ?></option>
