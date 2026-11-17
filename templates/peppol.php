@@ -101,19 +101,6 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
         <?php endif; ?>
     </td>
 </tr>
-<?php if ( $api_configured ): ?>
-<tr>
-    <th><?php esc_html_e( 'Webhook', 'eme-accounting' ); ?></th>
-    <td>
-        <?php if ( ! empty( $peppol_status['webhook_configured'] ) ): ?>
-            <span class="eme-acc-tag eme-acc-reconciled"><?php esc_html_e( 'Actief', 'eme-accounting' ); ?></span>
-        <?php else: ?>
-            <span class="eme-acc-tag eme-acc-pending"><?php esc_html_e( 'Niet geconfigureerd', 'eme-accounting' ); ?></span>
-        <?php endif; ?>
-        <br><code style="font-size:11px;word-break:break-all"><?php echo esc_html( $peppol_status['webhook_url'] ); ?></code>
-    </td>
-</tr>
-<?php endif; ?>
 </tbody>
 </table>
 <p>
