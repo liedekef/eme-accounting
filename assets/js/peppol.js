@@ -692,7 +692,7 @@
                 }
                 setText('peppol-mailbox-test-result', 'Verbonden met ' +
                     (r.data.mailbox || 'mailbox') + ': ' + (r.data.messages || 0) +
-                    ' berichten, ' + (r.data.unseen || 0) + ' ongelezen.');
+                    ' berichten in de map.');
             });
         });
     }
