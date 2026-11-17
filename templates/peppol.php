@@ -3,6 +3,13 @@
 defined( 'ABSPATH' ) || exit;
 
 $peppol_status = EMEAccounting\PeppolEInvoice::get_public_status();
+$imap_status   = EMEAccounting\PeppolImap::get_public_status();
+
+$api_configured  = ! empty( $peppol_status['api_configured'] );
+$imap_configured = ! empty( $imap_status['configured'] );
+$imap_available  = ! empty( $imap_status['available'] );
+$api_auto        = $api_configured && ! empty( $peppol_status['poll_enabled'] );
+$imap_auto       = $imap_available && $imap_configured && ! empty( $imap_status['enabled'] );
 
 $can_manage = EMEAccounting\Capabilities::can_manage( 'peppol' );
 $booking_accounts = [];
@@ -18,10 +25,10 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Peppol inbox', 'eme-accounting' ); ?></h1>
 
-<?php if ( empty( $peppol_status['api_configured'] ) ): ?>
+<?php if ( ! $api_configured && ! $imap_configured ): ?>
 <div class="notice notice-warning">
     <p>
-        <?php esc_html_e( 'Er is nog geen Peppol API-key ingesteld. Configureer de koppeling met e-invoice.be voordat je documenten kan ophalen.', 'eme-accounting' ); ?>
+        <?php esc_html_e( 'Er is nog geen Peppol-bron ingesteld. Configureer een API-key voor e-invoice.be of een e-mailbox voordat je documenten kan ophalen.', 'eme-accounting' ); ?>
         <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-settings&tab=peppol' ) ); ?>"><?php esc_html_e( 'Naar de Peppol-instellingen', 'eme-accounting' ); ?></a>
     </p>
 </div>
@@ -34,12 +41,25 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 <tr>
     <th style="width:240px"><?php esc_html_e( 'Laatste synchronisatie', 'eme-accounting' ); ?></th>
     <td>
-        <?php if ( ! empty( $peppol_status['last_poll_at'] ) ): ?>
+        <?php $has_last_sync = false; ?>
+        <?php if ( $api_configured && ! empty( $peppol_status['last_poll_at'] ) ): ?>
+            <?php $has_last_sync = true; ?>
+            <strong><?php esc_html_e( 'e-invoice.be', 'eme-accounting' ); ?>:</strong>
             <?php echo esc_html( eme_localized_date( $peppol_status['last_poll_at'], EME_TIMEZONE ) ); ?>
             <?php if ( ! empty( $peppol_status['last_poll_status'] ) ): ?>
                 <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $peppol_status['last_poll_status'] ); ?></span>
             <?php endif; ?>
-        <?php else: ?>
+        <?php endif; ?>
+        <?php if ( $imap_configured && ! empty( $imap_status['last_poll_at'] ) ): ?>
+            <?php if ( $has_last_sync ): ?><br><?php endif; ?>
+            <?php $has_last_sync = true; ?>
+            <strong><?php esc_html_e( 'Mailbox', 'eme-accounting' ); ?>:</strong>
+            <?php echo esc_html( eme_localized_date( $imap_status['last_poll_at'], EME_TIMEZONE ) ); ?>
+            <?php if ( ! empty( $imap_status['last_poll_status'] ) ): ?>
+                <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $imap_status['last_poll_status'] ); ?></span>
+            <?php endif; ?>
+        <?php endif; ?>
+        <?php if ( ! $has_last_sync ): ?>
             <span style="color:#646970"><?php esc_html_e( 'Nog niet uitgevoerd', 'eme-accounting' ); ?></span>
         <?php endif; ?>
     </td>
@@ -47,12 +67,28 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 <tr>
     <th><?php esc_html_e( 'Automatische synchronisatie', 'eme-accounting' ); ?></th>
     <td>
-        <?php if ( ! empty( $peppol_status['poll_enabled'] ) && ! empty( $peppol_status['api_configured'] ) ): ?>
+        <?php if ( $api_auto || $imap_auto ): ?>
             <span class="eme-acc-tag eme-acc-reconciled"><?php esc_html_e( 'Uurlijks actief', 'eme-accounting' ); ?></span>
         <?php else: ?>
             <span class="eme-acc-tag eme-acc-pending"><?php esc_html_e( 'Uit', 'eme-accounting' ); ?></span>
         <?php endif; ?>
-        <?php if ( empty( $peppol_status['backfill_done'] ) && (int) $peppol_status['backfill_page'] > 0 ): ?>
+        <?php if ( $api_configured ): ?>
+            <br><span style="font-size:12px;color:#646970">
+                <?php echo $api_auto ? esc_html__( 'API: uurlijks actief', 'eme-accounting' ) : esc_html__( 'API: uit', 'eme-accounting' ); ?>
+            </span>
+        <?php endif; ?>
+        <?php if ( $imap_configured ): ?>
+            <br><span style="font-size:12px;color:#646970">
+                <?php if ( ! $imap_available ): ?>
+                    <?php esc_html_e( 'Mailbox: IMAP-client niet beschikbaar', 'eme-accounting' ); ?>
+                <?php elseif ( $imap_auto ): ?>
+                    <?php esc_html_e( 'Mailbox: uurlijks actief', 'eme-accounting' ); ?>
+                <?php else: ?>
+                    <?php esc_html_e( 'Mailbox: uit', 'eme-accounting' ); ?>
+                <?php endif; ?>
+            </span>
+        <?php endif; ?>
+        <?php if ( $api_configured && empty( $peppol_status['backfill_done'] ) && (int) $peppol_status['backfill_page'] > 0 ): ?>
             <br><span style="font-size:12px;color:#646970">
                 <?php
                 printf(
@@ -65,6 +101,7 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
         <?php endif; ?>
     </td>
 </tr>
+<?php if ( $api_configured ): ?>
 <tr>
     <th><?php esc_html_e( 'Webhook', 'eme-accounting' ); ?></th>
     <td>
@@ -76,16 +113,25 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
         <br><code style="font-size:11px;word-break:break-all"><?php echo esc_html( $peppol_status['webhook_url'] ); ?></code>
     </td>
 </tr>
+<?php endif; ?>
 </tbody>
 </table>
 <p>
-    <button type="button" id="peppol-api-sync" class="button button-primary" <?php echo empty( $peppol_status['api_configured'] ) ? 'disabled' : ''; ?>>
-        <?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?>
-    </button>
+    <?php if ( $api_configured ): ?>
+        <button type="button" id="peppol-api-sync" class="button button-primary">
+            <?php esc_html_e( 'API nu synchroniseren', 'eme-accounting' ); ?>
+        </button>
+        <span id="peppol-api-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+    <?php endif; ?>
+    <?php if ( $imap_configured ): ?>
+        <button type="button" id="peppol-mailbox-sync" class="button" <?php echo $imap_available ? '' : 'disabled'; ?>>
+            <?php esc_html_e( 'Mailbox nu synchroniseren', 'eme-accounting' ); ?>
+        </button>
+        <span id="peppol-mailbox-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+    <?php endif; ?>
     <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-settings&tab=peppol' ) ); ?>" class="button">
         <?php esc_html_e( 'Peppol-instellingen', 'eme-accounting' ); ?>
     </a>
-    <span id="peppol-api-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
 </p>
 </div>
 
