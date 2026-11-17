@@ -103,23 +103,6 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 </tr>
 </tbody>
 </table>
-<p>
-    <?php if ( $api_configured ): ?>
-        <button type="button" id="peppol-api-sync" class="button button-primary">
-            <?php esc_html_e( 'API nu synchroniseren', 'eme-accounting' ); ?>
-        </button>
-        <span id="peppol-api-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
-    <?php endif; ?>
-    <?php if ( $imap_configured ): ?>
-        <button type="button" id="peppol-mailbox-sync" class="button" <?php echo $imap_available ? '' : 'disabled'; ?>>
-            <?php esc_html_e( 'Mailbox nu synchroniseren', 'eme-accounting' ); ?>
-        </button>
-        <span id="peppol-mailbox-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
-    <?php endif; ?>
-    <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-settings&tab=peppol' ) ); ?>" class="button">
-        <?php esc_html_e( 'Peppol-instellingen', 'eme-accounting' ); ?>
-    </a>
-</p>
 </div>
 
 <?php if ( $can_manage ): ?>

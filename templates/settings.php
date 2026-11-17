@@ -529,8 +529,8 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
 <form method="post">
 <?php wp_nonce_field( 'emeacc_peppol', 'emeacc_peppol_nonce' ); ?>
 
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'e-invoice.be koppeling', 'eme-accounting' ); ?></h2>
+<details class="eme-acc-form-box">
+<summary><b><?php esc_html_e( 'e-invoice.be koppeling', 'eme-accounting' ); ?></b></summary>
 <table class="form-table">
 <tr>
     <th><?php esc_html_e( 'API-key', 'eme-accounting' ); ?></th>
@@ -635,10 +635,10 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
         <?php endif; ?>
     </span>
 </p>
-</div>
+</details>
 
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'E-mailbox koppeling', 'eme-accounting' ); ?></h2>
+<details class="eme-acc-form-box">
+<summary><b><?php esc_html_e( 'E-mailbox koppeling', 'eme-accounting' ); ?></b></summary>
 <?php if ( empty( $imap_status['available'] ) ): ?>
     <div class="notice notice-warning inline"><p><?php esc_html_e( 'De interne IMAP-client is niet beschikbaar op deze server.', 'eme-accounting' ); ?></p></div>
 <?php endif; ?>
@@ -726,7 +726,7 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
         ?>
     </p>
 <?php endif; ?>
-</div>
+</details>
 </form>
 
 <?php elseif ( $active_tab === 'advanced' ): ?> <!-- tab advanced -->
