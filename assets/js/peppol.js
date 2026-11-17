@@ -46,6 +46,12 @@
         return '<span class="eme-acc-tag eme-acc-pending">Nieuw</span>';
     };
 
+    function bookingBadge(data) {
+        return data.booking_status === 'booked'
+            ? '<span class="eme-acc-tag eme-acc-reconciled">Geboekt</span>'
+            : '<span class="eme-acc-tag eme-acc-pending">Niet geboekt</span>';
+    }
+
     function fmtCur(value, currency) {
         const amount = Number(value) || 0;
         try {
@@ -79,6 +85,7 @@
                     search: (document.getElementById('peppol-search-filter') || {}).value || '',
                     document_type: (document.getElementById('peppol-type-filter') || {}).value || '',
                     status: (document.getElementById('peppol-status-filter') || {}).value || '',
+                    booking_status: (document.getElementById('peppol-booking-filter') || {}).value || '',
                     daterange: isoRange((document.getElementById('peppol-daterange-filter') || {}).value || '')
                 };
             },
@@ -132,7 +139,7 @@
                         return fmtCur(data.value, data.record.currency);
                     }
                 },
-                state: {
+                peppol_status: {
                     title: 'Toestand', sortable: true, create: false, edit: false,
                     display: function (data) {
                         if (!data.value) return '';
@@ -144,6 +151,17 @@
                     title: 'Status', sortable: true, create: false, edit: false,
                     display: function (data) {
                         return statusBadge(data.value);
+                    }
+                },
+                booking_status: {
+                    title: 'Boeking', sortable: true, create: false, edit: false,
+                    display: function (data) {
+                        if (data.value === 'booked') {
+                            const url = data.record.journal_edit_url;
+                            return '<span class="eme-acc-tag eme-acc-reconciled">Geboekt</span>' +
+                                (url ? ' <a href="' + E(url) + '">#' + E(data.record.journal_id) + '</a>' : '');
+                        }
+                        return '<span class="eme-acc-tag eme-acc-pending">Niet geboekt</span>';
                     }
                 },
                 received_at: {
@@ -182,7 +200,7 @@
 
         table.load();
 
-        const filterIds = ['peppol-type-filter', 'peppol-status-filter', 'peppol-daterange-filter'];
+        const filterIds = ['peppol-type-filter', 'peppol-status-filter', 'peppol-booking-filter', 'peppol-daterange-filter'];
         filterIds.forEach(function (id) {
             const el = document.getElementById(id);
             if (el) el.addEventListener('change', function () { table.reload(); });
@@ -241,8 +259,20 @@
         html += row('Betalingsreferentie', E(data.payment_reference || ''));
         html += row('Aankooporder', E(data.purchase_order || ''));
         html += row('Nota', E(data.note || ''));
-        html += row('Toestand', E(data.state || ''));
+        html += row('Toestand', E(data.peppol_status || ''));
         html += row('Verwerking', statusBadge(data.processing_status));
+        let bookingHtml = bookingBadge(data);
+        if (data.booking_status === 'booked') {
+            if (data.journal_edit_url) {
+                bookingHtml += ' <a href="' + E(data.journal_edit_url) + '">Open boeking #' + E(data.journal_id) + '</a>';
+            }
+            if (cfg.canManage) {
+                bookingHtml += ' <button type="button" class="button button-small peppol-unlink">Ontkoppel</button>';
+            }
+        } else if (cfg.canManage) {
+            bookingHtml += ' <button type="button" class="button button-small peppol-book-open">Boek naar dagboek</button>';
+        }
+        html += row('Boeking', bookingHtml);
         html += row('Ontvangen', E(data.received_at || ''));
         html += row('Opgehaald', E(data.fetched_at || ''));
         if (data.last_error) {
@@ -327,8 +357,212 @@
         });
     }
 
+    /* ── Manual booking ───────────────────────────────────────────── */
+    const bookingBox        = document.getElementById('peppol-booking');
+    const bookingForm       = document.getElementById('peppol-booking-form');
+    const bookingCandidates = document.getElementById('peppol-booking-candidates');
+    const bookingResult     = document.getElementById('peppol-booking-result');
+
+    function bookingDirection(data) {
+        return String(data.document_type || '').indexOf('CREDIT_NOTE') !== -1 ? 'in' : 'out';
+    }
+
+    function bookingAmount(data) {
+        const amount = Math.abs(Number(data.invoice_total) || 0) ||
+            Math.abs(Number(data.amount_due) || 0);
+        return amount;
+    }
+
+    function bookingDescription(data) {
+        const label = bookingDirection(data) === 'in' ? 'Peppol creditnota' : 'Peppol factuur';
+        let text = label;
+        if (data.invoice_id) text += ' ' + data.invoice_id;
+        if (data.vendor_name) text += ' – ' + data.vendor_name;
+        return text;
+    }
+
+    function amountInput(value) {
+        return (Number(value) || 0).toFixed(2).replace('.', ',');
+    }
+
+    function bookingValues() {
+        const data = {};
+        if (!bookingForm) return data;
+        new FormData(bookingForm).forEach(function (value, key) { data[key] = value; });
+        return data;
+    }
+
+    function openBookingForm(data) {
+        if (!bookingBox || !bookingForm || !data) return;
+
+        bookingForm.reset();
+        bookingForm.querySelector('#peppol-booking-id').value = data.id || '';
+        bookingForm.querySelector('#peppol-booking-date').value =
+            data.invoice_date || new Date().toISOString().slice(0, 10);
+        bookingForm.querySelector('#peppol-booking-amount').value = amountInput(bookingAmount(data));
+        bookingForm.querySelector('#peppol-booking-description').value = bookingDescription(data);
+        bookingForm.querySelector('#peppol-booking-reference').value =
+            data.payment_reference || data.invoice_id || '';
+
+        const direction = bookingDirection(data);
+        const info = document.getElementById('peppol-booking-info');
+        if (info) {
+            info.textContent = (data.invoice_id || data.document_id || '') +
+                (data.vendor_name ? ' – ' + data.vendor_name : '');
+        }
+        const dirInfo = document.getElementById('peppol-booking-direction');
+        if (dirInfo) {
+            dirInfo.textContent = direction === 'in'
+                ? 'Richting: ontvangst (creditnota)'
+                : 'Richting: uitgave (factuur)';
+        }
+
+        Array.from(bookingForm.querySelectorAll('#peppol-booking-coa option')).forEach(function (option) {
+            if (!option.value) return;
+            if (option.dataset.originalDisabled === undefined) {
+                option.dataset.originalDisabled = option.disabled ? '1' : '0';
+            }
+            const matches = option.dataset.direction === direction;
+            option.hidden = !matches;
+            option.disabled = option.dataset.originalDisabled === '1' || !matches;
+        });
+        const coaSelect = bookingForm.querySelector('#peppol-booking-coa');
+        if (coaSelect && coaSelect.selectedOptions.length && coaSelect.selectedOptions[0].disabled) {
+            coaSelect.value = '';
+        }
+
+        if (!bookingForm.querySelector('#peppol-booking-account').value) {
+            const accountSelect = bookingForm.querySelector('#peppol-booking-account');
+            if (accountSelect.options.length === 2) {
+                accountSelect.selectedIndex = 1;
+            }
+        }
+
+        if (bookingCandidates) bookingCandidates.innerHTML = '';
+        if (bookingResult) {
+            bookingResult.textContent = '';
+            bookingResult.style.color = '';
+        }
+        bookingBox.style.display = '';
+        bookingBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function renderBookingCandidates(candidates) {
+        if (!bookingCandidates) return;
+
+        let html = '<h3>Bestaande boekingen met hetzelfde bedrag</h3>';
+        if (!candidates.length) {
+            html += '<p>Geen bestaande boeking gevonden.</p>';
+        } else {
+            html += '<table class="eme-acc-table"><thead><tr>' +
+                '<th>Datum</th><th>Omschrijving</th><th>Bedrag</th><th>Status</th><th></th>' +
+                '</tr></thead><tbody>';
+            candidates.forEach(function (candidate) {
+                html += '<tr><td>' + E(candidate.entry_date_display || candidate.entry_date) + '</td>' +
+                    '<td>' + E(candidate.description) + '</td>' +
+                    '<td class="amount">' + fmtCur(candidate.amount) + '</td>' +
+                    '<td>' + (Number(candidate.is_reconciled)
+                        ? '<span class="eme-acc-tag eme-acc-reconciled">Afgestemd</span>'
+                        : '<span class="eme-acc-tag eme-acc-pending">Open</span>') + '</td>' +
+                    '<td><button type="button" class="button button-small peppol-book-link" data-journal-id="' +
+                    E(candidate.id) + '">Koppel</button></td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        html += '<p><button type="button" id="peppol-book-force" class="button">' +
+            'Toch een nieuwe boeking aanmaken</button></p>';
+        bookingCandidates.innerHTML = html;
+    }
+
+    function handleBookingResponse(r) {
+        if (!bookingResult) return;
+        if (!r.success) {
+            bookingResult.textContent = r.data || 'Fout';
+            bookingResult.style.color = '#d63638';
+            return;
+        }
+        if (r.data && r.data.needs_choice) {
+            renderBookingCandidates(r.data.candidates || []);
+            bookingResult.textContent = 'Er bestaat al een passende boeking. Kies een bestaande boeking of maak toch een nieuwe.';
+            bookingResult.style.color = '#646970';
+            return;
+        }
+        if (bookingBox) bookingBox.style.display = 'none';
+        if (bookingCandidates) bookingCandidates.innerHTML = '';
+        if (table) table.reload();
+        if (detailRow) openDetail(detailRow.id);
+    }
+
+    if (bookingForm) {
+        bookingForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (bookingResult) {
+                bookingResult.textContent = 'Bezig…';
+                bookingResult.style.color = '#646970';
+            }
+            post('eme_accounting_peppol_book', bookingValues()).then(handleBookingResponse);
+        });
+    }
+
     /* ── Delegated clicks ─────────────────────────────────────────── */
     document.addEventListener('click', function (e) {
+        const bookOpen = e.target.closest('.peppol-book-open');
+        if (bookOpen && detailRow) {
+            openBookingForm(detailRow);
+            return;
+        }
+
+        const unlink = e.target.closest('.peppol-unlink');
+        if (unlink && detailRow) {
+            if (!window.confirm('Boeking ontkoppelen? De journaalboeking blijft bestaan.')) return;
+            unlink.disabled = true;
+            post('eme_accounting_peppol_unlink', { id: detailRow.id }).then(function (r) {
+                unlink.disabled = false;
+                if (!r.success) { alert(r.data || 'Fout'); return; }
+                if (table) table.reload();
+                openDetail(detailRow.id);
+            });
+            return;
+        }
+
+        const link = e.target.closest('.peppol-book-link');
+        if (link) {
+            const data = bookingValues();
+            data.journal_id = link.dataset.journalId;
+            link.disabled = true;
+            if (bookingResult) {
+                bookingResult.textContent = 'Bezig…';
+                bookingResult.style.color = '#646970';
+            }
+            post('eme_accounting_peppol_link', data).then(function (r) {
+                link.disabled = false;
+                handleBookingResponse(r);
+            });
+            return;
+        }
+
+        if (e.target.id === 'peppol-book-force') {
+            const data = bookingValues();
+            data.force_create = 1;
+            e.target.disabled = true;
+            if (bookingResult) {
+                bookingResult.textContent = 'Bezig…';
+                bookingResult.style.color = '#646970';
+            }
+            const forceButton = e.target;
+            post('eme_accounting_peppol_book', data).then(function (r) {
+                forceButton.disabled = false;
+                handleBookingResponse(r);
+            });
+            return;
+        }
+
+        if (e.target.id === 'peppol-booking-cancel') {
+            if (bookingBox) bookingBox.style.display = 'none';
+            if (bookingCandidates) bookingCandidates.innerHTML = '';
+            return;
+        }
+
         const view = e.target.closest('.peppol-view');
         if (view) {
             openDetail(view.dataset.id);
@@ -441,6 +675,44 @@
                 setText('peppol-test-result', 'Verbonden met ' +
                     (r.data.company_name || 'e-invoice.be') +
                     (r.data.company_email ? ' (' + r.data.company_email + ')' : ''));
+            });
+        });
+    }
+
+    const mailboxTest = document.getElementById('peppol-mailbox-test');
+    if (mailboxTest) {
+        mailboxTest.addEventListener('click', function () {
+            mailboxTest.disabled = true;
+            setText('peppol-mailbox-test-result', 'Bezig…');
+            post('eme_accounting_peppol_mailbox_test', {}).then(function (r) {
+                mailboxTest.disabled = false;
+                if (!r.success) {
+                    setText('peppol-mailbox-test-result', r.data || 'Fout');
+                    return;
+                }
+                setText('peppol-mailbox-test-result', 'Verbonden met ' +
+                    (r.data.mailbox || 'mailbox') + ': ' + (r.data.messages || 0) +
+                    ' berichten, ' + (r.data.unseen || 0) + ' ongelezen.');
+            });
+        });
+    }
+
+    const mailboxSync = document.getElementById('peppol-mailbox-sync');
+    if (mailboxSync) {
+        mailboxSync.addEventListener('click', function () {
+            mailboxSync.disabled = true;
+            setText('peppol-mailbox-sync-result', 'Bezig…');
+            post('eme_accounting_peppol_mailbox_sync', {}).then(function (r) {
+                mailboxSync.disabled = false;
+                if (!r.success) {
+                    setText('peppol-mailbox-sync-result', r.data || 'Fout');
+                    return;
+                }
+                const s = r.data.summary || {};
+                setText('peppol-mailbox-sync-result', 'Verwerkt: ' + (s.processed || 0) +
+                    ', overgeslagen: ' + (s.skipped || 0) +
+                    ', fouten: ' + (s.errors || 0));
+                if (table) table.reload();
             });
         });
     }

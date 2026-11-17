@@ -34,7 +34,7 @@ class Peppol {
     const MAX_DOCS_MANUAL    = 25;     // "sync now" runs inside an AJAX request
     const CURSOR_LAG         = 86400;  // re-scan a day behind the cursor; dedupe is a cheap DB lookup
     const RETRY_BACKOFF      = 3600;   // seconds before an errored document is retried by cron
-    const LOCK_NAME          = 'emeacc_peppol_poll_';
+    const LOCK_KEY           = 'eme_accounting_peppol_lock';
 
     const EVENTS = [ 'document.received', 'document.received.failed' ];
 
@@ -122,30 +122,12 @@ class Peppol {
      * fresh copy of the settings. poll() can run for minutes; writing back the
      * array it read at the start would overwrite an API key, webhook id/secret
      * or poll toggle saved in the meantime.
-     *
-     * The sync position itself is only written when it still matches the
-     * snapshot taken at the start of the run: a reset performed while the poll
-     * was running must not be reverted by the poll's stale cursor.
      */
-    private static function save_runtime_state( array $local, array $original ): void {
-        $fresh   = self::get_settings();
-        $runtime = [ 'cursor_created_at', 'backfill_page', 'backfill_done' ];
-
-        $changed = false;
-        foreach ( $runtime as $key ) {
-            if ( (string) ( $fresh[ $key ] ?? '' ) !== (string) ( $original[ $key ] ?? '' ) ) {
-                $changed = true;
-                break;
-            }
+    private static function save_runtime_state( array $local ): void {
+        $fresh = self::get_settings();
+        foreach ( [ 'cursor_created_at', 'backfill_page', 'backfill_done', 'last_poll_at', 'last_poll_status' ] as $key ) {
+            $fresh[ $key ] = $local[ $key ];
         }
-        if ( ! $changed ) {
-            foreach ( $runtime as $key ) {
-                $fresh[ $key ] = $local[ $key ];
-            }
-        }
-
-        $fresh['last_poll_at']     = $local['last_poll_at'];
-        $fresh['last_poll_status'] = $local['last_poll_status'];
         self::update_settings( $fresh );
     }
 
@@ -380,7 +362,7 @@ class Peppol {
         $hook     = null;
 
         if ( ! empty( $settings['webhook_id'] ) ) {
-            $res = $api->update_webhook( $settings['webhook_id'], [ 'url' => $url, 'events' => self::EVENTS ] );
+            $res = $api->update_webhook( $settings['webhook_id'], [ 'url' => $url, 'events' => self::EVENTS, 'enabled' => true ] );
             if ( ! is_wp_error( $res ) ) {
                 $hook = $res;
             } elseif ( $res->get_error_code() === 'peppol_404' ) {
@@ -406,19 +388,13 @@ class Peppol {
             }
         }
 
-        // The secret is normally only returned when a webhook is created. A hook
-        // we have no secret for can never be verified (every delivery would get
-        // a 503), so replace it instead of adopting it.
-        if ( $hook !== null && empty( $hook['secret'] ) && empty( $settings['webhook_secret'] ) ) {
-            $stale_id = (string) ( $hook['id'] ?? $settings['webhook_id'] );
-            if ( $stale_id !== '' ) {
-                $del = $api->delete_webhook( $stale_id );
-                if ( is_wp_error( $del ) && $del->get_error_code() !== 'peppol_404' ) {
-                    wp_send_json_error( $del->get_error_message() );
-                }
+        // An adopted webhook may have been disabled on the e-invoice.be side.
+        if ( $hook !== null && ( $hook['enabled'] ?? true ) === false && ! empty( $hook['id'] ) ) {
+            $res = $api->update_webhook( (string) $hook['id'], [ 'url' => $url, 'events' => self::EVENTS, 'enabled' => true ] );
+            if ( is_wp_error( $res ) ) {
+                wp_send_json_error( $res->get_error_message() );
             }
-            $hook                   = null;
-            $settings['webhook_id'] = '';
+            $hook = $res;
         }
 
         if ( $hook === null ) {
@@ -586,24 +562,20 @@ class Peppol {
             return [];
         }
 
-        // Cron and "sync now" must not run side by side. A MySQL named lock is
-        // atomic (unlike a transient), so two requests cannot both acquire it.
-        global $wpdb;
-        $lock_name = self::LOCK_NAME . $wpdb->prefix;
-        $got_lock  = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_name ) );
-        if ( $got_lock != 1 ) {
+        // Cron and "sync now" must not run side by side.
+        if ( get_transient( self::LOCK_KEY ) ) {
             return $manual ? new \WP_Error( 'peppol_busy', __( 'Er loopt al een synchronisatie, probeer het zo opnieuw.', 'eme-accounting' ) ) : [];
         }
+        set_transient( self::LOCK_KEY, 1, 10 * MINUTE_IN_SECONDS );
 
         try {
             return self::run_poll( $settings, $manual );
         } finally {
-            $wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+            delete_transient( self::LOCK_KEY );
         }
     }
 
     private static function run_poll( array $settings, bool $manual ): array {
-        $original_settings = $settings;
         $api        = self::api();
         $limit      = $manual ? self::MAX_DOCS_MANUAL : self::MAX_DOCS_PER_RUN;
         $processed  = 0;
@@ -740,7 +712,7 @@ class Peppol {
             $skipped,
             $errors
         );
-        self::save_runtime_state( $settings, $original_settings );
+        self::save_runtime_state( $settings );
 
         return [
             'processed' => $processed,
@@ -791,10 +763,6 @@ class Peppol {
         if ( empty( $opts['retry_errors'] ) || $row['status'] !== 'error' ) {
             return false;
         }
-        // e-invoice.be permanently rejected this document; retrying cannot help.
-        if ( ( $row['state'] ?? '' ) === 'FAILED' ) {
-            return false;
-        }
         if ( empty( $opts['backoff'] ) ) {
             return true;
         }
@@ -802,7 +770,7 @@ class Peppol {
         return $fetched < time() - self::RETRY_BACKOFF;
     }
 
-    /** @return array<string, array{status:string, state:string, fetched_at:?string}> keyed by document_id */
+    /** @return array<string, array{status:string, fetched_at:?string}> keyed by document_id */
     private static function existing_docs( array $ids ): array {
         global $wpdb;
         $ids = array_values( array_unique( array_filter( array_map( 'strval', $ids ) ) ) );
@@ -811,12 +779,11 @@ class Peppol {
         }
         $placeholders = implode( ',', array_fill( 0, count( $ids ), '%s' ) );
         $table        = $wpdb->prefix . self::TABLE;
-        $found        = $wpdb->get_results( $wpdb->prepare( "SELECT document_id, processing_status, state, fetched_at FROM `{$table}` WHERE document_id IN ({$placeholders})", ...$ids ), ARRAY_A ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $found        = $wpdb->get_results( $wpdb->prepare( "SELECT document_id, processing_status, fetched_at FROM `{$table}` WHERE document_id IN ({$placeholders})", ...$ids ), ARRAY_A ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $map          = [];
         foreach ( (array) $found as $row ) {
             $map[ (string) $row['document_id'] ] = [
                 'status'     => (string) $row['processing_status'],
-                'state'      => (string) $row['state'],
                 'fetched_at' => $row['fetched_at'] ?: null,
             ];
         }
@@ -1083,13 +1050,15 @@ class Peppol {
         $row = [
             'document_id'       => self::s( $document_id, 64 ),
             'direction'         => 'INBOUND',
-            'state'             => $set_state ? 'FAILED' : '',
             'currency'          => 'EUR',
             'processing_status' => 'error',
             'last_error'        => $message,
             'received_at'       => gmdate( 'Y-m-d H:i:s' ),
             'fetched_at'        => gmdate( 'Y-m-d H:i:s' ),
         ];
+        if ( $set_state ) {
+            $row['state'] = 'FAILED';
+        }
         $wpdb->insert( $table, $row );
     }
 

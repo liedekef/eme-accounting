@@ -449,6 +449,32 @@ class Import {
             if ( $id ) return $id;
         }
 
+        // A Peppol booking is made on the invoice date, while the bank
+        // payment can arrive months later. Match those entries before the
+        // narrow ±3 day window, otherwise the payment would be booked twice.
+        $id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT j.id FROM `{$wpdb->prefix}emeacc_journal` j
+                 INNER JOIN `{$wpdb->prefix}emeacc_peppol_documents` p ON p.journal_id = j.id
+                 WHERE j.account_id = %d
+                   AND j.amount     = %f
+                   AND j.direction  = %s
+                   AND j.transfer_id IS NULL
+                   AND j.is_closing_entry = 0
+                   AND NOT EXISTS ( SELECT 1 FROM `{$wpdb->prefix}emeacc_import_lines` il WHERE il.journal_id = j.id )
+                   AND j.entry_date BETWEEN DATE_SUB(%s, INTERVAL 365 DAY) AND DATE_ADD(%s, INTERVAL 7 DAY)
+                 ORDER BY ABS(DATEDIFF(j.entry_date, %s))
+                 LIMIT 1",
+                $account_id,
+                abs( (float) $line->amount ),
+                (float) $line->amount >= 0 ? 'in' : 'out',
+                $line->transaction_date,
+                $line->transaction_date,
+                $line->transaction_date
+            )
+        );
+        if ( $id ) return $id;
+
         // Try date + amount within ±3 days
         $id = (int) $wpdb->get_var(
             $wpdb->prepare(

@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'eme_accounting_db_version';
-    const DB_VERSION        = '24';
+    const DB_VERSION        = '26';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
     /**
@@ -90,6 +90,7 @@ class Installer {
         self::sync_weekly_rebuild_cron();
         // Re-arm the Peppol poll when it was already configured.
         \EMEAccounting\Peppol::sync_poll_cron();
+        \EMEAccounting\PeppolImap::sync_cron();
         //flush_rewrite_rules();
     }
 
@@ -184,6 +185,59 @@ class Installer {
             // already have an explicit peppol cap are left untouched.
             \EMEAccounting\Capabilities::ensure_page_caps_from_profile( 'peppol' );
         }
+        if ( $current_version && $current_version < 26 ) {
+            // Manual booking of a Peppol document links it to one journal entry.
+            // Version 25 briefly added a separate booking_status column; version
+            // 26 derives it from journal_id and renames state to peppol_status.
+            self::migrate_peppol_documents_table();
+        }
+    }
+
+    /**
+     * Bring the Peppol table to the version 26 schema.
+     *
+     * Idempotent so both a 24 → 26 upgrade and a 25 → 26 upgrade land in the
+     * same state, and so a partially migrated table can be repaired.
+     */
+    private static function migrate_peppol_documents_table(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'emeacc_peppol_documents';
+
+        $has_state         = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'state' ) ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $has_peppol_status = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'peppol_status' ) ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        if ( $has_state && ! $has_peppol_status ) {
+            $wpdb->query( "ALTER TABLE `{$table}` CHANGE COLUMN state peppol_status VARCHAR(20) NOT NULL DEFAULT 'RECEIVED'" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+
+        // booked/unbooked is derived from journal_id, so drop the intermediate column.
+        if ( $wpdb->get_var( "SHOW INDEX FROM `{$table}` WHERE Key_name = 'idx_booking_status'" ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` DROP INDEX idx_booking_status" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'booking_status' ) ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` DROP COLUMN booking_status" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+
+        $columns = [
+            'journal_id' => "ALTER TABLE `{$table}` ADD COLUMN journal_id BIGINT UNSIGNED DEFAULT NULL",
+            'booked_at'  => "ALTER TABLE `{$table}` ADD COLUMN booked_at DATETIME DEFAULT NULL",
+            'booked_by'  => "ALTER TABLE `{$table}` ADD COLUMN booked_by BIGINT UNSIGNED DEFAULT NULL",
+        ];
+        foreach ( $columns as $column => $sql ) {
+            $exists = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", $column ) ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            if ( ! $exists ) {
+                $wpdb->query( $sql ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+            }
+        }
+
+        if ( ! $wpdb->get_var( "SHOW INDEX FROM `{$table}` WHERE Key_name = 'uniq_peppol_journal'" ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` ADD UNIQUE KEY uniq_peppol_journal (journal_id)" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+        if ( ! $wpdb->get_var( "SHOW INDEX FROM `{$table}` WHERE Key_name = 'idx_peppol_status'" ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` ADD INDEX idx_peppol_status (peppol_status)" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+        if ( $wpdb->get_var( "SHOW INDEX FROM `{$table}` WHERE Key_name = 'idx_state'" ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` DROP INDEX idx_state" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
     }
 
     private static function seed_data(): void {
@@ -211,6 +265,7 @@ class Installer {
         // survives a deactivation (re-activation will reschedule if enabled).
         wp_clear_scheduled_hook( self::CRON_HOOK );
         wp_clear_scheduled_hook( 'eme_accounting_peppol_poll' );
+        wp_clear_scheduled_hook( 'eme_accounting_peppol_imap_poll' );
         wp_unschedule_hook( 'eme_accounting_peppol_fetch_document' ); // per-document events carry args; clear_scheduled_hook() would miss them
     }
 
@@ -244,6 +299,7 @@ class Installer {
         delete_option( 'eme_accounting_settings' );
         delete_option( 'eme_accounting_peppol_settings' );
         wp_clear_scheduled_hook( 'eme_accounting_peppol_poll' );
+        wp_clear_scheduled_hook( 'eme_accounting_peppol_imap_poll' );
         wp_unschedule_hook( 'eme_accounting_peppol_fetch_document' ); // per-document events carry args; clear_scheduled_hook() would miss them
     }
 
@@ -542,7 +598,7 @@ class Installer {
             id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             document_id          VARCHAR(64)     NOT NULL,
             direction            VARCHAR(16)     NOT NULL DEFAULT 'INBOUND',
-            state                VARCHAR(20)     NOT NULL DEFAULT 'RECEIVED',
+            peppol_status        VARCHAR(20)     NOT NULL DEFAULT 'RECEIVED',
             document_type        VARCHAR(40)     NOT NULL DEFAULT '',
             invoice_id           VARCHAR(100)    NOT NULL DEFAULT '',
             invoice_date         DATE                     DEFAULT NULL,
@@ -569,6 +625,9 @@ class Installer {
             attachments_json     LONGTEXT,
             raw_json             LONGTEXT,
             processing_status    VARCHAR(20)     NOT NULL DEFAULT 'new',
+            journal_id           BIGINT UNSIGNED          DEFAULT NULL,
+            booked_at            DATETIME                 DEFAULT NULL,
+            booked_by            BIGINT UNSIGNED          DEFAULT NULL,
             last_error           TEXT,
             received_at          DATETIME                 DEFAULT NULL,
             fetched_at           DATETIME                 DEFAULT NULL,
@@ -576,7 +635,8 @@ class Installer {
             updated_at           DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY uniq_document (document_id),
-            KEY idx_state (state),
+            UNIQUE KEY uniq_peppol_journal (journal_id),
+            KEY idx_peppol_status (peppol_status),
             KEY idx_invoice_date (invoice_date),
             KEY idx_status (processing_status)
         ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared

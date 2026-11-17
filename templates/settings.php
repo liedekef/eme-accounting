@@ -94,6 +94,30 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
     }
 
     $peppol['poll_enabled'] = (int) ! empty( $_POST['peppol_poll_enabled'] );
+    $peppol['imap_enabled'] = (int) ! empty( $_POST['peppol_imap_enabled'] );
+
+    $peppol['imap_host'] = sanitize_text_field( wp_unslash( $_POST['peppol_imap_host'] ?? '' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $imap_port           = (int) ( $_POST['peppol_imap_port'] ?? 993 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $peppol['imap_port'] = $imap_port > 0 && $imap_port <= 65535 ? $imap_port : 993;
+
+    $imap_encryption          = sanitize_key( $_POST['peppol_imap_encryption'] ?? 'ssl' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $peppol['imap_encryption'] = in_array( $imap_encryption, [ 'ssl', 'tls', 'none' ], true ) ? $imap_encryption : 'ssl';
+    $peppol['imap_username']   = sanitize_text_field( wp_unslash( $_POST['peppol_imap_username'] ?? '' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $peppol['imap_folder']     = sanitize_text_field( wp_unslash( $_POST['peppol_imap_folder'] ?? 'INBOX' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    if ( $peppol['imap_folder'] === '' ) {
+        $peppol['imap_folder'] = 'INBOX';
+    }
+    $peppol['imap_mark_seen']    = (int) ! empty( $_POST['peppol_imap_mark_seen'] );
+    $imap_max                    = (int) ( $_POST['peppol_imap_max_messages'] ?? 25 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $peppol['imap_max_messages'] = max( 1, min( 100, $imap_max ) );
+
+    $raw_password = $_POST['peppol_imap_password'] ?? ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+    $new_password = is_string( $raw_password ) ? preg_replace( '/[\x00-\x1F\x7F]/', '', wp_unslash( $raw_password ) ) : '';
+    if ( ! empty( $_POST['peppol_imap_clear_password'] ) ) {
+        $peppol['imap_password'] = '';
+    } elseif ( $new_password !== '' ) {
+        $peppol['imap_password'] = mb_substr( $new_password, 0, 255 );
+    }
 
     $mode = sanitize_key( $_POST['peppol_initial_sync_mode'] ?? 'now' );
     $mode = in_array( $mode, [ 'now', 'full' ], true ) ? $mode : 'now';
@@ -116,6 +140,7 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
 
     EMEAccounting\Peppol::update_settings( $peppol );
     EMEAccounting\Peppol::sync_poll_cron();
+    EMEAccounting\PeppolImap::sync_cron();
     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Peppol-instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
     if ( $webhook_rejected ) {
         echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'De webhook-URL moet met https:// beginnen en is niet opgeslagen.', 'eme-accounting' ) . '</p></div>';
@@ -473,8 +498,10 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 <?php
 $pp            = EMEAccounting\Peppol::get_settings();
 $pp_status     = EMEAccounting\Peppol::get_public_status();
+$imap_status   = EMEAccounting\PeppolImap::get_public_status();
 $masked_key    = $pp['api_key'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['api_key'], -4 ) : '';
 $masked_secret = $pp['webhook_secret'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['webhook_secret'], -4 ) : '';
+$masked_imap   = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['imap_password'], -4 ) : '';
 ?>
 
 <!-- ══════════════════════════════════════════════════════════════════════
@@ -567,6 +594,101 @@ $masked_secret = $pp['webhook_secret'] !== '' ? str_repeat( '•', 8 ) . substr(
     <button type="button" id="peppol-test-connection" class="button"><?php esc_html_e( 'Verbinding testen', 'eme-accounting' ); ?></button>
     <span id="peppol-test-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
 </p>
+</div>
+
+<div class="eme-acc-form-box">
+<h2><?php esc_html_e( 'E-mailbox (Doccle)', 'eme-accounting' ); ?></h2>
+<?php if ( empty( $imap_status['available'] ) ): ?>
+    <div class="notice notice-warning inline"><p><?php esc_html_e( 'De interne IMAP-client is niet beschikbaar op deze server.', 'eme-accounting' ); ?></p></div>
+<?php endif; ?>
+<table class="form-table">
+<tr>
+    <th><?php esc_html_e( 'Mailbox inschakelen', 'eme-accounting' ); ?></th>
+    <td>
+        <label>
+            <input type="checkbox" name="peppol_imap_enabled" value="1" <?php echo checked( 1, (int) $pp['imap_enabled'], false ); ?>>
+            <?php esc_html_e( 'Elk uur XML-bijlagen uit de mailbox ophalen', 'eme-accounting' ); ?>
+        </label>
+        <p class="description"><?php esc_html_e( 'Gebruik een aparte mailbox waarin Doccle de Peppol-facturen doorstuurt. De UBL-XML en eventuele PDF worden in dezelfde Peppol-inbox bewaard.', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'IMAP-server', 'eme-accounting' ); ?></th>
+    <td>
+        <input type="text" name="peppol_imap_host" value="<?php echo esc_attr( $pp['imap_host'] ); ?>" style="min-width:260px" placeholder="imap.example.be">
+        <input type="number" name="peppol_imap_port" value="<?php echo esc_attr( (string) $pp['imap_port'] ); ?>" min="1" max="65535" style="width:90px">
+        <select name="peppol_imap_encryption">
+            <option value="ssl"  <?php echo selected( $pp['imap_encryption'], 'ssl', false ); ?>>SSL</option>
+            <option value="tls"  <?php echo selected( $pp['imap_encryption'], 'tls', false ); ?>>STARTTLS</option>
+            <option value="none" <?php echo selected( $pp['imap_encryption'], 'none', false ); ?>><?php esc_html_e( 'Geen', 'eme-accounting' ); ?></option>
+        </select>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Gebruiker', 'eme-accounting' ); ?></th>
+    <td>
+        <input type="text" name="peppol_imap_username" value="<?php echo esc_attr( $pp['imap_username'] ); ?>" style="min-width:320px" autocomplete="username">
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Wachtwoord', 'eme-accounting' ); ?></th>
+    <td>
+        <?php if ( $pp['imap_password'] !== '' ): ?>
+            <p><code><?php echo esc_html( $masked_imap ); ?></code></p>
+            <label>
+                <input type="checkbox" name="peppol_imap_clear_password" value="1">
+                <?php esc_html_e( 'Wachtwoord verwijderen', 'eme-accounting' ); ?>
+            </label>
+            <p class="description"><?php esc_html_e( 'Laat het veld hieronder leeg om het bestaande wachtwoord te bewaren.', 'eme-accounting' ); ?></p>
+        <?php endif; ?>
+        <input type="password" name="peppol_imap_password" value="" autocomplete="new-password" style="min-width:320px"
+               placeholder="<?php echo $pp['imap_password'] !== '' ? esc_attr__( 'Nieuw wachtwoord (optioneel)', 'eme-accounting' ) : esc_attr__( 'IMAP-wachtwoord', 'eme-accounting' ); ?>">
+        <p class="description"><?php esc_html_e( 'Het wachtwoord wordt niet in de pagina getoond en nooit gelogd.', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Map', 'eme-accounting' ); ?></th>
+    <td>
+        <input type="text" name="peppol_imap_folder" value="<?php echo esc_attr( $pp['imap_folder'] ); ?>" style="min-width:220px" placeholder="INBOX">
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Verwerking', 'eme-accounting' ); ?></th>
+    <td>
+        <label>
+            <input type="checkbox" name="peppol_imap_mark_seen" value="1" <?php echo checked( 1, (int) $pp['imap_mark_seen'], false ); ?>>
+            <?php esc_html_e( 'Berichten na verwerking als gelezen markeren', 'eme-accounting' ); ?>
+        </label>
+        <p>
+            <label>
+                <?php esc_html_e( 'Maximaal aantal berichten per synchronisatie:', 'eme-accounting' ); ?>
+                <input type="number" name="peppol_imap_max_messages" value="<?php echo esc_attr( (string) $pp['imap_max_messages'] ); ?>" min="1" max="100" style="width:80px">
+            </label>
+        </p>
+        <p class="description"><?php esc_html_e( 'Enkel berichten met een UBL-XML-bijlage worden geïmporteerd. Dubbels worden herkend aan de UBL-UUID.', 'eme-accounting' ); ?></p>
+    </td>
+</tr>
+</table>
+
+<p>
+    <button type="submit" class="button button-primary"><?php esc_html_e( 'Peppol-instellingen opslaan', 'eme-accounting' ); ?></button>
+    <button type="button" id="peppol-mailbox-test" class="button" <?php echo empty( $imap_status['available'] ) ? 'disabled' : ''; ?>><?php esc_html_e( 'Mailbox testen', 'eme-accounting' ); ?></button>
+    <button type="button" id="peppol-mailbox-sync" class="button" <?php echo empty( $imap_status['available'] ) || empty( $imap_status['configured'] ) ? 'disabled' : ''; ?>><?php esc_html_e( 'Mailbox nu synchroniseren', 'eme-accounting' ); ?></button>
+    <span id="peppol-mailbox-test-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+    <span id="peppol-mailbox-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+</p>
+<?php if ( $imap_status['last_poll_at'] !== '' ): ?>
+    <p class="description">
+        <?php
+        printf(
+            /* translators: 1: date, 2: status */
+            esc_html__( 'Laatste mailbox-synchronisatie: %1$s — %2$s', 'eme-accounting' ),
+            esc_html( eme_localized_date( $imap_status['last_poll_at'], EME_TIMEZONE ) ),
+            esc_html( $imap_status['last_poll_status'] )
+        );
+        ?>
+    </p>
+<?php endif; ?>
 </div>
 </form>
 

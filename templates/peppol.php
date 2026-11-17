@@ -3,6 +3,17 @@
 defined( 'ABSPATH' ) || exit;
 
 $peppol_status = EMEAccounting\Peppol::get_public_status();
+
+$can_manage = EMEAccounting\Capabilities::can_manage( 'peppol' );
+$booking_accounts = [];
+foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
+    if ( empty( $acc->is_active ) ) {
+        continue;
+    }
+    $label = $acc->name . ( $acc->iban ? ' (' . $acc->iban . ')' : '' );
+    $booking_accounts[ (int) $acc->id ] = $label;
+}
+$booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Peppol inbox', 'eme-accounting' ); ?></h1>
@@ -96,6 +107,11 @@ $peppol_status = EMEAccounting\Peppol::get_public_status();
         <option value="ignored"><?php esc_html_e( 'Genegeerd', 'eme-accounting' ); ?></option>
         <option value="error"><?php esc_html_e( 'Fout', 'eme-accounting' ); ?></option>
     </select>
+    <select id="peppol-booking-filter">
+        <option value=""><?php esc_html_e( 'Alle boekingen', 'eme-accounting' ); ?></option>
+        <option value="unbooked"><?php esc_html_e( 'Niet geboekt', 'eme-accounting' ); ?></option>
+        <option value="booked"><?php esc_html_e( 'Geboekt', 'eme-accounting' ); ?></option>
+    </select>
     <input type='text' id='peppol-daterange-filter' name='peppol-daterange-filter' placeholder='<?php esc_attr_e( 'Filter op factuurdatum', 'eme-accounting' ); ?>' data-autoclose='false' data-range='true' data-multiple-separator=' -- ' data-date='' style='width: 22ch;' class='eme_formfield_fdate'>
     <button type="button" id="peppol-filter-apply" class="button"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
 </div>
@@ -112,6 +128,81 @@ $peppol_status = EMEAccounting\Peppol::get_public_status();
     </p>
     <div id="peppol-detail-body"></div>
 </div>
+
+<?php if ( $can_manage ): ?>
+<div id="peppol-booking" class="eme-acc-form-box" style="display:none">
+    <h2><?php esc_html_e( 'Boek naar dagboek', 'eme-accounting' ); ?></h2>
+    <p id="peppol-booking-info" class="description"></p>
+    <form id="peppol-booking-form">
+        <input type="hidden" name="id" id="peppol-booking-id" value="">
+
+        <div class="eme-acc-row-3">
+            <div class="eme-acc-field">
+                <label><?php esc_html_e( 'Datum', 'eme-accounting' ); ?> *</label>
+                <input type="date" name="entry_date" id="peppol-booking-date" required>
+            </div>
+            <div class="eme-acc-field">
+                <label><?php esc_html_e( 'Bedrag (€)', 'eme-accounting' ); ?> *</label>
+                <input type="text" name="amount" id="peppol-booking-amount" inputmode="decimal"
+                       oninput="this.value=this.value.replace(/[^0-9,.]/g,'');" required>
+            </div>
+            <div class="eme-acc-field">
+                <label><?php esc_html_e( 'Rekening', 'eme-accounting' ); ?> *</label>
+                <select name="account_id" id="peppol-booking-account" required>
+                    <option value=""><?php esc_html_e( '— Kies rekening —', 'eme-accounting' ); ?></option>
+                    <?php foreach ( $booking_accounts as $acc_id => $acc_label ): ?>
+                        <option value="<?php echo (int) $acc_id; ?>"><?php echo esc_html( $acc_label ); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="eme-acc-row">
+            <div class="eme-acc-field">
+                <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?> *</label>
+                <select name="coa_id" id="peppol-booking-coa" required>
+                    <option value=""><?php esc_html_e( '— Kies rubriek —', 'eme-accounting' ); ?></option>
+                    <optgroup label="<?php esc_attr_e( 'Ontvangsten', 'eme-accounting' ); ?>">
+                        <?php foreach ( $booking_coa as $coa ): ?>
+                            <?php if ( ( $coa->direction ?? '' ) !== 'in' || empty( $coa->is_active ) ) continue; ?>
+                            <option value="<?php echo (int) $coa->id; ?>" data-direction="in" <?php disabled( empty( $coa->parent_id ) ); ?>>
+                                <?php echo esc_html( $coa->code . ' - ' . $coa->name ); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                    <optgroup label="<?php esc_attr_e( 'Uitgaven', 'eme-accounting' ); ?>">
+                        <?php foreach ( $booking_coa as $coa ): ?>
+                            <?php if ( ( $coa->direction ?? '' ) !== 'out' || empty( $coa->is_active ) ) continue; ?>
+                            <option value="<?php echo (int) $coa->id; ?>" data-direction="out" <?php disabled( empty( $coa->parent_id ) ); ?>>
+                                <?php echo esc_html( $coa->code . ' - ' . $coa->name ); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+
+        <div class="eme-acc-row">
+            <div class="eme-acc-field">
+                <label><?php esc_html_e( 'Omschrijving', 'eme-accounting' ); ?> *</label>
+                <input type="text" name="description" id="peppol-booking-description" maxlength="255" required>
+            </div>
+            <div class="eme-acc-field">
+                <label><?php esc_html_e( 'Betalingsreferentie', 'eme-accounting' ); ?></label>
+                <input type="text" name="bank_statement_ref" id="peppol-booking-reference" maxlength="100">
+            </div>
+        </div>
+
+        <p class="description" id="peppol-booking-direction"></p>
+        <p>
+            <button type="submit" class="button button-primary"><?php esc_html_e( 'Boeken', 'eme-accounting' ); ?></button>
+            <button type="button" id="peppol-booking-cancel" class="button"><?php esc_html_e( 'Annuleren', 'eme-accounting' ); ?></button>
+            <span id="peppol-booking-result" style="margin-left:1em"></span>
+        </p>
+    </form>
+    <div id="peppol-booking-candidates"></div>
+</div>
+<?php endif; ?>
 
 <?php if ( ! empty( $peppol_status['company_name'] ) ): ?>
 <p class="description">
