@@ -33,5 +33,11 @@ The plugin requires the Events Made Easy plugin.
 
 == Changelog ==
 
+= 1.1.1 =
+* Added IMAP for Peppol too
+
+= 1.1.0 =
+* Peppol added
+
 = 1.0.0 =
 * First release.
