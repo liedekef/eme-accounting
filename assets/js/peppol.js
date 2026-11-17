@@ -692,7 +692,7 @@
                 }
                 setText('peppol-mailbox-test-result', 'Verbonden met ' +
                     (r.data.mailbox || 'mailbox') + ': ' + (r.data.messages || 0) +
-                    ' berichten, ' + (r.data.unseen || 0) + ' ongelezen.');
+                    ' berichten in de map.');
             });
         });
     }
@@ -714,6 +714,77 @@
                     ', fouten: ' + (s.errors || 0));
                 if (table) table.reload();
             });
+        });
+    }
+
+    const mailboxResync = document.getElementById('peppol-mailbox-resync');
+    if (mailboxResync) {
+        mailboxResync.addEventListener('click', function () {
+            if (!window.confirm('Alle berichten in de mailbox opnieuw verwerken? Reeds geïmporteerde facturen worden herkend en niet dubbel opgeslagen.')) return;
+            mailboxResync.disabled = true;
+            const totals = { processed: 0, skipped: 0, errors: 0 };
+            const summary = function () {
+                return 'Verwerkt: ' + totals.processed + ', overgeslagen: ' + totals.skipped + ', fouten: ' + totals.errors;
+            };
+            const finish = function (text) {
+                mailboxResync.disabled = false;
+                setText('peppol-mailbox-resync-result', text);
+                if (table) table.reload();
+            };
+            // One page (a few messages) per request, until the server reports nothing left.
+            const step = function (afterUid) {
+                post('eme_accounting_peppol_mailbox_resync', { after_uid: afterUid }).then(function (r) {
+                    if (!r.success) {
+                        finish((r.data || 'Fout') + ' — ' + summary());
+                        return;
+                    }
+                    const d = r.data;
+                    Object.keys(totals).forEach(function (k) { totals[k] += (d.summary && d.summary[k]) || 0; });
+                    if (d.remaining > 0 && d.next_uid > afterUid) {
+                        setText('peppol-mailbox-resync-result', 'Bezig… nog ' + d.remaining + ' van ' + d.total + ' berichten');
+                        step(d.next_uid);
+                    } else {
+                        finish('Klaar. ' + summary());
+                    }
+                });
+            };
+            setText('peppol-mailbox-resync-result', 'Bezig…');
+            step(0);
+        });
+    }
+
+    /* ── Import UBL XML files (inbox page) ────────────────────────── */
+    const xmlBtn = document.getElementById('peppol-xml-import');
+    if (xmlBtn) {
+        xmlBtn.addEventListener('click', function () {
+            const input = document.getElementById('peppol-xml-files');
+            if (!input || !input.files.length) {
+                setText('peppol-xml-result', 'Kies eerst één of meer XML-bestanden.');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('action', 'eme_accounting_peppol_import_xml');
+            fd.append('nonce', nonce);
+            Array.from(input.files).forEach(function (f) { fd.append('xml_files[]', f); });
+
+            xmlBtn.disabled = true;
+            setText('peppol-xml-result', 'Bezig…');
+            setText('peppol-xml-detail', '');
+            fetch(ajaxUrl, { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .catch(function () { return { success: false, data: 'Netwerk- of serverfout' }; })
+                .then(function (r) {
+                    xmlBtn.disabled = false;
+                    if (!r.success) {
+                        setText('peppol-xml-result', r.data || 'Fout');
+                        return;
+                    }
+                    const d = r.data;
+                    setText('peppol-xml-result', 'Geïmporteerd: ' + (d.processed || 0) + ', fouten: ' + (d.errors || 0));
+                    setText('peppol-xml-detail', (d.detail || []).join('\n'));
+                    input.value = '';
+                    if (table) table.reload();
+                });
         });
     }
 
