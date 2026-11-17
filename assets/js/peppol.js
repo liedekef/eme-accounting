@@ -632,13 +632,13 @@
     });
 
     /* ── Sync now (inbox + settings) ──────────────────────────────── */
-    const syncBtn = document.getElementById('peppol-sync-now');
+    const syncBtn = document.getElementById('peppol-api-sync');
     if (syncBtn) {
         syncBtn.addEventListener('click', function () {
-            const result = document.getElementById('peppol-sync-result');
+            const result = document.getElementById('peppol-api-sync-result');
             syncBtn.disabled = true;
             if (result) result.textContent = 'Bezig…';
-            post('eme_accounting_peppol_sync', {}).then(function (r) {
+            post('eme_accounting_peppol_api_sync', {}).then(function (r) {
                 syncBtn.disabled = false;
                 if (!r.success) {
                     if (result) result.textContent = r.data || 'Fout';
@@ -661,18 +661,18 @@
         if (el) el.textContent = text;
     }
 
-    const testBtn = document.getElementById('peppol-test-connection');
+    const testBtn = document.getElementById('peppol-api-test');
     if (testBtn) {
         testBtn.addEventListener('click', function () {
             testBtn.disabled = true;
-            setText('peppol-test-result', 'Bezig…');
-            post('eme_accounting_peppol_test_connection', {}).then(function (r) {
+            setText('peppol-api-test-result', 'Bezig…');
+            post('eme_accounting_peppol_api_test', {}).then(function (r) {
                 testBtn.disabled = false;
                 if (!r.success) {
-                    setText('peppol-test-result', r.data || 'Fout');
+                    setText('peppol-api-test-result', r.data || 'Fout');
                     return;
                 }
-                setText('peppol-test-result', 'Verbonden met ' +
+                setText('peppol-api-test-result', 'Verbonden met ' +
                     (r.data.company_name || 'e-invoice.be') +
                     (r.data.company_email ? ' (' + r.data.company_email + ')' : ''));
             });
@@ -713,53 +713,6 @@
                     ', overgeslagen: ' + (s.skipped || 0) +
                     ', fouten: ' + (s.errors || 0));
                 if (table) table.reload();
-            });
-        });
-    }
-
-    const hookSync = document.getElementById('peppol-webhook-sync');
-    if (hookSync) {
-        hookSync.addEventListener('click', function () {
-            hookSync.disabled = true;
-            setText('peppol-webhook-result', 'Bezig…');
-            post('eme_accounting_peppol_webhook_sync', {}).then(function (r) {
-                hookSync.disabled = false;
-                if (!r.success) {
-                    setText('peppol-webhook-result', r.data || 'Fout');
-                    return;
-                }
-                setText('peppol-webhook-result', 'Webhook actief.');
-                setText('peppol-webhook-url', r.data.url || '');
-                const state = document.getElementById('peppol-webhook-state');
-                if (state) {
-                    state.textContent = 'Actief';
-                    state.className = 'eme-acc-tag eme-acc-reconciled';
-                }
-                const del = document.getElementById('peppol-webhook-delete');
-                if (del) del.style.display = '';
-            });
-        });
-    }
-
-    const hookDelete = document.getElementById('peppol-webhook-delete');
-    if (hookDelete) {
-        hookDelete.addEventListener('click', function () {
-            if (!window.confirm('Webhook verwijderen bij e-invoice.be?')) return;
-            hookDelete.disabled = true;
-            setText('peppol-webhook-result', 'Bezig…');
-            post('eme_accounting_peppol_webhook_delete', {}).then(function (r) {
-                hookDelete.disabled = false;
-                if (!r.success) {
-                    setText('peppol-webhook-result', r.data || 'Fout');
-                    return;
-                }
-                setText('peppol-webhook-result', 'Webhook verwijderd.');
-                const state = document.getElementById('peppol-webhook-state');
-                if (state) {
-                    state.textContent = 'Niet geconfigureerd';
-                    state.className = 'eme-acc-tag eme-acc-pending';
-                }
-                hookDelete.style.display = 'none';
             });
         });
     }

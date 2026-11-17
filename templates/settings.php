@@ -82,7 +82,8 @@ if ( isset( $_POST['emeacc_vat_nonce'] )
 if ( isset( $_POST['emeacc_peppol_nonce'] )
     && Capabilities::can_manage( 'settings' )
     && check_admin_referer( 'emeacc_peppol', 'emeacc_peppol_nonce' ) ) {
-    $peppol  = EMEAccounting\Peppol::get_settings();
+    $peppol     = EMEAccounting\Peppol::get_settings();
+    $peppol_old = $peppol;
     // API keys are printable ASCII; drop anything else instead of sanitize_text_field() (which mangles %xx).
     $raw_key = $_POST['peppol_api_key'] ?? ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
     $new_key = is_string( $raw_key ) ? preg_replace( '/[^\x21-\x7E]/', '', wp_unslash( $raw_key ) ) : '';
@@ -107,7 +108,6 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
     if ( $peppol['imap_folder'] === '' ) {
         $peppol['imap_folder'] = 'INBOX';
     }
-    $peppol['imap_mark_seen']    = (int) ! empty( $_POST['peppol_imap_mark_seen'] );
     $imap_max                    = (int) ( $_POST['peppol_imap_max_messages'] ?? 25 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
     $peppol['imap_max_messages'] = max( 1, min( 100, $imap_max ) );
 
@@ -135,13 +135,33 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
     $can_reset           = $peppol['api_key'] !== '';
     $sync_reset_rejected = $reset_requested && ! $can_reset;
     if ( $can_reset && ( $reset_requested || empty( $peppol['cursor_created_at'] ) ) ) {
-        $peppol = EMEAccounting\Peppol::reset_sync_position( $peppol, $mode );
+        $peppol = EMEAccounting\PeppolEInvoice::reset_sync_position( $peppol, $mode );
     }
 
-    EMEAccounting\Peppol::update_settings( $peppol );
-    EMEAccounting\Peppol::sync_poll_cron();
-    EMEAccounting\PeppolImap::sync_cron();
-    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Peppol-instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
+    $peppol = EMEAccounting\PeppolEInvoice::prepare_settings_update( $peppol, $peppol_old );
+    if ( is_wp_error( $peppol ) ) {
+        echo '<div class="notice notice-error"><p>' . sprintf(
+            /* translators: %s: API error message */
+            esc_html__( 'Peppol-instellingen niet opgeslagen: %s', 'eme-accounting' ),
+            esc_html( $peppol->get_error_message() )
+        ) . '</p></div>';
+    } else {
+        EMEAccounting\Peppol::update_settings( $peppol );
+        EMEAccounting\PeppolEInvoice::sync_poll_cron();
+        EMEAccounting\PeppolImap::sync_cron();
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Peppol-instellingen opgeslagen.', 'eme-accounting' ) . '</p></div>';
+
+        if ( ! empty( $peppol['api_key'] ) ) {
+            $webhook_sync = EMEAccounting\PeppolEInvoice::sync_webhook();
+            if ( is_wp_error( $webhook_sync ) ) {
+                echo '<div class="notice notice-warning is-dismissible"><p>' . sprintf(
+                    /* translators: %s: API error message */
+                    esc_html__( 'De webhook kon niet automatisch worden aangemaakt of bijgewerkt: %s', 'eme-accounting' ),
+                    esc_html( $webhook_sync->get_error_message() )
+                ) . '</p></div>';
+            }
+        }
+    }
     if ( $webhook_rejected ) {
         echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'De webhook-URL moet met https:// beginnen en is niet opgeslagen.', 'eme-accounting' ) . '</p></div>';
     }
@@ -497,11 +517,10 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 <?php elseif ( $active_tab === 'peppol' ): ?>
 <?php
 $pp            = EMEAccounting\Peppol::get_settings();
-$pp_status     = EMEAccounting\Peppol::get_public_status();
+$pp_status     = EMEAccounting\PeppolEInvoice::get_public_status();
 $imap_status   = EMEAccounting\PeppolImap::get_public_status();
-$masked_key    = $pp['api_key'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['api_key'], -4 ) : '';
-$masked_secret = $pp['webhook_secret'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['webhook_secret'], -4 ) : '';
-$masked_imap   = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['imap_password'], -4 ) : '';
+$masked_key  = $pp['api_key'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['api_key'], -4 ) : '';
+$masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['imap_password'], -4 ) : '';
 ?>
 
 <!-- ══════════════════════════════════════════════════════════════════════
@@ -582,22 +601,44 @@ $masked_imap   = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( 
     <th><?php esc_html_e( 'Webhook-URL overschrijven', 'eme-accounting' ); ?></th>
     <td>
         <input type="url" name="peppol_webhook_url_override" value="<?php echo esc_attr( $pp['webhook_url_override'] ); ?>" style="min-width:420px"
-               placeholder="<?php echo esc_attr( EMEAccounting\Peppol::webhook_url() ); ?>">
+               placeholder="<?php echo esc_attr( EMEAccounting\PeppolEInvoice::webhook_url() ); ?>">
         <p class="description"><?php esc_html_e( 'Laat leeg om de standaard REST-URL van deze site te gebruiken. Enkel nodig wanneer de site achter een proxy of alternatief domein draait.', 'eme-accounting' ); ?></p>
-        <p><code><?php echo esc_html( EMEAccounting\Peppol::webhook_url() ); ?></code></p>
+        <p><code><?php echo esc_html( EMEAccounting\PeppolEInvoice::webhook_url() ); ?></code></p>
+    </td>
+</tr>
+<tr>
+    <th><?php esc_html_e( 'Webhook', 'eme-accounting' ); ?></th>
+    <td>
+        <span class="eme-acc-tag <?php echo ! empty( $pp_status['webhook_configured'] ) ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
+            <?php echo ! empty( $pp_status['webhook_configured'] ) ? esc_html__( 'Actief', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
+        </span>
     </td>
 </tr>
 </table>
 
 <p>
     <button type="submit" class="button button-primary"><?php esc_html_e( 'Peppol-instellingen opslaan', 'eme-accounting' ); ?></button>
-    <button type="button" id="peppol-test-connection" class="button"><?php esc_html_e( 'Verbinding testen', 'eme-accounting' ); ?></button>
-    <span id="peppol-test-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+    <button type="button" id="peppol-api-test" class="button"><?php esc_html_e( 'Verbinding testen', 'eme-accounting' ); ?></button>
+    <button type="button" id="peppol-api-sync" class="button" <?php echo empty( $pp_status['api_configured'] ) ? 'disabled' : ''; ?>>
+        <?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?>
+    </button>
+    <span id="peppol-api-test-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+    <span id="peppol-api-sync-result" style="margin-left:1em;font-size:13px;color:#646970">
+        <?php if ( ! empty( $pp_status['last_poll_at'] ) ): ?>
+            <?php
+            printf(
+                /* translators: %s: date */
+                esc_html__( 'Laatste synchronisatie: %s', 'eme-accounting' ),
+                esc_html( eme_localized_date( $pp_status['last_poll_at'], EME_TIMEZONE ) )
+            );
+            ?>
+        <?php endif; ?>
+    </span>
 </p>
 </div>
 
 <div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'E-mailbox (Doccle)', 'eme-accounting' ); ?></h2>
+<h2><?php esc_html_e( 'E-mailbox koppeling', 'eme-accounting' ); ?></h2>
 <?php if ( empty( $imap_status['available'] ) ): ?>
     <div class="notice notice-warning inline"><p><?php esc_html_e( 'De interne IMAP-client is niet beschikbaar op deze server.', 'eme-accounting' ); ?></p></div>
 <?php endif; ?>
@@ -609,7 +650,7 @@ $masked_imap   = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( 
             <input type="checkbox" name="peppol_imap_enabled" value="1" <?php echo checked( 1, (int) $pp['imap_enabled'], false ); ?>>
             <?php esc_html_e( 'Elk uur XML-bijlagen uit de mailbox ophalen', 'eme-accounting' ); ?>
         </label>
-        <p class="description"><?php esc_html_e( 'Gebruik een aparte mailbox waarin Doccle de Peppol-facturen doorstuurt. De UBL-XML en eventuele PDF worden in dezelfde Peppol-inbox bewaard.', 'eme-accounting' ); ?></p>
+        <p class="description"><?php esc_html_e( 'Gebruik een aparte mailbox waarin de Peppol-facturen toekomen (UBL-XML inhoud is verplicht, optioneel met PDF).', 'eme-accounting' ); ?></p>
     </td>
 </tr>
 <tr>
@@ -655,17 +696,13 @@ $masked_imap   = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( 
 <tr>
     <th><?php esc_html_e( 'Verwerking', 'eme-accounting' ); ?></th>
     <td>
-        <label>
-            <input type="checkbox" name="peppol_imap_mark_seen" value="1" <?php echo checked( 1, (int) $pp['imap_mark_seen'], false ); ?>>
-            <?php esc_html_e( 'Berichten na verwerking als gelezen markeren', 'eme-accounting' ); ?>
-        </label>
         <p>
             <label>
                 <?php esc_html_e( 'Maximaal aantal berichten per synchronisatie:', 'eme-accounting' ); ?>
                 <input type="number" name="peppol_imap_max_messages" value="<?php echo esc_attr( (string) $pp['imap_max_messages'] ); ?>" min="1" max="100" style="width:80px">
             </label>
         </p>
-        <p class="description"><?php esc_html_e( 'Enkel berichten met een UBL-XML-bijlage worden geïmporteerd. Dubbels worden herkend aan de UBL-UUID.', 'eme-accounting' ); ?></p>
+        <p class="description"><?php esc_html_e( 'Enkel berichten met een UBL-XML-bijlage worden geïmporteerd. Dubbels worden herkend aan de UBL-UUID. De mailbox wordt enkel gelezen, nooit gewijzigd: elk uur worden de berichten van de laatste periode (dubbel zo lang als sinds de vorige controle) opnieuw bekeken, zodat een eenmalige fout vanzelf wordt hersteld.', 'eme-accounting' ); ?></p>
     </td>
 </tr>
 </table>
@@ -691,50 +728,6 @@ $masked_imap   = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( 
 <?php endif; ?>
 </div>
 </form>
-
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Webhook', 'eme-accounting' ); ?></h2>
-<p>
-    <span id="peppol-webhook-state" class="eme-acc-tag <?php echo ! empty( $pp_status['webhook_configured'] ) ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
-        <?php echo ! empty( $pp_status['webhook_configured'] ) ? esc_html__( 'Actief', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
-    </span>
-    <?php if ( $masked_secret !== '' ): ?>
-        <span style="margin-left:1em;font-size:12px;color:#646970"><?php esc_html_e( 'Secret:', 'eme-accounting' ); ?> <code><?php echo esc_html( $masked_secret ); ?></code></span>
-    <?php endif; ?>
-</p>
-<p><code id="peppol-webhook-url" style="font-size:11px;word-break:break-all"><?php echo esc_html( $pp_status['webhook_url'] ); ?></code></p>
-<p>
-    <button type="button" id="peppol-webhook-sync" class="button button-secondary" <?php echo empty( $pp_status['api_configured'] ) ? 'disabled' : ''; ?>>
-        <?php esc_html_e( 'Webhook aanmaken / bijwerken', 'eme-accounting' ); ?>
-    </button>
-    <button type="button" id="peppol-webhook-delete" class="button button-link-delete" <?php echo empty( $pp_status['webhook_configured'] ) ? 'style="display:none"' : ''; ?>>
-        <?php esc_html_e( 'Webhook verwijderen', 'eme-accounting' ); ?>
-    </button>
-    <span id="peppol-webhook-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
-</p>
-<p class="description"><?php esc_html_e( 'De webhook wordt automatisch ondertekend met het secret dat e-invoice.be bij aanmaak teruggeeft.', 'eme-accounting' ); ?></p>
-</div>
-
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?></h2>
-<p>
-    <button type="button" id="peppol-sync-now" class="button" <?php echo empty( $pp_status['api_configured'] ) ? 'disabled' : ''; ?>>
-        <?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?>
-    </button>
-    <span id="peppol-sync-result" style="margin-left:1em;font-size:13px;color:#646970">
-        <?php if ( ! empty( $pp_status['last_poll_at'] ) ): ?>
-            <?php
-            printf(
-                /* translators: %s: date */
-                esc_html__( 'Laatste synchronisatie: %s', 'eme-accounting' ),
-                esc_html( eme_localized_date( $pp_status['last_poll_at'], EME_TIMEZONE ) )
-            );
-            ?>
-        <?php endif; ?>
-    </span>
-</p>
-<p class="description"><?php esc_html_e( 'Haalt de nieuwste documenten onmiddellijk op, bovenop de uurlijkse poll.', 'eme-accounting' ); ?></p>
-</div>
 
 <?php elseif ( $active_tab === 'advanced' ): ?> <!-- tab advanced -->
 <div class="eme-acc-form-box">

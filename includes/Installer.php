@@ -89,7 +89,7 @@ class Installer {
         // In case of re-activation with a pre-existing 'yes' setting.
         self::sync_weekly_rebuild_cron();
         // Re-arm the Peppol poll when it was already configured.
-        \EMEAccounting\Peppol::sync_poll_cron();
+        \EMEAccounting\PeppolEInvoice::sync_poll_cron();
         \EMEAccounting\PeppolImap::sync_cron();
         //flush_rewrite_rules();
     }

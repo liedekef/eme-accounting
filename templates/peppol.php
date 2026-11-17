@@ -2,7 +2,7 @@
 // phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
-$peppol_status = EMEAccounting\Peppol::get_public_status();
+$peppol_status = EMEAccounting\PeppolEInvoice::get_public_status();
 
 $can_manage = EMEAccounting\Capabilities::can_manage( 'peppol' );
 $booking_accounts = [];
@@ -79,15 +79,28 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 </tbody>
 </table>
 <p>
-    <button type="button" id="peppol-sync-now" class="button button-primary" <?php echo empty( $peppol_status['api_configured'] ) ? 'disabled' : ''; ?>>
+    <button type="button" id="peppol-api-sync" class="button button-primary" <?php echo empty( $peppol_status['api_configured'] ) ? 'disabled' : ''; ?>>
         <?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?>
     </button>
     <a href="<?php echo esc_url( admin_url( 'admin.php?page=emeaccounting-settings&tab=peppol' ) ); ?>" class="button">
         <?php esc_html_e( 'Peppol-instellingen', 'eme-accounting' ); ?>
     </a>
-    <span id="peppol-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+    <span id="peppol-api-sync-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
 </p>
 </div>
+
+<?php if ( $can_manage ): ?>
+<div class="eme-acc-form-box">
+<h2><?php esc_html_e( 'XML importeren', 'eme-accounting' ); ?></h2>
+<p class="description"><?php esc_html_e( 'Voeg UBL-facturen of -creditnota\'s (.xml) rechtstreeks toe, bv. een factuur die buiten Peppol of de mailbox om binnenkwam. Bestaande documenten worden herkend en niet dubbel opgeslagen.', 'eme-accounting' ); ?></p>
+<p>
+    <input type="file" id="peppol-xml-files" accept=".xml,application/xml,text/xml" multiple>
+    <button type="button" id="peppol-xml-import" class="button"><?php esc_html_e( 'Importeren', 'eme-accounting' ); ?></button>
+    <span id="peppol-xml-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
+</p>
+<div id="peppol-xml-detail" style="white-space:pre-line;font-size:12px;color:#b32d2e"></div>
+</div>
+<?php endif; ?>
 
 <div class="eme-acc-form-box">
 <h2><?php esc_html_e( 'Documenten', 'eme-accounting' ); ?></h2>

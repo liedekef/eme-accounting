@@ -7,71 +7,44 @@ defined( 'ABSPATH' ) || exit;
 use EMEAccounting\Capabilities;
 
 /**
- * Peppol inbox backed by the e-invoice.be API.
+ * Peppol inbox: storage, list/detail, booking and journal links.
  *
- * Receives inbound documents through a webhook (REST) and/or an hourly
- * poll, stores the metadata in {prefix}emeacc_peppol_documents and the
- * UBL / PDF / extra attachments on disk (via EMEFileAttachments).
+ * Documents are stored in {prefix}emeacc_peppol_documents and their UBL / PDF /
+ * extra attachments on disk (via EMEFileAttachments). The inbox does not know
+ * where a document came from: sources push into it through
+ * import_external_document() / upsert_document():
  *
- * The e-invoice.be API has no "processed" flag, so local de-duplication is
- * done on the e-invoice document_id. Removing a row would make the next
- * poll re-import it; therefore documents are "ignored", not deleted.
+ *   - PeppolEInvoice  e-invoice.be API (webhook + poll)
+ *   - PeppolImap      forwarded mails (IMAP mailbox)
+ *
+ * Documents are "ignored", never deleted: a removed row would be re-imported
+ * by the next poll/scan.
  */
 class Peppol {
 
-    const OPTION      = 'eme_accounting_peppol_settings';
-    const TABLE       = 'emeacc_peppol_documents';
-    const TYPE        = 'peppol';
-    const CRON_POLL   = 'eme_accounting_peppol_poll';
-    const CRON_FETCH  = 'eme_accounting_peppol_fetch_document';
-    const REST_NS     = 'eme-accounting/v1';
-    const REST_ROUTE  = '/peppol-webhook';
-
-    const PAGE_SIZE          = 100;
-    const MAX_POLL_PAGES     = 3;
-    const MAX_BACKFILL_PAGES = 10;
-    const MAX_DOCS_PER_RUN   = 50;
-    const MAX_DOCS_MANUAL    = 25;     // "sync now" runs inside an AJAX request
-    const CURSOR_LAG         = 86400;  // re-scan a day behind the cursor; dedupe is a cheap DB lookup
-    const RETRY_BACKOFF      = 3600;   // seconds before an errored document is retried by cron
-    const LOCK_KEY           = 'eme_accounting_peppol_lock';
-
-    const EVENTS = [ 'document.received', 'document.received.failed' ];
+    const OPTION = 'eme_accounting_peppol_settings';
+    const TABLE  = 'emeacc_peppol_documents';
+    const TYPE   = 'peppol';
 
     const DOCUMENT_TYPES = [ 'INVOICE', 'CREDIT_NOTE', 'SELFBILLING_INVOICE', 'SELFBILLING_CREDIT_NOTE' ];
 
     /** @var \EMEFileAttachments|null */
     private static ?\EMEFileAttachments $attachments = null;
 
-    /* ------------------------------------------------------------------
-     * Bootstrap
-     * ------------------------------------------------------------------ */
-
     public static function init(): void {
-        add_action( 'wp_ajax_eme_accounting_peppol_list',            [ __CLASS__, 'ajax_list' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_get',             [ __CLASS__, 'ajax_get' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_sync',            [ __CLASS__, 'ajax_sync' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_ignore',          [ __CLASS__, 'ajax_ignore' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_retry',           [ __CLASS__, 'ajax_retry' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_test_connection', [ __CLASS__, 'ajax_test_connection' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_webhook_sync',    [ __CLASS__, 'ajax_webhook_sync' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_webhook_delete',  [ __CLASS__, 'ajax_webhook_delete' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_list',   [ __CLASS__, 'ajax_list' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_get',    [ __CLASS__, 'ajax_get' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_ignore', [ __CLASS__, 'ajax_ignore' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_book',   [ __CLASS__, 'ajax_book' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_link',   [ __CLASS__, 'ajax_link_journal' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_unlink', [ __CLASS__, 'ajax_unlink' ] );
 
-        add_action( 'rest_api_init', [ __CLASS__, 'register_rest_route' ] );
-
-        add_action( self::CRON_POLL, [ __CLASS__, 'poll' ] );
-        add_action( self::CRON_FETCH, [ __CLASS__, 'fetch_document_cron' ], 10, 1 );
-
-        // Re-arm the hourly poll when it got lost (activation, manual option
-        // import, ...). Only on admin/cron requests, so front-end traffic does
-        // not hit the (non-autoloaded) settings option on every page view.
-        if ( is_admin() || wp_doing_cron() ) {
-            $settings = self::get_settings();
-            if ( ! empty( $settings['api_key'] ) && ! empty( $settings['poll_enabled'] ) && ! wp_next_scheduled( self::CRON_POLL ) ) {
-                wp_schedule_event( time() + 5 * MINUTE_IN_SECONDS, 'hourly', self::CRON_POLL );
-            }
-        }
+        add_action( 'eme_accounting_journal_deleted', [ __CLASS__, 'on_journal_deleted' ] );
     }
+
+    /* ------------------------------------------------------------------
+     * Attachments
+     * ------------------------------------------------------------------ */
 
     public static function get_attachments(): \EMEFileAttachments {
         if ( self::$attachments === null ) {
@@ -85,7 +58,7 @@ class Peppol {
     }
 
     /* ------------------------------------------------------------------
-     * Settings
+     * Settings (one option shared by all Peppol sources)
      * ------------------------------------------------------------------ */
 
     public static function get_settings(): array {
@@ -102,97 +75,27 @@ class Peppol {
             'webhook_url_override'=> '',
             'last_poll_at'        => '',
             'last_poll_status'    => '',
+            'imap_enabled'        => 0,
+            'imap_host'           => '',
+            'imap_port'           => 993,
+            'imap_encryption'     => 'ssl',
+            'imap_username'       => '',
+            'imap_password'       => '',
+            'imap_folder'         => 'INBOX',
+            'imap_max_messages'   => 25,
+            'imap_checked_at'     => 0,   // unix time of the last successful mailbox scan
+            'imap_last_poll_at'   => '',
+            'imap_last_poll_status'=> '',
         ] );
     }
 
     public static function update_settings( array $settings ): void {
-        $old     = get_option( self::OPTION, [] );
-        $old_key = is_array( $old ) ? (string) ( $old['api_key'] ?? '' ) : '';
-        if ( $old_key !== (string) ( $settings['api_key'] ?? '' ) ) {
-            // The webhook (id + secret) belongs to the account of the old key.
-            $settings['webhook_id']     = '';
-            $settings['webhook_secret'] = '';
-        }
-        unset( $settings['cursor_ids'] ); // legacy key
+        unset( $settings['cursor_ids'], $settings['imap_mark_seen'] ); // legacy keys
         update_option( self::OPTION, $settings, false );
     }
 
-    /**
-     * Persist only what poll() owns (cursor, backfill, last run), on top of a
-     * fresh copy of the settings. poll() can run for minutes; writing back the
-     * array it read at the start would overwrite an API key, webhook id/secret
-     * or poll toggle saved in the meantime.
-     */
-    private static function save_runtime_state( array $local ): void {
-        $fresh = self::get_settings();
-        foreach ( [ 'cursor_created_at', 'backfill_page', 'backfill_done', 'last_poll_at', 'last_poll_status' ] as $key ) {
-            $fresh[ $key ] = $local[ $key ];
-        }
-        self::update_settings( $fresh );
-    }
-
-    /**
-     * Apply the first-sync choice. The cursor is always "now"; a full sync
-     * additionally walks the history via backfill_page. 'now' mode gets a
-     * floor (sync_from) so the poll's look-behind never imports older documents.
-     */
-    public static function reset_sync_position( array $settings, string $mode ): array {
-        $mode = $mode === 'full' ? 'full' : 'now';
-        $now  = gmdate( 'Y-m-d\TH:i:s\Z' );
-
-        $settings['initial_sync_mode'] = $mode;
-        $settings['cursor_created_at'] = $now;
-        $settings['sync_from']         = $mode === 'full' ? '' : $now;
-        $settings['backfill_page']     = $mode === 'full' ? 1 : 0;
-        $settings['backfill_done']     = $mode === 'full' ? 0 : 1;
-        unset( $settings['cursor_ids'] );
-        return $settings;
-    }
-
-    public static function sync_poll_cron(): void {
-        $settings = self::get_settings();
-        $enabled  = ! empty( $settings['api_key'] ) && ! empty( $settings['poll_enabled'] );
-        $scheduled = wp_next_scheduled( self::CRON_POLL );
-
-        if ( $enabled && ! $scheduled ) {
-            wp_schedule_event( time() + 5 * MINUTE_IN_SECONDS, 'hourly', self::CRON_POLL );
-        } elseif ( ! $enabled && $scheduled ) {
-            wp_clear_scheduled_hook( self::CRON_POLL );
-        }
-    }
-
-    public static function webhook_url(): string {
-        $settings = self::get_settings();
-        if ( ! empty( $settings['webhook_url_override'] ) ) {
-            return $settings['webhook_url_override'];
-        }
-        return rest_url( self::REST_NS . self::REST_ROUTE );
-    }
-
-    /** Safe subset for templates / AJAX (never exposes secrets). */
-    public static function get_public_status(): array {
-        $s = self::get_settings();
-        return [
-            'api_configured'     => ! empty( $s['api_key'] ),
-            'company_name'       => $s['company_name'],
-            'poll_enabled'       => (int) $s['poll_enabled'],
-            'last_poll_at'       => $s['last_poll_at'],
-            'last_poll_status'   => $s['last_poll_status'],
-            'backfill_page'      => (int) $s['backfill_page'],
-            'backfill_done'      => (int) $s['backfill_done'],
-            'has_cursor'         => ! empty( $s['cursor_created_at'] ),
-            'webhook_configured' => ! empty( $s['webhook_id'] ) && ! empty( $s['webhook_secret'] ),
-            'webhook_url'        => self::webhook_url(),
-        ];
-    }
-
-    private static function api(): PeppolApi {
-        $settings = self::get_settings();
-        return new PeppolApi( (string) $settings['api_key'] );
-    }
-
     /* ------------------------------------------------------------------
-     * AJAX — list / detail
+     * AJAX — list / detail / ignore
      * ------------------------------------------------------------------ */
 
     public static function ajax_list(): void {
@@ -200,18 +103,23 @@ class Peppol {
         Capabilities::require_view_ajax( 'peppol' );
         global $wpdb;
 
-        $type  = isset( $_POST['document_type'] ) && $_POST['document_type'] !== '' ? strtoupper( (string) eme_sanitize_request( $_POST['document_type'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $state = isset( $_POST['state'] ) && $_POST['state'] !== '' ? strtoupper( (string) eme_sanitize_request( $_POST['state'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $type          = isset( $_POST['document_type'] ) && $_POST['document_type'] !== '' ? strtoupper( (string) eme_sanitize_request( $_POST['document_type'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $peppol_status = isset( $_POST['peppol_status'] ) && $_POST['peppol_status'] !== '' ? strtoupper( (string) eme_sanitize_request( $_POST['peppol_status'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         if ( ! in_array( $type, self::DOCUMENT_TYPES, true ) ) {
             $type = '';
         }
+        $booking_status = isset( $_POST['booking_status'] ) && $_POST['booking_status'] !== '' ? sanitize_key( eme_sanitize_request( $_POST['booking_status'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( ! in_array( $booking_status, [ 'unbooked', 'booked' ], true ) ) {
+            $booking_status = '';
+        }
 
         $args = [
-            'search'        => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : '', //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-            'document_type' => $type,
-            'status'        => isset( $_POST['status'] ) && $_POST['status'] !== '' ? sanitize_key( eme_sanitize_request( $_POST['status'] ) ) : '', //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-            'state'         => $state,
-            'daterange'     => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : '', //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'search'         => isset( $_POST['search'] ) && $_POST['search'] !== '' ? eme_sanitize_request( $_POST['search'] ) : '', //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'document_type'  => $type,
+            'status'         => isset( $_POST['status'] ) && $_POST['status'] !== '' ? sanitize_key( eme_sanitize_request( $_POST['status'] ) ) : '', //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            'booking_status' => $booking_status,
+            'peppol_status'  => $peppol_status,
+            'daterange'      => isset( $_POST['daterange'] ) && $_POST['daterange'] !== '' ? eme_sanitize_request( $_POST['daterange'] ) : '', //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         ];
 
         [ $where_sql, $prepare ] = self::build_where( $args );
@@ -239,6 +147,8 @@ class Peppol {
             $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, EME_TIMEZONE ) : '';
             $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date, EME_TIMEZONE ) : '';
             $row->received_at_display  = $row->received_at ? eme_localized_date( $row->received_at, EME_TIMEZONE ) : '';
+            $row->journal_edit_url     = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
+            $row->booking_status       = ! empty( $row->journal_id ) ? 'booked' : 'unbooked';
             $row->files                = self::files_html( (int) $row->id );
             $records[]                 = $row;
         }
@@ -266,27 +176,11 @@ class Peppol {
         $row->attachments     = json_decode( (string) $row->attachments_json, true ) ?: [];
         $row->files           = self::files_html( (int) $row->id );
         $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, EME_TIMEZONE ) : '';
+        $row->journal_edit_url = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
+        $row->booking_status   = ! empty( $row->journal_id ) ? 'booked' : 'unbooked';
         unset( $row->raw_json );
 
         wp_send_json_success( $row );
-    }
-
-    /* ------------------------------------------------------------------
-     * AJAX — actions
-     * ------------------------------------------------------------------ */
-
-    public static function ajax_sync(): void {
-        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        Capabilities::require_manage_ajax( 'peppol' );
-
-        $result = self::poll( true );
-        if ( is_wp_error( $result ) ) {
-            wp_send_json_error( $result->get_error_message() );
-        }
-        wp_send_json_success( [
-            'summary' => $result,
-            'status'  => self::get_public_status(),
-        ] );
     }
 
     public static function ajax_ignore(): void {
@@ -305,145 +199,187 @@ class Peppol {
         wp_send_json_success( [ 'status' => $status ] );
     }
 
-    public static function ajax_retry(): void {
+    /* ------------------------------------------------------------------
+     * AJAX — booking and journal links
+     * ------------------------------------------------------------------ */
+
+    public static function ajax_book(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'peppol' );
+
+        $id  = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $row = self::get_document_row( $id );
+        if ( ! $row ) {
+            wp_send_json_error( __( 'Document niet gevonden.', 'eme-accounting' ) );
+        }
+        if ( ! empty( $row->journal_id ) ) {
+            wp_send_json_error( __( 'Dit document is al geboekt.', 'eme-accounting' ) );
+        }
+        if ( (string) $row->processing_status === 'ignored' ) {
+            wp_send_json_error( __( 'Dit document is genegeerd. Zet het eerst terug op nieuw.', 'eme-accounting' ) );
+        }
+
+        $journal_id = (int) eme_sanitize_request( $_POST['journal_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( $journal_id > 0 ) {
+            $result = self::link_document_to_journal( $row, $journal_id );
+            if ( is_wp_error( $result ) ) {
+                wp_send_json_error( $result->get_error_message() );
+            }
+            wp_send_json_success( [
+                'journal_id'      => $journal_id,
+                'journal_edit_url'=> admin_url( 'admin.php?page=emeaccounting-journal&edit=' . $journal_id ),
+                'booking_status'  => 'booked',
+            ] );
+        }
+
+        $account_id = (int) eme_sanitize_request( $_POST['account_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $coa_id     = (int) eme_sanitize_request( $_POST['coa_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( $account_id <= 0 ) {
+            wp_send_json_error( __( 'Kies een financiële rekening.', 'eme-accounting' ) );
+        }
+        $account = Accounts::get( $account_id );
+        if ( ! $account || ! (int) $account->is_active ) {
+            wp_send_json_error( __( 'Ongeldige of inactieve financiële rekening.', 'eme-accounting' ) );
+        }
+        $coa = $coa_id > 0 ? ChartOfAccounts::get( $coa_id ) : null;
+        if ( ! $coa ) {
+            wp_send_json_error( __( 'Kies een geldige rubriek uit het rekeningstelsel.', 'eme-accounting' ) );
+        }
+        if ( (string) $coa->direction !== self::booking_direction( $row ) ) {
+            wp_send_json_error( __( 'De gekozen rubriek past niet bij de richting van dit document.', 'eme-accounting' ) );
+        }
+
+        $entry_date = eme_sanitize_request( $_POST['entry_date'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $entry_date ) ) {
+            $entry_date = self::date_or_null( $row->invoice_date ?? null ) ?: current_time( 'Y-m-d' );
+        }
+
+        $amount_raw = (string) eme_sanitize_request( $_POST['amount'] ?? '' ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $amount_raw = str_replace( ' ', '', $amount_raw );
+        if ( str_contains( $amount_raw, ',' ) ) {
+            $amount_raw = str_replace( '.', '', $amount_raw );
+            $amount_raw = str_replace( ',', '.', $amount_raw );
+        }
+        $amount = round( (float) $amount_raw, 2 );
+        if ( $amount <= 0 ) {
+            $amount = self::booking_amount( $row );
+        }
+        if ( $amount <= 0 ) {
+            wp_send_json_error( __( 'Dit document heeft geen bruikbaar bedrag.', 'eme-accounting' ) );
+        }
+
+        $description = trim( (string) eme_sanitize_request( $_POST['description'] ?? '' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( $description === '' ) {
+            $description = self::booking_description( $row );
+        }
+        $description = mb_substr( $description, 0, 255 );
+
+        $reference = trim( (string) eme_sanitize_request( $_POST['bank_statement_ref'] ?? '' ) ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( $reference === '' ) {
+            $reference = self::booking_reference( $row );
+        }
+        $reference = mb_substr( $reference, 0, 100 );
+
+        $force_create = (int) eme_sanitize_request( $_POST['force_create'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( ! $force_create ) {
+            $candidates = self::booking_candidates( $row, $account_id, $amount );
+            if ( $candidates ) {
+                wp_send_json_success( [
+                    'needs_choice' => true,
+                    'candidates'   => $candidates,
+                ] );
+            }
+        }
+
+        [ $vat_code, $vat_amount ] = self::booking_vat( $row );
+
+        $journal_id = Journal::save( [
+            'entry_date'              => $entry_date,
+            'description'             => $description,
+            'amount'                  => $amount,
+            'direction'               => self::booking_direction( $row ),
+            'account_id'              => $account_id,
+            'coa_id'                  => $coa_id,
+            'bank_statement_ref'      => $reference,
+            'vat_code'                => $vat_code,
+            'vat_amount'              => $vat_amount,
+            'counterparty_vat_number' => mb_substr( (string) $row->vendor_tax_id, 0, 100 ),
+            'counterparty_name'       => mb_substr( (string) $row->vendor_name, 0, 150 ),
+            'is_reconciled'           => 0,
+            'notes'                   => sprintf( 'Peppol document: %s', (string) $row->document_id ),
+        ] );
+        if ( is_wp_error( $journal_id ) ) {
+            wp_send_json_error( $journal_id->get_error_message() );
+        }
+        if ( ! $journal_id ) {
+            wp_send_json_error( __( 'De boeking kon niet worden aangemaakt.', 'eme-accounting' ) );
+        }
+
+        $linked = self::link_document_to_journal( $row, (int) $journal_id );
+        if ( is_wp_error( $linked ) ) {
+            Journal::delete( (int) $journal_id );
+            wp_send_json_error( $linked->get_error_message() );
+        }
+
+        wp_send_json_success( [
+            'journal_id'       => (int) $journal_id,
+            'journal_edit_url' => admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $journal_id ),
+            'booking_status'   => 'booked',
+        ] );
+    }
+
+    public static function ajax_link_journal(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'peppol' );
+
+        $id         = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $journal_id = (int) eme_sanitize_request( $_POST['journal_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $row        = self::get_document_row( $id );
+        if ( ! $row ) {
+            wp_send_json_error( __( 'Document niet gevonden.', 'eme-accounting' ) );
+        }
+        if ( $journal_id <= 0 ) {
+            wp_send_json_error( __( 'Ongeldige boeking.', 'eme-accounting' ) );
+        }
+
+        $result = self::link_document_to_journal( $row, $journal_id );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+        wp_send_json_success( [
+            'journal_id'       => $journal_id,
+            'journal_edit_url' => admin_url( 'admin.php?page=emeaccounting-journal&edit=' . $journal_id ),
+            'booking_status'   => 'booked',
+        ] );
+    }
+
+    public static function ajax_unlink(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'peppol' );
         global $wpdb;
 
         $id  = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $doc = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}" . self::TABLE . "` WHERE id = %d", $id ) );
-        if ( ! $doc ) {
+        $row = self::get_document_row( $id );
+        if ( ! $row ) {
             wp_send_json_error( __( 'Document niet gevonden.', 'eme-accounting' ) );
         }
 
-        $result = self::fetch_document( (string) $doc->document_id );
-        if ( is_wp_error( $result ) ) {
-            wp_send_json_error( $result->get_error_message() );
-        }
-        wp_send_json_success();
-    }
-
-    public static function ajax_test_connection(): void {
-        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        Capabilities::require_manage_ajax( 'peppol' );
-
-        $api = self::api();
-        if ( ! $api->is_configured() ) {
-            wp_send_json_error( __( 'Geen Peppol API-key ingesteld.', 'eme-accounting' ) );
+        $table   = $wpdb->prefix . self::TABLE;
+        $updated = $wpdb->query( $wpdb->prepare(
+            "UPDATE `{$table}`
+             SET journal_id = NULL, booked_at = NULL, booked_by = NULL
+             WHERE id = %d",
+            $id
+        ) );
+        if ( $updated === false ) {
+            wp_send_json_error( __( 'Ontkoppelen mislukt.', 'eme-accounting' ) );
         }
 
-        $me = $api->me();
-        if ( is_wp_error( $me ) ) {
-            wp_send_json_error( $me->get_error_message() );
-        }
-
-        $settings                 = self::get_settings();
-        $settings['company_name'] = self::s( $me['company_name'] ?? ( $me['name'] ?? '' ), 190 );
-        self::update_settings( $settings );
-
-        wp_send_json_success( [
-            'company_name' => $settings['company_name'],
-            'company_email'=> self::s( $me['company_email'] ?? '', 190 ),
-            'peppol_ids'   => $me['peppol_ids'] ?? [],
-        ] );
-    }
-
-    public static function ajax_webhook_sync(): void {
-        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        Capabilities::require_manage_ajax( 'peppol' );
-
-        $api = self::api();
-        if ( ! $api->is_configured() ) {
-            wp_send_json_error( __( 'Stel eerst een Peppol API-key in.', 'eme-accounting' ) );
-        }
-
-        $settings = self::get_settings();
-        $url      = self::webhook_url();
-        $hook     = null;
-
-        if ( ! empty( $settings['webhook_id'] ) ) {
-            $res = $api->update_webhook( $settings['webhook_id'], [ 'url' => $url, 'events' => self::EVENTS, 'enabled' => true ] );
-            if ( ! is_wp_error( $res ) ) {
-                $hook = $res;
-            } elseif ( $res->get_error_code() === 'peppol_404' ) {
-                // Webhook was deleted on the e-invoice side; create a new one.
-                $settings['webhook_id']     = '';
-                $settings['webhook_secret'] = '';
-                self::update_settings( $settings );
-            } else {
-                wp_send_json_error( $res->get_error_message() );
-            }
-        }
-
-        if ( $hook === null ) {
-            // Adopt an existing webhook for this URL before creating a duplicate.
-            $list = $api->list_webhooks();
-            if ( ! is_wp_error( $list ) && is_array( $list ) ) {
-                foreach ( $list as $candidate ) {
-                    if ( isset( $candidate['url'] ) && $candidate['url'] === $url && ! empty( $candidate['id'] ) ) {
-                        $hook = $candidate;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // An adopted webhook may have been disabled on the e-invoice.be side.
-        if ( $hook !== null && ( $hook['enabled'] ?? true ) === false && ! empty( $hook['id'] ) ) {
-            $res = $api->update_webhook( (string) $hook['id'], [ 'url' => $url, 'events' => self::EVENTS, 'enabled' => true ] );
-            if ( is_wp_error( $res ) ) {
-                wp_send_json_error( $res->get_error_message() );
-            }
-            $hook = $res;
-        }
-
-        if ( $hook === null ) {
-            $res = $api->create_webhook( $url, self::EVENTS );
-            if ( is_wp_error( $res ) ) {
-                wp_send_json_error( $res->get_error_message() );
-            }
-            $hook = $res;
-        }
-
-        $settings['webhook_id']     = self::s( $hook['id'] ?? $settings['webhook_id'], 64 );
-        $settings['webhook_secret'] = self::s( $hook['secret'] ?? $settings['webhook_secret'], 128 );
-        self::update_settings( $settings );
-
-        if ( $settings['webhook_secret'] === '' ) {
-            wp_send_json_error( __( 'e-invoice.be gaf geen webhook-secret terug; inkomende meldingen kunnen niet gecontroleerd worden.', 'eme-accounting' ) );
-        }
-
-        wp_send_json_success( [
-            'webhook_id' => $settings['webhook_id'],
-            'url'        => $hook['url'] ?? $url,
-            'events'     => $hook['events'] ?? self::EVENTS,
-            'status'     => self::get_public_status(),
-        ] );
-    }
-
-    public static function ajax_webhook_delete(): void {
-        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
-        Capabilities::require_manage_ajax( 'peppol' );
-
-        $settings = self::get_settings();
-        if ( ! empty( $settings['webhook_id'] ) ) {
-            $api = self::api();
-            $res = $api->delete_webhook( $settings['webhook_id'] );
-            // A 404 means it is already gone: fine.
-            if ( is_wp_error( $res ) && $res->get_error_code() !== 'peppol_404' ) {
-                wp_send_json_error( $res->get_error_message() );
-            }
-        }
-
-        $settings['webhook_id']     = '';
-        $settings['webhook_secret'] = '';
-        self::update_settings( $settings );
-
-        wp_send_json_success( [ 'status' => self::get_public_status() ] );
+        wp_send_json_success( [ 'booking_status' => 'unbooked' ] );
     }
 
     /* ------------------------------------------------------------------
-     * Attachment proxy (called by Journal's shared dispatcher)
+     * Attachments (dispatched from Journal)
      * ------------------------------------------------------------------ */
 
     public static function ajax_delete_attachment(): void {
@@ -467,353 +403,58 @@ class Peppol {
     }
 
     /* ------------------------------------------------------------------
-     * Webhook (REST)
+     * Import / storage (used by every source)
      * ------------------------------------------------------------------ */
-
-    public static function register_rest_route(): void {
-        register_rest_route( self::REST_NS, self::REST_ROUTE, [
-            'methods'             => 'POST',
-            'callback'            => [ __CLASS__, 'handle_webhook' ],
-            'permission_callback' => '__return_true',
-        ] );
-    }
-
-    public static function handle_webhook( \WP_REST_Request $request ) {
-        $settings = self::get_settings();
-        $secret   = (string) $settings['webhook_secret'];
-        if ( $secret === '' ) {
-            return new \WP_REST_Response( [ 'error' => 'Peppol webhook is not configured.' ], 503 );
-        }
-
-        $body      = (string) $request->get_body();
-        $signature = (string) $request->get_header( 'x-signature' );
-
-        try {
-            $payload   = json_decode( $body, false, 512, JSON_THROW_ON_ERROR );
-            $canonical = self::canonical_json( $payload );
-        } catch ( \JsonException $e ) {
-            return new \WP_REST_Response( [ 'error' => 'Invalid JSON.' ], 400 );
-        }
-
-        $expected = 'sha256=' . hash_hmac( 'sha256', $canonical, $secret );
-        if ( ! hash_equals( $expected, $signature ) ) {
-            return new \WP_REST_Response( [ 'error' => 'Invalid signature.' ], 401 );
-        }
-
-        $event       = json_decode( $body, true );
-        $type        = is_array( $event ) ? (string) ( $event['type'] ?? '' ) : '';
-        $document_id = is_array( $event ) && is_array( $event['data'] ?? null ) ? (string) ( $event['data']['document_id'] ?? '' ) : '';
-
-        if ( $document_id === '' || ! in_array( $type, self::EVENTS, true ) ) {
-            // Unknown but validly signed: acknowledge so it is not retried.
-            return new \WP_REST_Response( [ 'ok' => true, 'ignored' => true ], 200 );
-        }
-
-        if ( $type === 'document.received.failed' ) {
-            self::mark_failed( $document_id, __( 'e-invoice.be kon het inkomende document niet verwerken.', 'eme-accounting' ) );
-        } else {
-            // Keep the webhook response fast: downloading UBL + attachments
-            // easily exceeds the 10 second delivery window.
-            wp_schedule_single_event( time(), self::CRON_FETCH, [ $document_id ] );
-            // wp-cron normally only fires on the next page view; kick it now.
-            if ( function_exists( 'spawn_cron' ) ) {
-                spawn_cron();
-            }
-        }
-
-        return new \WP_REST_Response( [ 'ok' => true ], 200 );
-    }
-
-    /** Port of the canonical JSON algorithm from the e-invoice.be docs. */
-    private static function canonical_json( $value ): string {
-        if ( $value instanceof \stdClass ) {
-            $members = (array) $value;
-            ksort( $members, SORT_STRING );
-            $parts = [];
-            foreach ( $members as $key => $member ) {
-                $parts[] = self::canonical_string( (string) $key ) . ': ' . self::canonical_json( $member );
-            }
-            return '{' . implode( ', ', $parts ) . '}';
-        }
-        if ( is_array( $value ) ) {
-            return '[' . implode( ', ', array_map( [ __CLASS__, 'canonical_json' ], $value ) ) . ']';
-        }
-        if ( is_string( $value ) ) {
-            return self::canonical_string( $value );
-        }
-        return (string) wp_json_encode( $value );
-    }
-
-    private static function canonical_string( string $text ): string {
-        $json = wp_json_encode( $text, JSON_UNESCAPED_SLASHES );
-        return str_replace( "\x7f", '\u007f', (string) $json );
-    }
-
-    /* ------------------------------------------------------------------
-     * Polling
-     * ------------------------------------------------------------------ */
-
-    public static function poll( bool $manual = false ) {
-        $settings = self::get_settings();
-        if ( empty( $settings['api_key'] ) ) {
-            return $manual ? new \WP_Error( 'peppol_no_key', __( 'Geen Peppol API-key ingesteld.', 'eme-accounting' ) ) : [];
-        }
-        if ( ! $manual && empty( $settings['poll_enabled'] ) ) {
-            return [];
-        }
-
-        // Cron and "sync now" must not run side by side.
-        if ( get_transient( self::LOCK_KEY ) ) {
-            return $manual ? new \WP_Error( 'peppol_busy', __( 'Er loopt al een synchronisatie, probeer het zo opnieuw.', 'eme-accounting' ) ) : [];
-        }
-        set_transient( self::LOCK_KEY, 1, 10 * MINUTE_IN_SECONDS );
-
-        try {
-            return self::run_poll( $settings, $manual );
-        } finally {
-            delete_transient( self::LOCK_KEY );
-        }
-    }
-
-    private static function run_poll( array $settings, bool $manual ): array {
-        $api        = self::api();
-        $limit      = $manual ? self::MAX_DOCS_MANUAL : self::MAX_DOCS_PER_RUN;
-        $processed  = 0;
-        $skipped    = 0;
-        $errors     = 0;
-        $poll_error = '';
-
-        // ── 1. Normal poll: everything newer than the cursor (minus a lag) ──
-        $cursor_ts = ! empty( $settings['cursor_created_at'] ) ? (int) strtotime( $settings['cursor_created_at'] ) : 0;
-
-        // sync_from: null = settings from before this field existed (no lag),
-        // '' = no floor (full history), otherwise nothing older is imported.
-        $sync_from = $settings['sync_from'] ?? null;
-        if ( $sync_from === null ) {
-            $floor_ts = $cursor_ts;
-        } else {
-            $floor_ts = $sync_from !== '' ? (int) strtotime( (string) $sync_from ) : 0;
-        }
-        $stop_ts = $cursor_ts ? max( $floor_ts, $cursor_ts - self::CURSOR_LAG ) : $floor_ts;
-
-        $opts            = [ 'limit' => $limit, 'retry_errors' => true, 'backoff' => ! $manual ];
-        $newest          = '';
-        $page            = 1;
-        $normal_complete = true;
-
-        for ( $i = 0; $i < self::MAX_POLL_PAGES; $i++ ) {
-            $res = $api->inbox( [
-                'sort_by'    => 'created_at',
-                'sort_order' => 'desc',
-                'page'       => $page,
-                'page_size'  => self::PAGE_SIZE,
-            ] );
-            if ( is_wp_error( $res ) ) {
-                $errors++;
-                $normal_complete = false;
-                $poll_error      = $res->get_error_message();
-                break;
-            }
-
-            $items = is_array( $res['items'] ?? null ) ? $res['items'] : [];
-            if ( $i === 0 && $items ) {
-                $newest = (string) ( $items[0]['created_at'] ?? '' );
-            }
-
-            $eligible = [];
-            $stop     = false;
-            foreach ( $items as $item ) {
-                if ( empty( $item['id'] ) ) {
-                    continue;
-                }
-                $ts = ! empty( $item['created_at'] ) ? (int) strtotime( (string) $item['created_at'] ) : 0;
-                if ( $stop_ts && $ts && $ts < $stop_ts ) {
-                    $stop = true;
-                    break;
-                }
-                $eligible[] = $item;
-            }
-
-            $limit_hit = false;
-            if ( $eligible && ! self::process_items( $eligible, $processed, $skipped, $errors, $opts ) ) {
-                $limit_hit       = true;
-                $normal_complete = false;
-            }
-
-            if ( $stop || $limit_hit || empty( $res['has_next_page'] ) ) {
-                break;
-            }
-            $page++;
-        }
-
-        // Hitting the page cap with more pages left means the scan is not
-        // complete either: leave the cursor where it is.
-        if ( $page > self::MAX_POLL_PAGES ) {
-            $normal_complete = false;
-        }
-
-        // Only move the cursor when the scan finished without errors or a
-        // per-run limit. Otherwise the next poll could skip documents that
-        // this run did not get to.
-        if ( $newest !== '' && $normal_complete && (int) strtotime( $newest ) > $cursor_ts ) {
-            $settings['cursor_created_at'] = $newest;
-        }
-
-        // ── 2. One-time backfill of older documents ──────────────────────
-        if ( empty( $settings['backfill_done'] ) && (int) $settings['backfill_page'] > 0 ) {
-            $opts      = [ 'limit' => $limit, 'retry_errors' => false, 'backoff' => true ];
-            $page      = (int) $settings['backfill_page'];
-            $pages     = 0;
-            $exhausted = false;
-            $limit_hit = false;
-
-            while ( $pages < self::MAX_BACKFILL_PAGES ) {
-                $res = $api->inbox( [
-                    'sort_by'    => 'created_at',
-                    'sort_order' => 'desc',
-                    'page'       => $page,
-                    'page_size'  => self::PAGE_SIZE,
-                ] );
-                if ( is_wp_error( $res ) ) {
-                    $errors++;
-                    if ( $poll_error === '' ) {
-                        $poll_error = $res->get_error_message();
-                    }
-                    break;
-                }
-
-                $items = is_array( $res['items'] ?? null ) ? $res['items'] : [];
-                if ( $items && ! self::process_items( $items, $processed, $skipped, $errors, $opts ) ) {
-                    $limit_hit = true;
-                    break;
-                }
-
-                if ( empty( $res['has_next_page'] ) ) {
-                    $exhausted = true;
-                    break;
-                }
-                $page++;
-                $pages++;
-            }
-
-            if ( $exhausted ) {
-                $settings['backfill_done'] = 1;
-                $settings['backfill_page'] = 0;
-            } elseif ( ! $limit_hit ) {
-                $settings['backfill_page'] = $page;
-            }
-        }
-
-        $settings['last_poll_at']     = gmdate( 'Y-m-d H:i:s' );
-        $settings['last_poll_status'] = $poll_error !== '' ? $poll_error : sprintf(
-            /* translators: 1: processed, 2: skipped, 3: errors */
-            __( 'Verwerkt: %1$d, overgeslagen: %2$d, fouten: %3$d', 'eme-accounting' ),
-            $processed,
-            $skipped,
-            $errors
-        );
-        self::save_runtime_state( $settings );
-
-        return [
-            'processed' => $processed,
-            'skipped'   => $skipped,
-            'errors'    => $errors,
-        ];
-    }
 
     /**
-     * Fetch metadata/files for each inbox item that is not yet in the DB
-     * (and, for the normal poll, retry rows that ended in an error).
+     * Store a document that did not come from the e-invoice.be API (IMAP).
      *
-     * @param array $opts limit (int), retry_errors (bool), backoff (bool).
-     * @return bool False when the per-run document limit was reached.
+     * @param array<int,array{name:string,contents:string,key?:string,type?:string}> $files
+     * @return int|\WP_Error
      */
-    private static function process_items( array $items, int &$processed, int &$skipped, int &$errors, array $opts ): bool {
-        $ids = [];
-        foreach ( $items as $item ) {
-            if ( ! empty( $item['id'] ) ) {
-                $ids[] = (string) $item['id'];
-            }
-        }
-        $existing = self::existing_docs( $ids );
-
-        foreach ( $items as $item ) {
-            $id = (string) ( $item['id'] ?? '' );
-            if ( $id === '' ) {
-                continue;
-            }
-            if ( isset( $existing[ $id ] ) && ! self::should_retry( $existing[ $id ], $opts ) ) {
-                $skipped++;
-                continue;
-            }
-            if ( $processed >= (int) $opts['limit'] ) {
-                return false;
-            }
-            $result = self::fetch_document( $id );
-            if ( is_wp_error( $result ) ) {
-                $errors++;
-            } else {
-                $processed++;
-            }
-        }
-        return true;
-    }
-
-    private static function should_retry( array $row, array $opts ): bool {
-        if ( empty( $opts['retry_errors'] ) || $row['status'] !== 'error' ) {
-            return false;
-        }
-        if ( empty( $opts['backoff'] ) ) {
-            return true;
-        }
-        $fetched = $row['fetched_at'] ? (int) strtotime( $row['fetched_at'] . ' UTC' ) : 0;
-        return $fetched < time() - self::RETRY_BACKOFF;
-    }
-
-    /** @return array<string, array{status:string, fetched_at:?string}> keyed by document_id */
-    private static function existing_docs( array $ids ): array {
+    public static function import_external_document( array $doc, string $xml = '', array $files = [] ) {
         global $wpdb;
-        $ids = array_values( array_unique( array_filter( array_map( 'strval', $ids ) ) ) );
-        if ( ! $ids ) {
-            return [];
-        }
-        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%s' ) );
-        $table        = $wpdb->prefix . self::TABLE;
-        $found        = $wpdb->get_results( $wpdb->prepare( "SELECT document_id, processing_status, fetched_at FROM `{$table}` WHERE document_id IN ({$placeholders})", ...$ids ), ARRAY_A ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $map          = [];
-        foreach ( (array) $found as $row ) {
-            $map[ (string) $row['document_id'] ] = [
-                'status'     => (string) $row['processing_status'],
-                'fetched_at' => $row['fetched_at'] ?: null,
-            ];
-        }
-        return $map;
-    }
+        $table = $wpdb->prefix . self::TABLE;
 
-    public static function fetch_document_cron( $document_id ): void {
-        self::fetch_document( (string) $document_id );
-    }
+        // The same invoice can arrive through the e-invoice.be API and through
+        // a forwarded mail. Reuse the existing row in that case so the
+        // XML/PDF is attached to the booking the user already sees.
+        $document_id = self::s( $doc['id'] ?? '', 64 );
+        $exists      = $document_id !== ''
+            ? $wpdb->get_row( $wpdb->prepare( "SELECT document_id, peppol_status FROM `{$table}` WHERE document_id = %s", $document_id ) )
+            : null;
+        if ( $exists ) {
+            $doc['id'] = $exists->document_id;
+            $doc['_preserve_status'] = (string) $exists->peppol_status !== '';
+        } else {
+            $invoice_id   = self::s( $doc['invoice_id'] ?? '', 100 );
+            $invoice_date = self::date_or_null( $doc['invoice_date'] ?? null );
+            $amount       = abs( (float) ( $doc['invoice_total'] ?? 0 ) );
+            if ( $invoice_id !== '' && $invoice_date && $amount > 0 ) {
+                $where  = 'invoice_id = %s AND invoice_date = %s AND ABS(invoice_total - %f) < 0.005';
+                $params = [ $invoice_id, $invoice_date, $amount ];
 
-    /**
-     * Download metadata, UBL and attachments for one document.
-     *
-     * @return true|\WP_Error
-     */
-    public static function fetch_document( string $document_id ) {
-        $document_id = trim( sanitize_text_field( $document_id ) );
-        if ( $document_id === '' ) {
-            return new \WP_Error( 'peppol_no_document', __( 'Leeg document-id.', 'eme-accounting' ) );
-        }
+                $tax_id = self::s( $doc['vendor_tax_id'] ?? '', 64 );
+                if ( $tax_id !== '' ) {
+                    $where   .= ' AND vendor_tax_id = %s';
+                    $params[] = $tax_id;
+                } else {
+                    $vendor = self::s( $doc['vendor_name'] ?? '', 255 );
+                    if ( $vendor !== '' ) {
+                        $where   .= ' AND vendor_name = %s';
+                        $params[] = $vendor;
+                    }
+                }
 
-        $api = self::api();
-        if ( ! $api->is_configured() ) {
-            return new \WP_Error( 'peppol_no_key', __( 'Geen Peppol API-key ingesteld.', 'eme-accounting' ) );
-        }
-
-        $doc = $api->document( $document_id );
-        if ( is_wp_error( $doc ) ) {
-            self::mark_failed( $document_id, $doc->get_error_message(), false );
-            return $doc;
+                $match = $wpdb->get_row( $wpdb->prepare(
+                    "SELECT document_id, peppol_status FROM `{$table}` WHERE {$where} ORDER BY id LIMIT 1",
+                    ...$params
+                ) );
+                if ( $match ) {
+                    $doc['id'] = $match->document_id;
+                    $doc['_preserve_status'] = (string) $match->peppol_status !== '';
+                }
+            }
         }
 
         $row_id = self::upsert_document( $doc );
@@ -821,26 +462,40 @@ class Peppol {
             return $row_id;
         }
 
-        // A successful metadata fetch clears an earlier error; a failing
-        // UBL/attachment download below can set it again.
-        global $wpdb;
-        $wpdb->update(
-            $wpdb->prefix . self::TABLE,
-            [ 'processing_status' => 'new' ],
-            [ 'id' => (int) $row_id, 'processing_status' => 'error' ]
-        );
+        $attachments = self::get_attachments();
+        $existing    = [];
+        foreach ( $attachments->get_files( (int) $row_id, self::TYPE, '' ) as $file ) {
+            $existing[ (string) $file['name'] ] = true;
+        }
 
-        self::ensure_ubl( (int) $row_id, $document_id, $api );
-        self::ensure_attachments( (int) $row_id, $document_id, $api );
+        if ( $xml !== '' && ! $attachments->get_files( (int) $row_id, self::TYPE, 'ubl' ) ) {
+            $name = self::s( $doc['ubl_name'] ?? '', 255 );
+            if ( $name === '' ) {
+                $name = ( self::s( $doc['invoice_id'] ?? '', 100 ) ?: 'document' ) . '.xml';
+            }
+            if ( pathinfo( $name, PATHINFO_EXTENSION ) === '' ) {
+                $name .= '.xml';
+            }
+            $attachments->store_bytes( (int) $row_id, self::TYPE, 'ubl', $name, $xml, [ 'xml' ] );
+            $existing[ $name ] = true;
+        }
 
-        return true;
+        foreach ( $files as $file ) {
+            $name = self::s( $file['name'] ?? '', 255 );
+            $data = $file['contents'] ?? '';
+            if ( $name === '' || $data === '' || isset( $existing[ $name ] ) ) {
+                continue;
+            }
+            $key = in_array( ( $file['key'] ?? '' ), [ 'pdf', 'att' ], true ) ? (string) $file['key'] : 'att';
+            if ( $attachments->store_bytes( (int) $row_id, self::TYPE, $key, $name, $data ) !== false ) {
+                $existing[ $name ] = true;
+            }
+        }
+
+        return (int) $row_id;
     }
 
-    /* ------------------------------------------------------------------
-     * Storage
-     * ------------------------------------------------------------------ */
-
-    private static function upsert_document( array $doc ) {
+    public static function upsert_document( array $doc ) {
         global $wpdb;
         $table       = $wpdb->prefix . self::TABLE;
         $document_id = self::s( $doc['id'] ?? '', 64 );
@@ -853,7 +508,7 @@ class Peppol {
 
         $data = [
             'direction'          => self::s( $doc['direction'] ?? 'INBOUND', 16 ),
-            'state'              => self::s( $doc['state'] ?? 'RECEIVED', 20 ),
+            'peppol_status'      => self::s( $doc['state'] ?? 'RECEIVED', 20 ),
             'document_type'      => self::s( $doc['document_type'] ?? '', 40 ),
             'invoice_id'         => self::s( $doc['invoice_id'] ?? '', 100 ),
             'invoice_date'       => self::date_or_null( $doc['invoice_date'] ?? null ),
@@ -886,6 +541,9 @@ class Peppol {
 
         $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE document_id = %s", $document_id ) );
         if ( $existing ) {
+            if ( ! empty( $doc['_preserve_status'] ) ) {
+                unset( $data['peppol_status'] );
+            }
             $wpdb->update( $table, $data, [ 'id' => (int) $existing ] );
             return (int) $existing;
         }
@@ -904,162 +562,199 @@ class Peppol {
         return (int) $wpdb->insert_id;
     }
 
-    private static function ensure_ubl( int $row_id, string $document_id, PeppolApi $api ): void {
-        if ( self::get_attachments()->get_files( $row_id, self::TYPE, 'ubl' ) ) {
-            return;
-        }
+    /* ------------------------------------------------------------------
+     * Booking helpers
+     * ------------------------------------------------------------------ */
 
-        $meta = $api->ubl( $document_id );
-        if ( is_wp_error( $meta ) ) {
-            self::set_row_error( $row_id, $meta->get_error_message() );
-            return;
-        }
-
-        $url = (string) ( $meta['signed_url'] ?? '' );
-        if ( $url === '' ) {
-            self::set_row_error( $row_id, __( 'Geen UBL-download-URL ontvangen.', 'eme-accounting' ) );
-            return;
-        }
-
-        $name = self::s( $meta['file_name'] ?? $document_id . '.xml', 255 );
-        if ( pathinfo( $name, PATHINFO_EXTENSION ) === '' ) {
-            $name .= '.xml';
-        }
-
-        $bytes = $api->download_file( $url );
-        if ( is_wp_error( $bytes ) ) {
-            self::set_row_error( $row_id, $bytes->get_error_message() );
-            return;
-        }
-
-        if ( self::get_attachments()->store_bytes( $row_id, self::TYPE, 'ubl', $name, $bytes, [ 'xml' ] ) === false ) {
-            self::set_row_error( $row_id, __( 'UBL kon niet op schijf worden bewaard.', 'eme-accounting' ) );
-        }
-    }
-
-    private static function ensure_attachments( int $row_id, string $document_id, PeppolApi $api ): void {
+    private static function get_document_row( int $id ): ?object {
         global $wpdb;
-        $table = $wpdb->prefix . self::TABLE;
-        $row   = $wpdb->get_row( $wpdb->prepare( "SELECT attachments_json FROM `{$table}` WHERE id = %d", $row_id ) );
-
-        $old     = $row && $row->attachments_json ? json_decode( (string) $row->attachments_json, true ) : [];
-        $old     = is_array( $old ) ? $old : [];
-        $old_map = [];
-        foreach ( $old as $att ) {
-            if ( ! empty( $att['id'] ) ) {
-                $old_map[ (string) $att['id'] ] = $att;
-            }
+        if ( $id <= 0 ) {
+            return null;
         }
-
-        $local_files = [];
-        foreach ( self::get_attachments()->get_files( $row_id, self::TYPE, '' ) as $file ) {
-            $local_files[ $file['field_name'] ] = true;
-        }
-
-        $list = $api->attachments( $document_id );
-        if ( is_wp_error( $list ) ) {
-            self::set_row_error( $row_id, $list->get_error_message() );
-            return;
-        }
-        if ( ! is_array( $list ) || ! $list ) {
-            return;
-        }
-
-        $changed = false;
-        foreach ( $list as &$att ) {
-            $att_id = self::s( $att['id'] ?? '', 64 );
-            if ( $att_id !== '' && isset( $old_map[ $att_id ]['_local'] ) ) {
-                $att['_local'] = $old_map[ $att_id ]['_local'];
-            }
-            if ( ! empty( $att['_local'] ) && isset( $local_files[ $att['_local'] ] ) ) {
-                continue;
-            }
-
-            $url = (string) ( $att['file_url'] ?? '' );
-            if ( $url === '' ) {
-                continue;
-            }
-            $name = self::s( $att['file_name'] ?? ( 'attachment-' . $att_id ), 255 );
-            if ( pathinfo( $name, PATHINFO_EXTENSION ) === '' ) {
-                continue;
-            }
-
-            $key   = ( ( $att['file_type'] ?? '' ) === 'application/pdf' ) ? 'pdf' : 'att';
-            $bytes = $api->download_file( $url );
-            if ( is_wp_error( $bytes ) ) {
-                self::set_row_error( $row_id, $bytes->get_error_message() );
-                continue;
-            }
-
-            $stored = self::get_attachments()->store_bytes( $row_id, self::TYPE, $key, $name, $bytes );
-            if ( $stored === false ) {
-                self::set_row_error( $row_id, sprintf(
-                    /* translators: %s: filename */
-                    __( 'Bijlage %s kon niet op schijf worden bewaard.', 'eme-accounting' ),
-                    $name
-                ) );
-                continue;
-            }
-            $att['_local']       = $stored;
-            $local_files[ $stored ] = true;
-            $changed             = true;
-        }
-        unset( $att );
-
-        if ( $changed ) {
-            $wpdb->update( $table, [ 'attachments_json' => wp_json_encode( $list ) ], [ 'id' => $row_id ] );
-        }
-    }
-
-    private static function set_row_error( int $row_id, string $message ): void {
-        global $wpdb;
-        $wpdb->update(
-            $wpdb->prefix . self::TABLE,
-            [
-                'processing_status' => 'error',
-                'last_error'        => $message,
-            ],
-            [ 'id' => $row_id ]
+        return $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}" . self::TABLE . "` WHERE id = %d", $id )
         );
     }
 
-    /**
-     * @param bool $set_state True for the "document.received.failed" event
-     *                        (e-invoice.be could not process it). False for a
-     *                        failed fetch on our side, which must not overwrite
-     *                        the state of a document we already have.
-     */
-    public static function mark_failed( string $document_id, string $message, bool $set_state = true ): void {
+    private static function booking_amount( object $row ): float {
+        $amount = abs( (float) ( $row->invoice_total ?? 0 ) );
+        if ( $amount <= 0 ) {
+            $amount = abs( (float) ( $row->amount_due ?? 0 ) );
+        }
+        return round( $amount, 2 );
+    }
+
+    private static function booking_direction( object $row ): string {
+        return str_contains( strtoupper( (string) ( $row->document_type ?? '' ) ), 'CREDIT_NOTE' ) ? 'in' : 'out';
+    }
+
+    private static function booking_reference( object $row ): string {
+        $reference = (string) ( $row->payment_reference ?? '' );
+        if ( $reference === '' ) {
+            $reference = (string) ( $row->invoice_id ?? '' );
+        }
+        return mb_substr( $reference, 0, 100 );
+    }
+
+    private static function booking_description( object $row ): string {
+        $label = self::booking_direction( $row ) === 'in'
+            ? __( 'Peppol creditnota', 'eme-accounting' )
+            : __( 'Peppol factuur', 'eme-accounting' );
+
+        if ( ! empty( $row->invoice_id ) ) {
+            $label .= ' ' . $row->invoice_id;
+        }
+        if ( ! empty( $row->vendor_name ) ) {
+            $label .= ' – ' . $row->vendor_name;
+        }
+        return mb_substr( $label, 0, 255 );
+    }
+
+    /** @return array{0:string,1:float} vat code and vat amount */
+    private static function booking_vat( object $row ): array {
+        $config = \EMEVzw\Config::get();
+        if ( empty( $config->vat_liable ) ) {
+            return [ '', 0.0 ];
+        }
+
+        $taxes = json_decode( (string) ( $row->tax_details_json ?? '' ), true );
+        $taxes = is_array( $taxes ) ? $taxes : [];
+        $rates = [];
+        foreach ( $taxes as $tax ) {
+            if ( ! is_array( $tax ) ) {
+                continue;
+            }
+            $rate = $tax['rate'] ?? ( $tax['tax_rate'] ?? null );
+            if ( is_numeric( $rate ) ) {
+                $rates[] = (string) (float) $rate;
+            }
+        }
+        $rates = array_values( array_unique( $rates ) );
+
+        $code = '';
+        if ( count( $rates ) === 1 ) {
+            $rate = (string) $rates[0];
+            if ( (float) $rate === 0.0 ) {
+                $code = 'exempt';
+            } elseif ( in_array( $rate, Vat::rates(), true ) ) {
+                $code = $rate;
+            }
+        }
+
+        return [ $code, round( (float) ( $row->total_tax ?? 0 ), 2 ) ];
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private static function booking_candidates( object $row, int $account_id, ?float $amount = null ): array {
+        global $wpdb;
+
+        $amount = $amount !== null ? round( abs( $amount ), 2 ) : self::booking_amount( $row );
+        if ( $amount <= 0 || $account_id <= 0 ) {
+            return [];
+        }
+
+        $direction = self::booking_direction( $row );
+        $date      = self::date_or_null( $row->invoice_date ?? null ) ?: current_time( 'Y-m-d' );
+        $journal   = $wpdb->prefix . 'emeacc_journal';
+        $peppol    = $wpdb->prefix . self::TABLE;
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT j.id, j.entry_date, j.description, j.amount, j.direction, j.bank_statement_ref, j.is_reconciled
+             FROM `{$journal}` j
+             WHERE j.account_id = %d
+               AND j.direction = %s
+               AND j.amount = %f
+               AND j.transfer_id IS NULL
+               AND j.is_closing_entry = 0
+               AND j.entry_date BETWEEN DATE_SUB(%s, INTERVAL 60 DAY) AND DATE_ADD(%s, INTERVAL 60 DAY)
+               AND NOT EXISTS ( SELECT 1 FROM `{$peppol}` p WHERE p.journal_id = j.id )
+             ORDER BY ABS(DATEDIFF(j.entry_date, %s)), j.id DESC
+             LIMIT 10",
+            $account_id,
+            $direction,
+            $amount,
+            $date,
+            $date,
+            $date
+        ) );
+
+        $out = [];
+        foreach ( (array) $rows as $candidate ) {
+            $out[] = [
+                'id'                 => (int) $candidate->id,
+                'entry_date'         => (string) $candidate->entry_date,
+                'entry_date_display' => eme_localized_date( $candidate->entry_date, EME_TIMEZONE ),
+                'description'        => (string) $candidate->description,
+                'amount'             => (float) $candidate->amount,
+                'direction'          => (string) $candidate->direction,
+                'bank_statement_ref' => (string) $candidate->bank_statement_ref,
+                'is_reconciled'      => (int) $candidate->is_reconciled,
+                'journal_edit_url'   => admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $candidate->id ),
+            ];
+        }
+        return $out;
+    }
+
+    private static function link_document_to_journal( object $row, int $journal_id ): bool|\WP_Error {
+        global $wpdb;
+
+        if ( ! empty( $row->journal_id ) ) {
+            return new \WP_Error( 'peppol_already_booked', __( 'Dit document is al geboekt.', 'eme-accounting' ) );
+        }
+
+        $entry = Journal::get( $journal_id );
+        if ( ! $entry ) {
+            return new \WP_Error( 'peppol_journal_missing', __( 'Boeking niet gevonden.', 'eme-accounting' ) );
+        }
+        if ( ! empty( $entry->transfer_id ) ) {
+            return new \WP_Error( 'peppol_journal_transfer', __( 'Een transfer kan niet aan een Peppol-document gekoppeld worden.', 'eme-accounting' ) );
+        }
+        if ( ! empty( $entry->is_closing_entry ) ) {
+            return new \WP_Error( 'peppol_journal_closing', __( 'Een afsluitboeking kan niet gekoppeld worden.', 'eme-accounting' ) );
+        }
+        if ( (string) $entry->direction !== self::booking_direction( $row ) ) {
+            return new \WP_Error( 'peppol_journal_direction', __( 'De richting van de boeking komt niet overeen met het document.', 'eme-accounting' ) );
+        }
+
+        $expected = self::booking_amount( $row );
+        if ( $expected > 0 && abs( (float) $entry->amount - $expected ) > 0.005 ) {
+            return new \WP_Error( 'peppol_journal_amount', __( 'Het bedrag van de boeking komt niet overeen met het document.', 'eme-accounting' ) );
+        }
+
+        $table = $wpdb->prefix . self::TABLE;
+        $other = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM `{$table}` WHERE journal_id = %d AND id <> %d LIMIT 1",
+            $journal_id,
+            (int) $row->id
+        ) );
+        if ( $other ) {
+            return new \WP_Error( 'peppol_journal_in_use', __( 'Deze boeking is al aan een ander Peppol-document gekoppeld.', 'eme-accounting' ) );
+        }
+
+        $updated = $wpdb->query( $wpdb->prepare(
+            "UPDATE `{$table}`
+             SET journal_id = %d, booked_at = %s, booked_by = %d
+             WHERE id = %d AND journal_id IS NULL",
+            $journal_id,
+            current_time( 'mysql' ),
+            (int) get_current_user_id(),
+            (int) $row->id
+        ) );
+        if ( $updated === false || $updated !== 1 ) {
+            return new \WP_Error( 'peppol_booking_conflict', __( 'Het document kon niet geboekt worden. Misschien is het intussen al door iemand anders geboekt.', 'eme-accounting' ) );
+        }
+        return true;
+    }
+
+    public static function on_journal_deleted( int $entry_id ): void {
         global $wpdb;
         $table = $wpdb->prefix . self::TABLE;
-
-        $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE document_id = %s", $document_id ) );
-        if ( $existing ) {
-            $update = [
-                'processing_status' => 'error',
-                'last_error'        => $message,
-                'fetched_at'        => gmdate( 'Y-m-d H:i:s' ),
-            ];
-            if ( $set_state ) {
-                $update['state'] = 'FAILED';
-            }
-            $wpdb->update( $table, $update, [ 'id' => (int) $existing ] );
-            return;
-        }
-
-        $row = [
-            'document_id'       => self::s( $document_id, 64 ),
-            'direction'         => 'INBOUND',
-            'currency'          => 'EUR',
-            'processing_status' => 'error',
-            'last_error'        => $message,
-            'received_at'       => gmdate( 'Y-m-d H:i:s' ),
-            'fetched_at'        => gmdate( 'Y-m-d H:i:s' ),
-        ];
-        if ( $set_state ) {
-            $row['state'] = 'FAILED';
-        }
-        $wpdb->insert( $table, $row );
+        $wpdb->query( $wpdb->prepare(
+            "UPDATE `{$table}`
+             SET journal_id = NULL, booked_at = NULL, booked_by = NULL
+             WHERE journal_id = %d",
+            $entry_id
+        ) );
     }
 
     /* ------------------------------------------------------------------
@@ -1091,9 +786,12 @@ class Peppol {
             $where[]   = 'processing_status = %s';
             $prepare[] = $args['status'];
         }
-        if ( ! empty( $args['state'] ) ) {
-            $where[]   = 'state = %s';
-            $prepare[] = $args['state'];
+        if ( ! empty( $args['booking_status'] ) ) {
+            $where[] = $args['booking_status'] === 'booked' ? 'journal_id IS NOT NULL' : 'journal_id IS NULL';
+        }
+        if ( ! empty( $args['peppol_status'] ) ) {
+            $where[]   = 'peppol_status = %s';
+            $prepare[] = $args['peppol_status'];
         }
         if ( ! empty( $args['daterange'] ) ) {
             $parts = array_map( 'trim', explode( ',', (string) $args['daterange'] ) );
@@ -1109,12 +807,15 @@ class Peppol {
     }
 
     private static function build_order( string $raw ): string {
-        $allowed = [ 'id', 'invoice_date', 'received_at', 'invoice_total', 'vendor_name', 'invoice_id', 'document_type', 'state', 'processing_status' ];
+        $allowed = [ 'id', 'invoice_date', 'received_at', 'invoice_total', 'vendor_name', 'invoice_id', 'document_type', 'peppol_status', 'processing_status', 'journal_id' ];
         $out     = [];
 
         foreach ( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) as $part ) {
             if ( preg_match( '/^([a-z_]+)(?:\s+(asc|desc))?$/i', $part, $m ) ) {
                 $column = strtolower( $m[1] );
+                if ( $column === 'booking_status' ) {
+                    $column = 'journal_id';
+                }
                 if ( ! in_array( $column, $allowed, true ) ) {
                     continue;
                 }
@@ -1126,7 +827,7 @@ class Peppol {
         return $out ? implode( ', ', $out ) : 'received_at DESC, id DESC';
     }
 
-    private static function s( $value, int $max = 0 ): string {
+    public static function s( $value, int $max = 0 ): string {
         if ( ! is_scalar( $value ) ) {
             return '';
         }

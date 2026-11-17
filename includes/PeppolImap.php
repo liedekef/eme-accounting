@@ -4,11 +4,19 @@ namespace EMEAccounting;
 
 defined( 'ABSPATH' ) || exit;
 
+use EventsMadeEasy\ImapClient;
+
 /**
- * Optional IMAP ingestion for Peppol documents forwarded by Doccle.
+ * Optional IMAP ingestion for Peppol documents forwarded by mail.
  *
- * Doccle mails the UBL XML and can also attach a PDF. Documents are stored in
+ * Mails should contain the UBL XML and optionally a PDF. Documents are stored in
  * the same inbox table as the e-invoice.be API, keyed by the UBL UUID.
+ *
+ * The mailbox is only ever read (EXAMINE, BODY.PEEK): nothing is flagged or
+ * moved. Every run looks at the messages that arrived since twice the time
+ * since the last successful check; imports are idempotent, so seeing a message
+ * again is harmless and gives a one-off failure a second chance. A direct
+ * XML upload covers the rest.
  */
 class PeppolImap {
 
@@ -16,9 +24,13 @@ class PeppolImap {
     const LOCK_NAME = 'emeacc_peppol_imap_poll_';
     const MAX_XML   = 5242880;
 
+    /** Max XML files per upload request. */
+    const MAX_UPLOAD_FILES = 20;
+
     public static function init(): void {
         add_action( 'wp_ajax_eme_accounting_peppol_mailbox_test', [ __CLASS__, 'ajax_test_connection' ] );
         add_action( 'wp_ajax_eme_accounting_peppol_mailbox_sync', [ __CLASS__, 'ajax_sync' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_import_xml', [ __CLASS__, 'ajax_import_xml' ] );
         add_action( self::CRON_POLL, [ __CLASS__, 'poll' ] );
 
         if ( is_admin() || wp_doing_cron() ) {
@@ -42,7 +54,23 @@ class PeppolImap {
     }
 
     public static function is_available(): bool {
-        return class_exists( PeppolImapClient::class ) && function_exists( 'stream_socket_client' );
+        return function_exists( 'stream_socket_client' ) && self::ensure_imap_client();
+    }
+
+    private static function ensure_imap_client(): bool {
+        if ( class_exists( ImapClient::class ) ) {
+            return true;
+        }
+        if ( ! defined( 'EME_PLUGIN_DIR' ) ) {
+            return false;
+        }
+
+        $file = EME_PLUGIN_DIR . 'includes/class-imap.php';
+        if ( ! file_exists( $file ) ) {
+            return false;
+        }
+        require_once $file;
+        return class_exists( ImapClient::class );
     }
 
     public static function is_configured( array $settings ): bool {
@@ -62,7 +90,6 @@ class PeppolImap {
             'encryption'     => (string) $s['imap_encryption'],
             'username'       => (string) $s['imap_username'],
             'folder'         => (string) $s['imap_folder'],
-            'mark_seen'      => (int) $s['imap_mark_seen'],
             'max_messages'   => (int) $s['imap_max_messages'],
             'last_poll_at'   => (string) $s['imap_last_poll_at'],
             'last_poll_status' => (string) $s['imap_last_poll_status'],
@@ -86,19 +113,12 @@ class PeppolImap {
             wp_send_json_error( $client->get_error_message() );
         }
 
-        $unseen = $client->search( [ 'UNSEEN' ] );
-        if ( $client->get_last_error() !== '' ) {
-            $error = $client->get_last_error();
-            $client->logout();
-            wp_send_json_error( $error );
-        }
         $messages = $client->message_count();
         $client->logout();
 
         wp_send_json_success( [
             'mailbox'  => self::mailbox_label( $settings ),
             'messages' => $messages,
-            'unseen'   => count( $unseen ),
         ] );
     }
 
@@ -130,18 +150,39 @@ class PeppolImap {
             return $manual ? new \WP_Error( 'peppol_imap_missing', $error ) : [];
         }
 
+        $result = self::with_lock( static function () use ( $settings, $manual ) {
+            return self::run_poll( $settings, $manual );
+        } );
+
+        // Cron has nobody to show an error to: it is stored as status instead.
+        return ( is_wp_error( $result ) && ! $manual ) ? [] : $result;
+    }
+
+    /** One run at a time (cron or "sync now"): atomic MySQL named lock. */
+    private static function with_lock( callable $fn ) {
         global $wpdb;
         $lock_name = self::LOCK_NAME . $wpdb->prefix;
         $got_lock  = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_name ) );
         if ( $got_lock != 1 ) {
-            return $manual ? new \WP_Error( 'peppol_imap_busy', __( 'Er loopt al een mailbox-synchronisatie.', 'eme-accounting' ) ) : [];
+            return new \WP_Error( 'peppol_imap_busy', __( 'Er loopt al een mailbox-synchronisatie.', 'eme-accounting' ) );
         }
 
         try {
-            return self::run_poll( $settings, $manual );
+            return $fn();
         } finally {
             $wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
         }
+    }
+
+    /**
+     * Start of the re-scan window: twice the time since the last successful
+     * check (at least an hour), or 7 days back on the very first run.
+     */
+    public static function window_start( int $checked_at, int $now ): int {
+        if ( $checked_at <= 0 || $checked_at > $now ) {
+            return $now - 7 * DAY_IN_SECONDS;
+        }
+        return $checked_at - max( $now - $checked_at, HOUR_IN_SECONDS );
     }
 
     private static function run_poll( array $settings, bool $manual ): array|\WP_Error {
@@ -153,38 +194,47 @@ class PeppolImap {
         }
 
         try {
-            $criteria = ! empty( $settings['imap_mark_seen'] )
-                ? [ 'UNSEEN' ]
-                : [ 'SINCE "' . gmdate( 'd-M-Y', time() - 7 * DAY_IN_SECONDS ) . '"' ];
+            $now   = time();
+            $since = self::window_start( (int) ( $settings['imap_checked_at'] ?? 0 ), $now );
 
-            $ids = $client->search( $criteria );
+            // IMAP SINCE works on whole days and ignores time zones: ask for one
+            // day too much, then filter on the exact arrival time.
+            $ids = $client->search( [ 'SINCE "' . gmdate( 'd-M-Y', $since - DAY_IN_SECONDS ) . '"' ] );
             if ( $client->get_last_error() !== '' ) {
                 self::save_status( $client->get_last_error() );
                 return $manual ? new \WP_Error( 'peppol_imap_search', $client->get_last_error() ) : $summary;
             }
-            rsort( $ids );
+
+            $fresh = [];
+            foreach ( $ids as $uid ) {
+                $arrived = $client->fetch_internal_date( (int) $uid );
+                if ( $arrived === null || $arrived >= $since ) { // unknown arrival time: process it
+                    $fresh[] = (int) $uid;
+                }
+            }
+            rsort( $fresh ); // newest first
 
             $limit = max( 1, min( 100, (int) $settings['imap_max_messages'] ) );
-            $ids   = array_slice( $ids, 0, $limit );
 
-            foreach ( $ids as $msgno ) {
-                $result = self::process_message( $client, (int) $msgno, $settings );
-                $summary['processed'] += (int) ( $result['processed'] ?? 0 );
-                $summary['skipped']   += (int) ( $result['skipped'] ?? 0 );
-                $summary['errors']    += (int) ( $result['errors'] ?? 0 );
+            foreach ( array_slice( $fresh, 0, $limit ) as $uid ) {
+                $result = self::process_message( $client, $uid );
+                foreach ( $summary as $key => $value ) {
+                    $summary[ $key ] = $value + (int) ( $result[ $key ] ?? 0 );
+                }
             }
 
-            if ( $ids ) {
-                self::save_status( sprintf(
+            $status = $fresh
+                ? sprintf(
                     /* translators: 1: processed, 2: skipped, 3: errors */
                     __( 'Verwerkt: %1$d, overgeslagen: %2$d, fouten: %3$d', 'eme-accounting' ),
                     $summary['processed'],
                     $summary['skipped'],
                     $summary['errors']
-                ) );
-            } else {
-                self::save_status( __( 'Geen berichten gevonden.', 'eme-accounting' ) );
-            }
+                )
+                : __( 'Geen nieuwe berichten.', 'eme-accounting' );
+            // The scan itself succeeded: move the window, even if single
+            // messages failed (they get a second chance in the next window).
+            self::save_status( $status, $now );
         } finally {
             $client->logout();
         }
@@ -192,23 +242,91 @@ class PeppolImap {
         return $summary;
     }
 
-    private static function process_message( PeppolImapClient $client, int $msgno, array $settings ): array {
-        $result = [ 'processed' => 0, 'skipped' => 0, 'errors' => 0 ];
+    /**
+     * Import UBL XML files directly (invoice that did not come in through
+     * Peppol or the mailbox, or a message that could not be processed).
+     */
+    public static function ajax_import_xml(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'peppol' );
 
-        $raw_header = (string) $client->fetch_header( $msgno );
+        $upload = $_FILES['xml_files'] ?? null; //phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput
+        if ( ! is_array( $upload ) || empty( $upload['tmp_name'] ) ) {
+            wp_send_json_error( __( 'Geen bestanden ontvangen.', 'eme-accounting' ) );
+        }
+
+        $names  = (array) $upload['name'];
+        $tmps   = (array) $upload['tmp_name'];
+        $errors = (array) $upload['error'];
+
+        $total  = [ 'processed' => 0, 'skipped' => 0, 'errors' => 0 ];
+        $detail = [];
+        if ( count( $tmps ) > self::MAX_UPLOAD_FILES ) {
+            /* translators: %d: number of files */
+            $detail[] = sprintf( __( 'Maximaal %d bestanden per keer: de rest is genegeerd.', 'eme-accounting' ), self::MAX_UPLOAD_FILES );
+        }
+
+        foreach ( array_slice( array_keys( $tmps ), 0, self::MAX_UPLOAD_FILES ) as $i ) {
+            $name = sanitize_file_name( wp_unslash( (string) ( $names[ $i ] ?? '' ) ) );
+            $name = $name !== '' ? $name : 'document.xml';
+            $tmp  = (string) $tmps[ $i ];
+
+            if ( (int) ( $errors[ $i ] ?? UPLOAD_ERR_NO_FILE ) !== UPLOAD_ERR_OK || ! is_uploaded_file( $tmp ) ) {
+                $total['errors']++;
+                $detail[] = $name . ': ' . __( 'upload mislukt', 'eme-accounting' );
+                continue;
+            }
+            if ( (int) filesize( $tmp ) > self::MAX_XML ) {
+                $total['errors']++;
+                $detail[] = $name . ': ' . __( 'bestand is te groot', 'eme-accounting' );
+                continue;
+            }
+
+            $xml    = (string) file_get_contents( $tmp );
+            $result = self::import_attachments(
+                [ [ 'name' => $name, 'mime' => 'application/xml', 'contents' => $xml ] ],
+                'upload',
+                'upload-' . substr( hash( 'sha256', $xml ), 0, 16 ),
+                '',
+                gmdate( 'Y-m-d H:i:s' )
+            );
+            foreach ( $total as $key => $value ) {
+                $total[ $key ] = $value + (int) ( $result[ $key ] ?? 0 );
+            }
+            $detail = array_merge( $detail, $result['detail'] );
+        }
+
+        wp_send_json_success( $total + [ 'detail' => array_slice( $detail, 0, 20 ) ] );
+    }
+
+    private static function process_message( ImapClient $client, int $uid ): array {
+        $raw_header = (string) $client->fetch_header( $uid );
         $message_id = trim( self::header_value( $raw_header, 'Message-ID' ) );
         if ( $message_id === '' ) {
-            $message_id = 'message-' . $msgno;
+            $message_id = 'message-' . $uid;
         }
         $subject = self::decode_header_value( self::header_value( $raw_header, 'Subject' ) );
         $date    = (int) strtotime( self::header_value( $raw_header, 'Date' ) );
         $date    = $date > 0 ? gmdate( 'Y-m-d H:i:s', $date ) : gmdate( 'Y-m-d H:i:s' );
 
-        $attachments = self::extract_attachments( $client, $msgno, $raw_header );
+        $attachments = self::extract_attachments( $client, $uid, $raw_header );
         if ( $attachments === null ) {
-            $result['errors'] = 1;
-            return $result;
+            return [ 'processed' => 0, 'skipped' => 0, 'errors' => 1 ];
         }
+
+        return self::import_attachments( $attachments, 'imap', $message_id, $subject, $date );
+    }
+
+    /**
+     * Import the UBL XML attachments of one source (a mail or an upload),
+     * together with its other attachments (PDF, ...). Idempotent.
+     *
+     * @param array[] $attachments Each: name, mime, contents.
+     * @return array{processed:int, skipped:int, errors:int, detail:string[]}
+     */
+    private static function import_attachments( array $attachments, string $source, string $source_id, string $subject, string $date ): array {
+        $result = [ 'processed' => 0, 'skipped' => 0, 'errors' => 0, 'detail' => [] ];
+
         $xml_files   = array_values( array_filter( $attachments, static function ( array $file ): bool {
             return self::is_xml_attachment( $file );
         } ) );
@@ -218,14 +336,13 @@ class PeppolImap {
 
         if ( ! $xml_files ) {
             $result['skipped'] = 1;
-            self::mark_seen( $client, $msgno, $settings );
             return $result;
         }
 
         $meta = [];
         foreach ( $attachments as $index => $file ) {
             $meta[] = [
-                'id'        => $message_id . '-' . $index,
+                'id'        => $source_id . '-' . $index,
                 'file_name' => $file['name'],
                 'file_type' => $file['mime'],
             ];
@@ -244,32 +361,27 @@ class PeppolImap {
             $doc = self::parse_ubl( $xml_file['contents'] );
             if ( is_wp_error( $doc ) ) {
                 $result['errors']++;
+                $result['detail'][] = $xml_file['name'] . ': ' . $doc->get_error_message();
                 continue;
             }
 
             $doc['created_at']   = $date;
             $doc['attachments']  = $meta;
             $doc['ubl_name']     = $xml_file['name'];
-            $doc['_source']      = 'imap';
-            $doc['_message_id']  = $message_id;
+            $doc['_source']      = $source;
+            $doc['_message_id']  = $source_id;
             $doc['_subject']     = $subject;
 
             $stored = Peppol::import_external_document( $doc, $xml_file['contents'], $files );
             if ( is_wp_error( $stored ) ) {
                 $result['errors']++;
+                $result['detail'][] = $xml_file['name'] . ': ' . $stored->get_error_message();
             } else {
                 $result['processed']++;
             }
         }
 
-        self::mark_seen( $client, $msgno, $settings );
         return $result;
-    }
-
-    private static function mark_seen( PeppolImapClient $client, int $msgno, array $settings ): void {
-        if ( ! empty( $settings['imap_mark_seen'] ) ) {
-            $client->mark_seen( $msgno );
-        }
     }
 
     /* ------------------------------------------------------------------
@@ -292,7 +404,11 @@ class PeppolImap {
             $encryption = 'ssl';
         }
 
-        $client = new PeppolImapClient();
+        if ( ! self::ensure_imap_client() ) {
+            return new \WP_Error( 'peppol_imap_missing', __( 'De interne IMAP-client is niet beschikbaar op deze server.', 'eme-accounting' ) );
+        }
+
+        $client = new ImapClient();
         if ( ! $client->connect( $host, $port, $encryption === 'none' ? '' : $encryption ) ) {
             return new \WP_Error( 'peppol_imap_connect', $client->get_last_error() ?: __( 'Kan geen verbinding maken met de IMAP-server.', 'eme-accounting' ) );
         }
@@ -302,7 +418,7 @@ class PeppolImap {
         }
 
         $folder = trim( (string) $settings['imap_folder'] ) ?: 'INBOX';
-        if ( $client->open_mailbox( $folder, empty( $settings['imap_mark_seen'] ) ) === false ) {
+        if ( $client->open_mailbox( $folder, true ) === false ) { // read-only: never changes the mailbox
             $error = $client->get_last_error();
             $client->logout();
             return new \WP_Error( 'peppol_imap_folder', $error ?: __( 'Kan de IMAP-map niet openen.', 'eme-accounting' ) );
@@ -315,10 +431,14 @@ class PeppolImap {
         return (string) $settings['imap_username'] . '@' . (string) $settings['imap_host'] . '/' . ( (string) $settings['imap_folder'] ?: 'INBOX' );
     }
 
-    private static function save_status( string $status ): void {
+    /** @param int|null $checked_at Set only after a scan that succeeded: it moves the re-scan window. */
+    private static function save_status( string $status, ?int $checked_at = null ): void {
         $settings = Peppol::get_settings();
         $settings['imap_last_poll_at']     = gmdate( 'Y-m-d H:i:s' );
         $settings['imap_last_poll_status'] = mb_substr( $status, 0, 255 );
+        if ( $checked_at !== null ) {
+            $settings['imap_checked_at'] = $checked_at;
+        }
         Peppol::update_settings( $settings );
     }
 
@@ -326,7 +446,7 @@ class PeppolImap {
      * MIME
      * ------------------------------------------------------------------ */
 
-    private static function extract_attachments( PeppolImapClient $client, int $msgno, string $raw_header ): ?array {
+    private static function extract_attachments( ImapClient $client, int $msgno, string $raw_header ): ?array {
         $structure = $client->fetch_structure( $msgno );
         if ( $structure === null ) {
             return null;

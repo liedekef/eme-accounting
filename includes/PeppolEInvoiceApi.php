@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
  * All calls return an array on success or a WP_Error on failure.
  * The API key and webhook secret are never logged.
  */
-class PeppolApi {
+class PeppolEInvoiceApi {
 
     const BASE_URL = 'https://api.e-invoice.be';
 
@@ -86,7 +86,7 @@ class PeppolApi {
      */
     public function download_file( string $url ) {
         if ( stripos( $url, 'https://' ) !== 0 ) {
-            return new \WP_Error( 'peppol_download', __( 'Download geweigerd: geen https-URL.', 'eme-accounting' ) );
+            return new \WP_Error( 'peppol_download', 'Download geweigerd: geen https-URL.' );
         }
         // wp_safe_*: refuses private/loopback targets. limit_response_size
         // stops an oversized file from being pulled into memory.
@@ -102,23 +102,7 @@ class PeppolApi {
         if ( $code < 200 || $code >= 300 ) {
             return new \WP_Error( 'peppol_download', sprintf( 'Download mislukt (HTTP %d).', $code ) );
         }
-
-        $body            = (string) wp_remote_retrieve_body( $response );
-        $declared_header = wp_remote_retrieve_header( $response, 'content-length' );
-        $declared        = is_array( $declared_header ) ? (int) ( $declared_header[0] ?? 0 ) : (int) $declared_header;
-
-        if ( strlen( $body ) > self::MAX_DOWNLOAD_BYTES - 1 || $declared > self::MAX_DOWNLOAD_BYTES - 1 ) {
-            return new \WP_Error( 'peppol_download', __( 'Download geweigerd: bestand is te groot.', 'eme-accounting' ) );
-        }
-
-        // A short read can otherwise store a truncated PDF/UBL. Skip the check
-        // for compressed responses, where Content-Length is the encoded size.
-        $encoding = (string) wp_remote_retrieve_header( $response, 'content-encoding' );
-        if ( $declared > 0 && $encoding === '' && strlen( $body ) !== $declared ) {
-            return new \WP_Error( 'peppol_download', __( 'Download onvolledig: ontvangen bestand heeft niet de verwachte grootte.', 'eme-accounting' ) );
-        }
-
-        return $body;
+        return (string) wp_remote_retrieve_body( $response );
     }
 
     /* ------------------------------------------------------------------
