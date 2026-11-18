@@ -418,7 +418,7 @@ class PeppolImap {
         }
 
         $folder = trim( (string) $settings['imap_folder'] ) ?: 'INBOX';
-        if ( $client->open_mailbox( $folder, true ) === false ) { // read-only: never changes the mailbox
+        if ( $client->open_mailbox_read_only( $folder ) === false ) { // read-only: never changes the mailbox
             $error = $client->get_last_error();
             $client->logout();
             return new \WP_Error( 'peppol_imap_folder', $error ?: __( 'Kan de IMAP-map niet openen.', 'eme-accounting' ) );
