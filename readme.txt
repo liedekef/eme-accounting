@@ -22,6 +22,7 @@ EME Accounting extends Events Made Easy with single-entry accounting:
 * Budgeting
 * Financial reports (balance, results, cash flow) with charts
 * Fiscal years and year-end closing
+* Peppol integration (E-Invoice API or IMAP mailbox imports supported)
 
 The plugin requires the Events Made Easy plugin.
 
