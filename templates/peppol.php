@@ -2,13 +2,13 @@
 // phpcs:ignoreFile WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 defined( 'ABSPATH' ) || exit;
 
-$peppol_status = EMEAccounting\PeppolEInvoice::get_public_status();
+$einvoice_status = EMEAccounting\PeppolEInvoice::get_public_status();
 $imap_status   = EMEAccounting\PeppolImap::get_public_status();
 
-$api_configured  = ! empty( $peppol_status['api_configured'] );
+$api_configured  = ! empty( $einvoice_status['api_configured'] );
 $imap_configured = ! empty( $imap_status['configured'] );
 $imap_available  = ! empty( $imap_status['available'] );
-$api_auto        = $api_configured && ! empty( $peppol_status['poll_enabled'] );
+$api_auto        = $api_configured && ! empty( $einvoice_status['poll_enabled'] );
 $imap_auto       = $imap_available && $imap_configured && ! empty( $imap_status['enabled'] );
 
 $can_manage = EMEAccounting\Capabilities::can_manage( 'peppol' );
@@ -41,12 +41,12 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
     <th style="width:240px"><?php esc_html_e( 'Laatste synchronisatie', 'eme-accounting' ); ?></th>
     <td>
         <?php $has_last_sync = false; ?>
-        <?php if ( $api_configured && ! empty( $peppol_status['last_poll_at'] ) ): ?>
+        <?php if ( $api_configured && ! empty( $einvoice_status['last_poll_at'] ) ): ?>
             <?php $has_last_sync = true; ?>
             <strong><?php esc_html_e( 'e-invoice.be', 'eme-accounting' ); ?>:</strong>
-            <?php echo esc_html( eme_localized_date( $peppol_status['last_poll_at'], EME_TIMEZONE ) ); ?>
-            <?php if ( ! empty( $peppol_status['last_poll_status'] ) ): ?>
-                <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $peppol_status['last_poll_status'] ); ?></span>
+            <?php echo esc_html( eme_localized_date( $einvoice_status['last_poll_at'], EME_TIMEZONE ) ); ?>
+            <?php if ( ! empty( $einvoice_status['last_poll_status'] ) ): ?>
+                <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $einvoice_status['last_poll_status'] ); ?></span>
             <?php endif; ?>
         <?php endif; ?>
         <?php if ( $imap_configured && ! empty( $imap_status['last_poll_at'] ) ): ?>
@@ -87,13 +87,13 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
                 <?php endif; ?>
             </span>
         <?php endif; ?>
-        <?php if ( $api_configured && empty( $peppol_status['backfill_done'] ) && (int) $peppol_status['backfill_page'] > 0 ): ?>
+        <?php if ( $api_configured && empty( $einvoice_status['backfill_done'] ) && (int) $einvoice_status['backfill_page'] > 0 ): ?>
             <br><span style="font-size:12px;color:#646970">
                 <?php
                 printf(
                     /* translators: %d: page number */
                     esc_html__( 'Geschiedenis wordt opgehaald (volgende pagina: %d).', 'eme-accounting' ),
-                    (int) $peppol_status['backfill_page']
+                    (int) $einvoice_status['backfill_page']
                 );
                 ?>
             </span>
@@ -132,13 +132,14 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
     <select id="peppol-status-filter">
         <option value=""><?php esc_html_e( 'Alle statussen', 'eme-accounting' ); ?></option>
         <option value="new"><?php esc_html_e( 'Nieuw', 'eme-accounting' ); ?></option>
-        <option value="ignored"><?php esc_html_e( 'Genegeerd', 'eme-accounting' ); ?></option>
         <option value="error"><?php esc_html_e( 'Fout', 'eme-accounting' ); ?></option>
+        <option value="deleted"><?php esc_html_e( 'Verwijderd', 'eme-accounting' ); ?></option>
     </select>
     <select id="peppol-booking-filter">
         <option value=""><?php esc_html_e( 'Alle boekingen', 'eme-accounting' ); ?></option>
         <option value="unbooked"><?php esc_html_e( 'Niet geboekt', 'eme-accounting' ); ?></option>
-        <option value="booked"><?php esc_html_e( 'Geboekt', 'eme-accounting' ); ?></option>
+        <option value="booked"><?php esc_html_e( 'Geboekt, niet betaald', 'eme-accounting' ); ?></option>
+        <option value="paid"><?php esc_html_e( 'Betaald', 'eme-accounting' ); ?></option>
     </select>
     <input type='text' id='peppol-daterange-filter' name='peppol-daterange-filter' placeholder='<?php esc_attr_e( 'Filter op factuurdatum', 'eme-accounting' ); ?>' data-autoclose='false' data-range='true' data-multiple-separator=' -- ' data-date='' style='width: 22ch;' class='eme_formfield_fdate'>
     <button type="button" id="peppol-filter-apply" class="button"><?php esc_html_e( 'Filteren', 'eme-accounting' ); ?></button>
@@ -152,7 +153,9 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
     <p>
         <button type="button" id="peppol-detail-close" class="button"><?php esc_html_e( '↑ Sluit', 'eme-accounting' ); ?></button>
         <a href="#" id="peppol-detail-retry" class="button" style="display:none"><?php esc_html_e( 'Opnieuw ophalen', 'eme-accounting' ); ?></a>
-        <button type="button" id="peppol-detail-ignore" class="button" style="display:none"><?php esc_html_e( 'Negeren', 'eme-accounting' ); ?></button>
+        <button type="button" id="peppol-detail-delete" class="button" style="display:none"><?php esc_html_e( 'Verwijderen', 'eme-accounting' ); ?></button>
+        <button type="button" id="peppol-detail-restore" class="button" style="display:none"><?php esc_html_e( 'Terugzetten', 'eme-accounting' ); ?></button>
+        <button type="button" id="peppol-detail-hard-delete" class="button" style="display:none"><?php esc_html_e( 'Definitief verwijderen', 'eme-accounting' ); ?></button>
     </p>
     <div id="peppol-detail-body"></div>
 </div>
@@ -216,13 +219,13 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
 </div>
 <?php endif; ?>
 
-<?php if ( ! empty( $peppol_status['company_name'] ) ): ?>
+<?php if ( ! empty( $einvoice_status['company_name'] ) ): ?>
 <p class="description">
     <?php
     printf(
         /* translators: %s: company name */
         esc_html__( 'Gekoppeld e-invoice.be bedrijf: %s', 'eme-accounting' ),
-        esc_html( $peppol_status['company_name'] )
+        esc_html( $einvoice_status['company_name'] )
     );
     ?>
 </p>

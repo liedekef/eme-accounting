@@ -20,6 +20,13 @@
             .catch(function () { return { success: false, data: 'Netwerk- of serverfout' }; });
     }
 
+    function confirmBox(title, message) {
+        if (typeof FTable !== 'undefined' && typeof FTable.confirm === 'function') {
+            return FTable.confirm(title, message);
+        }
+        return Promise.resolve(window.confirm(message));
+    }
+
     function isoRange(value) {
         if (!value) return '';
         return value.split(' -- ').map(function (part) {
@@ -37,8 +44,8 @@
     };
 
     const statusBadge = function (status) {
-        if (status === 'ignored') {
-            return '<span class="eme-acc-tag eme-acc-ignored">Genegeerd</span>';
+        if (status === 'deleted') {
+            return '<span class="eme-acc-tag eme-acc-ignored">Verwijderd</span>';
         }
         if (status === 'error') {
             return '<span class="eme-acc-tag" style="background:#fcf0f1;color:#d63638">Fout</span>';
@@ -46,10 +53,14 @@
         return '<span class="eme-acc-tag eme-acc-pending">Nieuw</span>';
     };
 
-    function bookingBadge(data) {
-        return data.booking_status === 'booked'
-            ? '<span class="eme-acc-tag eme-acc-reconciled">Geboekt</span>'
-            : '<span class="eme-acc-tag eme-acc-pending">Niet geboekt</span>';
+    function bookingBadge(status) {
+        if (status === 'paid') {
+            return '<span class="eme-acc-tag eme-acc-reconciled">Betaald</span>';
+        }
+        if (status === 'booked') {
+            return '<span class="eme-acc-tag eme-acc-pending">Geboekt, nog niet betaald</span>';
+        }
+        return '<span class="eme-acc-tag eme-acc-pending">Niet geboekt</span>';
     }
 
     function fmtCur(value, currency) {
@@ -91,10 +102,10 @@
             },
             fields: {
                 id: {
-                    title: '#', key: true, list: false, create: false, edit: false
+                    title: '#', key: true, list: false
                 },
                 invoice_date: {
-                    title: 'Factuurdatum', sortable: true, create: false, edit: false,
+                    title: 'Factuurdatum',
                     display: function (data) {
                         return data.record.invoice_date_display
                             ? E(data.record.invoice_date_display)
@@ -102,13 +113,13 @@
                     }
                 },
                 invoice_id: {
-                    title: 'Factuurnummer', sortable: true, create: false, edit: false,
+                    title: 'Factuurnummer',
                     display: function (data) {
                         return data.value ? '<strong>' + E(data.value) + '</strong>' : '<span style="color:#a7aaad">—</span>';
                     }
                 },
                 vendor_name: {
-                    title: 'Leverancier', sortable: true, create: false, edit: false,
+                    title: 'Leverancier',
                     display: function (data) {
                         if (!data.value && !data.record.vendor_tax_id) return '';
                         return '<span style="font-size:12px">' + E(data.value || '') +
@@ -119,28 +130,29 @@
                     }
                 },
                 document_type: {
-                    title: 'Type', sortable: true, create: false, edit: false,
+                    title: 'Type',
                     display: function (data) {
                         if (!data.value) return '';
                         return '<span class="eme-acc-tag">' + E(typeLabels[data.value] || data.value) + '</span>';
                     }
                 },
                 invoice_total: {
-                    title: 'Totaal', sortable: true, create: false, edit: false,
+                    title: 'Totaal',
                     listClass: 'amount',
                     display: function (data) {
                         return '<span style="font-weight:bold">' + fmtCur(data.value, data.record.currency) + '</span>';
                     }
                 },
                 amount_due: {
-                    title: 'Openstaand', sortable: false, create: false, edit: false,
+                    title: 'Openstaand', sortable: false,
                     listClass: 'amount',
                     display: function (data) {
                         return fmtCur(data.value, data.record.currency);
                     }
                 },
                 peppol_status: {
-                    title: 'Toestand', sortable: true, create: false, edit: false,
+                    title: 'Peppol status',
+                    visibility: 'hidden',
                     display: function (data) {
                         if (!data.value) return '';
                         const cls = data.value === 'FAILED' ? 'eme-acc-pending' : 'eme-acc-reconciled';
@@ -148,49 +160,59 @@
                     }
                 },
                 processing_status: {
-                    title: 'Status', sortable: true, create: false, edit: false,
+                    title: 'Interne status',
                     display: function (data) {
                         return statusBadge(data.value);
                     }
                 },
                 booking_status: {
-                    title: 'Boeking', sortable: true, create: false, edit: false,
+                    title: 'Boeking',
                     display: function (data) {
-                        if (data.value === 'booked') {
-                            const url = data.record.journal_edit_url;
-                            return '<span class="eme-acc-tag eme-acc-reconciled">Geboekt</span>' +
-                                (url ? ' <a href="' + E(url) + '">#' + E(data.record.journal_id) + '</a>' : '');
+                        let html = bookingBadge(data.value);
+                        if (data.record.journal_edit_url) {
+                            html += ' <a href="' + E(data.record.journal_edit_url) + '">#' +
+                                E(data.record.journal_id) + '</a>';
                         }
-                        return '<span class="eme-acc-tag eme-acc-pending">Niet geboekt</span>';
+                        return html;
                     }
                 },
                 received_at: {
-                    title: 'Ontvangen', sortable: true, create: false, edit: false,
+                    title: 'Ontvangen',
                     display: function (data) {
                         return '<span style="font-size:11px;color:#646970">' +
                             E(data.record.received_at_display || data.value || '') + '</span>';
                     }
                 },
                 files: {
-                    title: 'Bestanden', sortable: false, create: false, edit: false,
+                    title: 'Bestanden', sortable: false,
                     display: function (data) {
                         return data.value || '';
                     }
                 },
                 _actions: {
-                    title: 'Acties', sortable: false, create: false, edit: false,
+                    title: 'Acties', sortable: false,
                     display: function (data) {
-                        let html = '<button type="button" class="button button-small peppol-view" data-id="' + E(data.record.id) + '">Details</button>';
-                        if (data.record.processing_status === 'ignored') {
-                            html += ' <button type="button" class="button button-small peppol-ignore" data-id="' +
-                                E(data.record.id) + '" data-ignored="0">Terugzetten</button>';
-                        } else {
-                            html += ' <button type="button" class="button button-small peppol-ignore" data-id="' +
-                                E(data.record.id) + '" data-ignored="1">Negeren</button>';
+                        const record = data.record;
+                        let html = '<button type="button" class="button button-small peppol-view" data-id="' +
+                            E(record.id) + '">Details</button>';
+                        if (Number(record.payment_qr_available) && record.processing_status !== 'deleted') {
+                            html += ' <button type="button" class="button button-small peppol-qr" data-id="' +
+                                E(record.id) + '">Betaal met QR</button>';
                         }
-                        if (data.record.processing_status === 'error') {
+                        if (cfg.canManage) {
+                            if (record.processing_status === 'deleted') {
+                                html += ' <button type="button" class="button button-small peppol-restore" data-id="' +
+                                    E(record.id) + '">Terugzetten</button>';
+                                html += ' <button type="button" class="button button-small peppol-hard-delete" data-id="' +
+                                    E(record.id) + '">Definitief verwijderen</button>';
+                            } else {
+                                html += ' <button type="button" class="button button-small peppol-delete" data-id="' +
+                                    E(record.id) + '">Verwijderen</button>';
+                            }
+                        }
+                        if (record.processing_status === 'error') {
                             html += ' <button type="button" class="button button-small peppol-retry" data-id="' +
-                                E(data.record.id) + '">Opnieuw</button>';
+                                E(record.id) + '">Opnieuw</button>';
                         }
                         return html;
                     }
@@ -224,11 +246,13 @@
     }
 
     /* ── Detail panel ─────────────────────────────────────────────── */
-    const detail       = document.getElementById('peppol-detail');
-    const detailBody   = document.getElementById('peppol-detail-body');
-    const detailTitle  = document.getElementById('peppol-detail-title');
-    const detailIgnore = document.getElementById('peppol-detail-ignore');
-    const detailRetry  = document.getElementById('peppol-detail-retry');
+    const detail          = document.getElementById('peppol-detail');
+    const detailBody      = document.getElementById('peppol-detail-body');
+    const detailTitle     = document.getElementById('peppol-detail-title');
+    const detailDelete    = document.getElementById('peppol-detail-delete');
+    const detailRestore   = document.getElementById('peppol-detail-restore');
+    const detailHardDelete= document.getElementById('peppol-detail-hard-delete');
+    const detailRetry     = document.getElementById('peppol-detail-retry');
     let detailRow = null;
 
     function row(label, value) {
@@ -261,11 +285,11 @@
         html += row('Nota', E(data.note || ''));
         html += row('Toestand', E(data.peppol_status || ''));
         html += row('Verwerking', statusBadge(data.processing_status));
-        let bookingHtml = bookingBadge(data);
-        if (data.booking_status === 'booked') {
-            if (data.journal_edit_url) {
-                bookingHtml += ' <a href="' + E(data.journal_edit_url) + '">Open boeking #' + E(data.journal_id) + '</a>';
-            }
+        let bookingHtml = bookingBadge(data.booking_status);
+        if (data.journal_edit_url) {
+            bookingHtml += ' <a href="' + E(data.journal_edit_url) + '">Open boeking #' + E(data.journal_id) + '</a>';
+        }
+        if (data.booking_status !== 'unbooked') {
             if (cfg.canManage) {
                 bookingHtml += ' <button type="button" class="button button-small peppol-unlink">Ontkoppel</button>';
             }
@@ -282,7 +306,7 @@
 
         if (items.length) {
             html += '<h3>Lijnen</h3><table class="eme-acc-table"><thead><tr>' +
-                '<th>Omschrijving</th><th>Aantal</th><th>Eenheidsprijs</th><th>Totaal</th><th>BTW</th>' +
+                '<th>Omschrijving</th><th>Aantal</th><th class="amount">Eenheidsprijs</th><th class="amount">Totaal</th><th>BTW</th>' +
                 '</tr></thead><tbody>';
             items.forEach(function (item) {
                 const desc  = item.description || item.name || item.item_name || '';
@@ -303,7 +327,7 @@
 
         if (taxes.length) {
             html += '<h3>BTW-details</h3><table class="eme-acc-table"><thead><tr>' +
-                '<th>Categorie</th><th>Tarief</th><th>Basis</th><th>BTW</th></tr></thead><tbody>';
+                '<th>Categorie</th><th>Tarief</th><th class="amount">Basis</th><th class="amount">BTW</th></tr></thead><tbody>';
             taxes.forEach(function (tax) {
                 const cat   = tax.category || tax.tax_category || tax.code || '';
                 const rate  = tax.rate !== undefined ? tax.rate
@@ -332,19 +356,33 @@
             html += '<h3>Lokale bestanden</h3><div>' + data.files + '</div>';
         }
 
+        if (data.payment_qr && data.payment_qr.svg) {
+            html += '<div class="eme-acc-payment-qr">' +
+                '<h3>Betaling</h3>' +
+                '<button type="button" id="peppol-qr-toggle" class="button">Betaal met QR</button>' +
+                '<div id="peppol-qr-box" class="eme-acc-qr-box" style="display:none">' +
+                data.payment_qr.svg +
+                '<p class="description">Scan deze code met je bankapp om ' +
+                fmtCur(data.amount_due || data.invoice_total, data.currency) +
+                ' aan ' + E(data.vendor_name || '') + ' te betalen.</p>' +
+                '</div></div>';
+        }
+
         detailBody.innerHTML = html;
         detailTitle.textContent = (data.invoice_id || data.document_id || 'Document') +
             (data.vendor_name ? ' – ' + data.vendor_name : '');
 
         detailRetry.style.display = data.processing_status === 'error' ? '' : 'none';
-        detailIgnore.style.display = '';
-        detailIgnore.textContent = data.processing_status === 'ignored' ? 'Terugzetten' : 'Negeren';
+        const isDeleted = data.processing_status === 'deleted';
+        if (detailDelete) detailDelete.style.display = (!cfg.canManage || isDeleted) ? 'none' : '';
+        if (detailRestore) detailRestore.style.display = (cfg.canManage && isDeleted) ? '' : 'none';
+        if (detailHardDelete) detailHardDelete.style.display = (cfg.canManage && isDeleted) ? '' : 'none';
 
         detail.style.display = '';
         detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function openDetail(id) {
+    function openDetail(id, showQr) {
         detailBody.innerHTML = '<p>Laden…</p>';
         detail.style.display = '';
         post('eme_accounting_peppol_get', { id: id }).then(function (r) {
@@ -354,6 +392,10 @@
             }
             detailRow = r.data;
             renderDetail(r.data);
+            if (showQr) {
+                const toggle = document.getElementById('peppol-qr-toggle');
+                if (toggle) toggle.click();
+            }
         });
     }
 
@@ -567,17 +609,56 @@
             return;
         }
 
-        const ignore = e.target.closest('.peppol-ignore');
-        if (ignore) {
-            const ignored = ignore.dataset.ignored === '1' ? 1 : 0;
-            ignore.disabled = true;
-            post('eme_accounting_peppol_ignore', { id: ignore.dataset.id, ignored: ignored }).then(function (r) {
-                ignore.disabled = false;
+        const qr = e.target.closest('.peppol-qr');
+        if (qr) {
+            openDetail(qr.dataset.id, true);
+            return;
+        }
+
+        const remove = e.target.closest('.peppol-delete');
+        if (remove) {
+            confirmBox('Verwijderen', 'Dit document wordt verborgen. Je kan het later terugzetten of definitief verwijderen.').then(function (ok) {
+                if (!ok) return;
+                remove.disabled = true;
+                post('eme_accounting_peppol_delete', { id: remove.dataset.id }).then(function (r) {
+                    remove.disabled = false;
+                    if (!r.success) { alert(r.data || 'Fout'); return; }
+                    if (table) table.reload();
+                    if (detailRow && String(detailRow.id) === String(remove.dataset.id)) {
+                        openDetail(detailRow.id);
+                    }
+                });
+            });
+            return;
+        }
+
+        const hardDelete = e.target.closest('.peppol-hard-delete');
+        if (hardDelete) {
+            confirmBox('Definitief verwijderen', 'Dit document en zijn bestanden worden permanent verwijderd. Bij een IMAP-overlap of een volledige API-import kan het opnieuw verschijnen.').then(function (ok) {
+                if (!ok) return;
+                hardDelete.disabled = true;
+                post('eme_accounting_peppol_delete', { id: hardDelete.dataset.id, hard: 1 }).then(function (r) {
+                    hardDelete.disabled = false;
+                    if (!r.success) { alert(r.data || 'Fout'); return; }
+                    if (detailRow && String(detailRow.id) === String(hardDelete.dataset.id)) {
+                        detail.style.display = 'none';
+                        detailRow = null;
+                    }
+                    if (table) table.reload();
+                });
+            });
+            return;
+        }
+
+        const restore = e.target.closest('.peppol-restore');
+        if (restore) {
+            restore.disabled = true;
+            post('eme_accounting_peppol_restore', { id: restore.dataset.id }).then(function (r) {
+                restore.disabled = false;
                 if (!r.success) { alert(r.data || 'Fout'); return; }
                 if (table) table.reload();
-                if (detailRow && String(detailRow.id) === String(ignore.dataset.id)) {
-                    detailRow.processing_status = r.data.status;
-                    renderDetail(detailRow);
+                if (detailRow && String(detailRow.id) === String(restore.dataset.id)) {
+                    openDetail(detailRow.id);
                 }
             });
             return;
@@ -603,15 +684,51 @@
             return;
         }
 
-        if (e.target.id === 'peppol-detail-ignore' && detailRow) {
-            const ignored = detailRow.processing_status === 'ignored' ? 0 : 1;
+        if (e.target.id === 'peppol-qr-toggle') {
+            const box = document.getElementById('peppol-qr-box');
+            if (box) box.style.display = box.style.display === 'none' ? '' : 'none';
+            return;
+        }
+
+        if (e.target.id === 'peppol-detail-delete' && detailRow) {
+            const id = detailRow.id;
+            confirmBox('Verwijderen', 'Dit document wordt verborgen. Je kan het later terugzetten of definitief verwijderen.').then(function (ok) {
+                if (!ok) return;
+                e.target.disabled = true;
+                post('eme_accounting_peppol_delete', { id: id }).then(function (r) {
+                    e.target.disabled = false;
+                    if (!r.success) { alert(r.data || 'Fout'); return; }
+                    if (table) table.reload();
+                    openDetail(id);
+                });
+            });
+            return;
+        }
+
+        if (e.target.id === 'peppol-detail-hard-delete' && detailRow) {
+            const id = detailRow.id;
+            confirmBox('Definitief verwijderen', 'Dit document en zijn bestanden worden permanent verwijderd. Bij een IMAP-overlap of een volledige API-import kan het opnieuw verschijnen.').then(function (ok) {
+                if (!ok) return;
+                e.target.disabled = true;
+                post('eme_accounting_peppol_delete', { id: id, hard: 1 }).then(function (r) {
+                    e.target.disabled = false;
+                    if (!r.success) { alert(r.data || 'Fout'); return; }
+                    detail.style.display = 'none';
+                    detailRow = null;
+                    if (table) table.reload();
+                });
+            });
+            return;
+        }
+
+        if (e.target.id === 'peppol-detail-restore' && detailRow) {
+            const id = detailRow.id;
             e.target.disabled = true;
-            post('eme_accounting_peppol_ignore', { id: detailRow.id, ignored: ignored }).then(function (r) {
+            post('eme_accounting_peppol_restore', { id: id }).then(function (r) {
                 e.target.disabled = false;
                 if (!r.success) { alert(r.data || 'Fout'); return; }
-                detailRow.processing_status = r.data.status;
-                renderDetail(detailRow);
                 if (table) table.reload();
+                openDetail(id);
             });
             return;
         }

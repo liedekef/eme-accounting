@@ -116,6 +116,7 @@ class Import {
                     [ 'id' => $line_id ],
                     [ '%s', '%d' ], [ '%d' ]
                 );
+                Peppol::link_document_for_line( $line, (int) $journal_id );
                 $records[] = self::get_line( $line_id );
                 $processed++;
             }
@@ -1000,6 +1001,13 @@ class Import {
         );
         if ($res) {
             Journal::mark_reconciled( $journal_id );
+            $line = $wpdb->get_row( $wpdb->prepare(
+                "SELECT * FROM `{$wpdb->prefix}emeacc_import_lines` WHERE id = %d",
+                $line_id
+            ) );
+            if ( $line ) {
+                Peppol::link_document_for_line( $line, $journal_id );
+            }
             wp_send_json_success( [ 'Record' => self::get_line( $line_id ) ] );
         } else {
             wp_send_json_error( 'Link niet kunnen leggen' );
@@ -1074,6 +1082,7 @@ class Import {
             [ '%s', '%d' ],
             [ '%d', '%s' ]
         );
+        Peppol::link_document_for_line( $line, (int) $journal_id );
 
         wp_send_json_success( [ 'journal_id' => $journal_id, 'Record' => self::get_line( $line_id ) ] );
     }

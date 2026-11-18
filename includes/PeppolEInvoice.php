@@ -708,6 +708,11 @@ class PeppolEInvoice {
             return $doc;
         }
 
+        $existing = Peppol::find_existing_document( $doc );
+        if ( $existing ) {
+            $doc['id'] = $existing->document_id;
+        }
+
         $row_id = Peppol::upsert_document( $doc );
         if ( is_wp_error( $row_id ) ) {
             return $row_id;

@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'eme_accounting_db_version';
-    const DB_VERSION        = '26';
+    const DB_VERSION        = '27';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
     /**
@@ -191,6 +191,29 @@ class Installer {
             // 26 derives it from journal_id and renames state to peppol_status.
             self::migrate_peppol_documents_table();
         }
+        if ( $current_version && $current_version < 27 ) {
+            // "Negeren" and soft-delete are the same thing: a hidden document
+            // whose document_id stays in the table so an IMAP overlap scan or
+            // an API re-import does not resurrect it.
+            self::migrate_peppol_delete_columns();
+        }
+    }
+
+    /**
+     * Add the soft-delete marker and turn existing "ignored" rows into
+     * soft-deleted ones. Idempotent.
+     */
+    private static function migrate_peppol_delete_columns(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'emeacc_peppol_documents';
+
+        if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'deleted_at' ) ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN deleted_at DATETIME DEFAULT NULL" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+        if ( ! $wpdb->get_var( "SHOW INDEX FROM `{$table}` WHERE Key_name = 'idx_deleted_at'" ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` ADD INDEX idx_deleted_at (deleted_at)" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        }
+        $wpdb->query( "UPDATE `{$table}` SET processing_status = 'deleted', deleted_at = COALESCE(deleted_at, updated_at) WHERE processing_status = 'ignored'" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
     }
 
     /**
@@ -628,6 +651,7 @@ class Installer {
             journal_id           BIGINT UNSIGNED          DEFAULT NULL,
             booked_at            DATETIME                 DEFAULT NULL,
             booked_by            BIGINT UNSIGNED          DEFAULT NULL,
+            deleted_at           DATETIME                 DEFAULT NULL,
             last_error           TEXT,
             received_at          DATETIME                 DEFAULT NULL,
             fetched_at           DATETIME                 DEFAULT NULL,
@@ -638,7 +662,8 @@ class Installer {
             UNIQUE KEY uniq_peppol_journal (journal_id),
             KEY idx_peppol_status (peppol_status),
             KEY idx_invoice_date (invoice_date),
-            KEY idx_status (processing_status)
+            KEY idx_status (processing_status),
+            KEY idx_deleted_at (deleted_at)
         ) $charset;" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
     }
 

@@ -88,6 +88,31 @@
     background: #fff8e5;
     color: #996800;
 }
+.eme-acc-ignored {
+    background: #f0f0f1;
+    color: #646970;
+}
+.eme-acc-payment-qr {
+    margin-top: 16px;
+}
+.eme-acc-qr-box {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+.eme-acc-qr-box svg {
+    width: 220px;
+    height: 220px;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+.eme-acc-qr-box .description {
+    max-width: 320px;
+}
 
 /* ── Forms ────────────────────────────────────────────────────────── */
 .eme-acc-form-box {

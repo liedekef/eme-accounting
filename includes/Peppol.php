@@ -17,8 +17,10 @@ use EMEAccounting\Capabilities;
  *   - PeppolEInvoice  e-invoice.be API (webhook + poll)
  *   - PeppolImap      forwarded mails (IMAP mailbox)
  *
- * Documents are "ignored", never deleted: a removed row would be re-imported
- * by the next poll/scan.
+ * Deleting a document is a soft delete: the row stays behind with
+ * processing_status = 'deleted' so the unique document_id keeps blocking a
+ * re-import by an IMAP overlap scan or an API poll. A second delete removes
+ * the row and its attachments for real.
  */
 class Peppol {
 
@@ -32,12 +34,13 @@ class Peppol {
     private static ?\EMEFileAttachments $attachments = null;
 
     public static function init(): void {
-        add_action( 'wp_ajax_eme_accounting_peppol_list',   [ __CLASS__, 'ajax_list' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_get',    [ __CLASS__, 'ajax_get' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_ignore', [ __CLASS__, 'ajax_ignore' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_book',   [ __CLASS__, 'ajax_book' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_link',   [ __CLASS__, 'ajax_link_journal' ] );
-        add_action( 'wp_ajax_eme_accounting_peppol_unlink', [ __CLASS__, 'ajax_unlink' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_list',    [ __CLASS__, 'ajax_list' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_get',     [ __CLASS__, 'ajax_get' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_delete',  [ __CLASS__, 'ajax_delete' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_restore', [ __CLASS__, 'ajax_restore' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_book',    [ __CLASS__, 'ajax_book' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_link',    [ __CLASS__, 'ajax_link_journal' ] );
+        add_action( 'wp_ajax_eme_accounting_peppol_unlink',  [ __CLASS__, 'ajax_unlink' ] );
 
         add_action( 'eme_accounting_journal_deleted', [ __CLASS__, 'on_journal_deleted' ] );
     }
@@ -109,7 +112,7 @@ class Peppol {
             $type = '';
         }
         $booking_status = isset( $_POST['booking_status'] ) && $_POST['booking_status'] !== '' ? sanitize_key( eme_sanitize_request( $_POST['booking_status'] ) ) : ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        if ( ! in_array( $booking_status, [ 'unbooked', 'booked' ], true ) ) {
+        if ( ! in_array( $booking_status, [ 'unbooked', 'booked', 'paid' ], true ) ) {
             $booking_status = '';
         }
 
@@ -123,17 +126,20 @@ class Peppol {
         ];
 
         [ $where_sql, $prepare ] = self::build_where( $args );
-        $table = $wpdb->prefix . self::TABLE;
+        $table   = $wpdb->prefix . self::TABLE;
+        $journal = $wpdb->prefix . 'emeacc_journal';
+        $from    = "FROM `{$table}` d LEFT JOIN `{$journal}` j ON j.id = d.journal_id";
+        $select  = "SELECT d.*, j.is_reconciled AS journal_is_reconciled {$from}";
 
         if ( $prepare ) {
-            $total = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `{$table}` {$where_sql}", ...$prepare ) ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $total = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) {$from} {$where_sql}", ...$prepare ) ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         } else {
-            $total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}` {$where_sql}" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $total = (int) $wpdb->get_var( "SELECT COUNT(*) {$from} {$where_sql}" ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         }
 
         $limit = eme_get_ftable_limit();
         $order = self::build_order( eme_get_ftable_orderby() );
-        $sql   = "SELECT * FROM `{$table}` {$where_sql} ORDER BY {$order} {$limit}";
+        $sql   = "{$select} {$where_sql} ORDER BY {$order} {$limit}";
 
         if ( $prepare ) {
             $rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare ) ); //phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -148,8 +154,11 @@ class Peppol {
             $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date, EME_TIMEZONE ) : '';
             $row->received_at_display  = $row->received_at ? eme_localized_date( $row->received_at, EME_TIMEZONE ) : '';
             $row->journal_edit_url     = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
-            $row->booking_status       = ! empty( $row->journal_id ) ? 'booked' : 'unbooked';
+            $row->booking_status       = self::booking_state( $row );
+            $row->payment_qr_available = EpcQr::is_payable( $row ) ? 1 : 0;
+            $row->deleted_at_display   = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, EME_TIMEZONE ) : '';
             $row->files                = self::files_html( (int) $row->id );
+            unset( $row->journal_is_reconciled );
             $records[]                 = $row;
         }
 
@@ -165,8 +174,16 @@ class Peppol {
         Capabilities::require_view_ajax( 'peppol' );
         global $wpdb;
 
-        $id  = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}" . self::TABLE . "` WHERE id = %d", $id ) );
+        $id      = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $table   = $wpdb->prefix . self::TABLE;
+        $journal = $wpdb->prefix . 'emeacc_journal';
+        $row     = $wpdb->get_row( $wpdb->prepare(
+            "SELECT d.*, j.is_reconciled AS journal_is_reconciled
+             FROM `{$table}` d
+             LEFT JOIN `{$journal}` j ON j.id = d.journal_id
+             WHERE d.id = %d",
+            $id
+        ) );
         if ( ! $row ) {
             wp_send_json_error( __( 'Document niet gevonden.', 'eme-accounting' ) );
         }
@@ -177,26 +194,86 @@ class Peppol {
         $row->files           = self::files_html( (int) $row->id );
         $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, EME_TIMEZONE ) : '';
         $row->journal_edit_url = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
-        $row->booking_status   = ! empty( $row->journal_id ) ? 'booked' : 'unbooked';
-        unset( $row->raw_json );
+        $row->booking_status   = self::booking_state( $row );
+        $row->payment_qr       = EpcQr::for_document( $row );
+        $row->deleted_at_display = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, EME_TIMEZONE ) : '';
+        unset( $row->raw_json, $row->journal_is_reconciled );
 
         wp_send_json_success( $row );
     }
 
-    public static function ajax_ignore(): void {
+    /**
+     * Soft-delete a document, or permanently remove it when it is already
+     * soft-deleted. The row is kept on the first delete so document_id still
+     * blocks re-imports; the linked journal entry is deliberately left alone.
+     */
+    public static function ajax_delete(): void {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'peppol' );
         global $wpdb;
 
-        $id      = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $ignored = (int) (bool) eme_sanitize_request( $_POST['ignored'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $status  = $ignored ? 'ignored' : 'new';
-
-        $updated = $wpdb->update( $wpdb->prefix . self::TABLE, [ 'processing_status' => $status ], [ 'id' => $id ] );
-        if ( $updated === false ) {
-            wp_send_json_error( __( 'Bijwerken mislukt.', 'eme-accounting' ) );
+        $id   = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $hard = (int) (bool) eme_sanitize_request( $_POST['hard'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $row  = self::get_document_row( $id );
+        if ( ! $row ) {
+            wp_send_json_error( __( 'Document niet gevonden.', 'eme-accounting' ) );
         }
-        wp_send_json_success( [ 'status' => $status ] );
+
+        $table  = $wpdb->prefix . self::TABLE;
+        $status = (string) $row->processing_status;
+
+        if ( $hard ) {
+            if ( $status !== 'deleted' ) {
+                wp_send_json_error( __( 'Alleen een verwijderd document kan definitief verwijderd worden.', 'eme-accounting' ) );
+            }
+            self::get_attachments()->delete_all( $id, self::TYPE );
+            $deleted = $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+            if ( $deleted === false ) {
+                wp_send_json_error( __( 'Definitief verwijderen mislukt.', 'eme-accounting' ) );
+            }
+            wp_send_json_success( [ 'status' => 'hard_deleted' ] );
+        }
+
+        $updated = $wpdb->update(
+            $table,
+            [
+                'processing_status' => 'deleted',
+                'deleted_at'        => current_time( 'mysql' ),
+            ],
+            [ 'id' => $id ],
+            [ '%s', '%s' ],
+            [ '%d' ]
+        );
+        if ( $updated === false ) {
+            wp_send_json_error( __( 'Verwijderen mislukt.', 'eme-accounting' ) );
+        }
+        wp_send_json_success( [ 'status' => 'deleted' ] );
+    }
+
+    public static function ajax_restore(): void {
+        check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
+        Capabilities::require_manage_ajax( 'peppol' );
+        global $wpdb;
+
+        $id  = (int) eme_sanitize_request( $_POST['id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $row = self::get_document_row( $id );
+        if ( ! $row ) {
+            wp_send_json_error( __( 'Document niet gevonden.', 'eme-accounting' ) );
+        }
+        if ( (string) $row->processing_status !== 'deleted' ) {
+            wp_send_json_error( __( 'Dit document is niet verwijderd.', 'eme-accounting' ) );
+        }
+
+        $updated = $wpdb->query( $wpdb->prepare(
+            "UPDATE `{$wpdb->prefix}" . self::TABLE . "`
+             SET processing_status = 'new', deleted_at = NULL
+             WHERE id = %d",
+            $id
+        ) );
+        if ( $updated === false ) {
+            wp_send_json_error( __( 'Terugzetten mislukt.', 'eme-accounting' ) );
+        }
+        wp_send_json_success( [ 'status' => 'new' ] );
     }
 
     /* ------------------------------------------------------------------
@@ -215,8 +292,8 @@ class Peppol {
         if ( ! empty( $row->journal_id ) ) {
             wp_send_json_error( __( 'Dit document is al geboekt.', 'eme-accounting' ) );
         }
-        if ( (string) $row->processing_status === 'ignored' ) {
-            wp_send_json_error( __( 'Dit document is genegeerd. Zet het eerst terug op nieuw.', 'eme-accounting' ) );
+        if ( (string) $row->processing_status === 'deleted' ) {
+            wp_send_json_error( __( 'Dit document is verwijderd. Zet het eerst terug.', 'eme-accounting' ) );
         }
 
         $journal_id = (int) eme_sanitize_request( $_POST['journal_id'] ?? 0 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
@@ -386,9 +463,9 @@ class Peppol {
         check_ajax_referer( 'eme_accounting_nonce', 'nonce' );
         Capabilities::require_manage_ajax( 'peppol' );
 
-        // Received invoices are part of the bookkeeping archive: not deletable
-        // from the UI (use "negeren" to hide a document instead).
-        wp_send_json_error( __( 'Ontvangen Peppol-documenten kunnen niet verwijderd worden.', 'eme-accounting' ) );
+        // Received invoices are part of the bookkeeping archive: delete the
+        // whole document (soft delete) instead of one attachment.
+        wp_send_json_error( __( 'Ontvangen Peppol-documenten kunnen niet per bijlage verwijderd worden.', 'eme-accounting' ) );
     }
 
     public static function ajax_download_attachment(): void {
@@ -407,54 +484,68 @@ class Peppol {
      * ------------------------------------------------------------------ */
 
     /**
+     * Find an existing row for a payload, first by document id and then by
+     * invoice identity (mail/upload ids differ from API ids).
+     *
+     * @return object|null Row with document_id and peppol_status.
+     */
+    public static function find_existing_document( array $doc ): ?object {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE;
+
+        $document_id = self::s( $doc['id'] ?? '', 64 );
+        if ( $document_id !== '' ) {
+            $exists = $wpdb->get_row( $wpdb->prepare(
+                "SELECT document_id, peppol_status FROM `{$table}` WHERE document_id = %s",
+                $document_id
+            ) );
+            if ( $exists ) {
+                return $exists;
+            }
+        }
+
+        $invoice_id   = self::s( $doc['invoice_id'] ?? '', 100 );
+        $invoice_date = self::date_or_null( $doc['invoice_date'] ?? null );
+        $amount       = abs( (float) ( $doc['invoice_total'] ?? 0 ) );
+        if ( $invoice_id === '' || ! $invoice_date || $amount <= 0 ) {
+            return null;
+        }
+
+        $where  = 'invoice_id = %s AND invoice_date = %s AND ABS(invoice_total - %f) < 0.005';
+        $params = [ $invoice_id, $invoice_date, $amount ];
+
+        $tax_id = self::s( $doc['vendor_tax_id'] ?? '', 64 );
+        if ( $tax_id !== '' ) {
+            $where   .= ' AND vendor_tax_id = %s';
+            $params[] = $tax_id;
+        } else {
+            $vendor = self::s( $doc['vendor_name'] ?? '', 255 );
+            if ( $vendor !== '' ) {
+                $where   .= ' AND vendor_name = %s';
+                $params[] = $vendor;
+            }
+        }
+
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT document_id, peppol_status FROM `{$table}` WHERE {$where} ORDER BY id LIMIT 1",
+            ...$params
+        ) ) ?: null;
+    }
+
+    /**
      * Store a document that did not come from the e-invoice.be API (IMAP).
      *
      * @param array<int,array{name:string,contents:string,key?:string,type?:string}> $files
      * @return int|\WP_Error
      */
     public static function import_external_document( array $doc, string $xml = '', array $files = [] ) {
-        global $wpdb;
-        $table = $wpdb->prefix . self::TABLE;
-
         // The same invoice can arrive through the e-invoice.be API and through
         // a forwarded mail. Reuse the existing row in that case so the
         // XML/PDF is attached to the booking the user already sees.
-        $document_id = self::s( $doc['id'] ?? '', 64 );
-        $exists      = $document_id !== ''
-            ? $wpdb->get_row( $wpdb->prepare( "SELECT document_id, peppol_status FROM `{$table}` WHERE document_id = %s", $document_id ) )
-            : null;
+        $exists = self::find_existing_document( $doc );
         if ( $exists ) {
             $doc['id'] = $exists->document_id;
             $doc['_preserve_status'] = (string) $exists->peppol_status !== '';
-        } else {
-            $invoice_id   = self::s( $doc['invoice_id'] ?? '', 100 );
-            $invoice_date = self::date_or_null( $doc['invoice_date'] ?? null );
-            $amount       = abs( (float) ( $doc['invoice_total'] ?? 0 ) );
-            if ( $invoice_id !== '' && $invoice_date && $amount > 0 ) {
-                $where  = 'invoice_id = %s AND invoice_date = %s AND ABS(invoice_total - %f) < 0.005';
-                $params = [ $invoice_id, $invoice_date, $amount ];
-
-                $tax_id = self::s( $doc['vendor_tax_id'] ?? '', 64 );
-                if ( $tax_id !== '' ) {
-                    $where   .= ' AND vendor_tax_id = %s';
-                    $params[] = $tax_id;
-                } else {
-                    $vendor = self::s( $doc['vendor_name'] ?? '', 255 );
-                    if ( $vendor !== '' ) {
-                        $where   .= ' AND vendor_name = %s';
-                        $params[] = $vendor;
-                    }
-                }
-
-                $match = $wpdb->get_row( $wpdb->prepare(
-                    "SELECT document_id, peppol_status FROM `{$table}` WHERE {$where} ORDER BY id LIMIT 1",
-                    ...$params
-                ) );
-                if ( $match ) {
-                    $doc['id'] = $match->document_id;
-                    $doc['_preserve_status'] = (string) $match->peppol_status !== '';
-                }
-            }
         }
 
         $row_id = self::upsert_document( $doc );
@@ -576,6 +667,13 @@ class Peppol {
         );
     }
 
+    private static function booking_state( object $row ): string {
+        if ( empty( $row->journal_id ) ) {
+            return 'unbooked';
+        }
+        return ! empty( $row->journal_is_reconciled ) ? 'paid' : 'booked';
+    }
+
     private static function booking_amount( object $row ): float {
         $amount = abs( (float) ( $row->invoice_total ?? 0 ) );
         if ( $amount <= 0 ) {
@@ -594,6 +692,82 @@ class Peppol {
             $reference = (string) ( $row->invoice_id ?? '' );
         }
         return mb_substr( $reference, 0, 100 );
+    }
+
+    /**
+     * Link the Peppol document that belongs to a bank import line to the
+     * journal entry created from that line. Returns the document id on
+     * success, 0 when nothing (safely) matched.
+     */
+    public static function link_document_for_line( object $line, int $journal_id ): int {
+        global $wpdb;
+
+        if ( $journal_id <= 0 ) {
+            return 0;
+        }
+        $amount = abs( (float) ( $line->amount ?? 0 ) );
+        if ( $amount <= 0 ) {
+            return 0;
+        }
+
+        $table     = $wpdb->prefix . self::TABLE;
+        $direction = (float) ( $line->amount ?? 0 ) >= 0 ? 'in' : 'out';
+        $today     = (string) ( $line->transaction_date ?? current_time( 'Y-m-d' ) );
+        $rows      = [];
+
+        $digits = preg_replace( '/\D/', '', (string) ( $line->structured_ref ?? '' ) );
+        if ( strlen( $digits ) === 12 ) {
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT * FROM `{$table}`
+                 WHERE journal_id IS NULL
+                   AND processing_status <> 'deleted'
+                   AND ( ABS(amount_due - %f) < 0.005 OR ABS(invoice_total - %f) < 0.005 )
+                   AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(payment_reference, '+', ''), '/', ''), ' ', ''), '-', ''), '.', '') = %s
+                 ORDER BY ABS(DATEDIFF(COALESCE(invoice_date, due_date, %s), %s))
+                 LIMIT 5",
+                $amount,
+                $amount,
+                $digits,
+                $today,
+                $today
+            ) );
+        }
+
+        if ( ! $rows ) {
+            $iban = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) ( $line->counterparty_iban ?? '' ) ) );
+            if ( $iban !== '' ) {
+                $rows = $wpdb->get_results( $wpdb->prepare(
+                    "SELECT * FROM `{$table}`
+                     WHERE journal_id IS NULL
+                       AND processing_status <> 'deleted'
+                       AND REPLACE(payment_iban, ' ', '') = %s
+                       AND ( ABS(amount_due - %f) < 0.005 OR ABS(invoice_total - %f) < 0.005 )
+                       AND COALESCE(invoice_date, due_date, %s) BETWEEN DATE_SUB(%s, INTERVAL 365 DAY) AND DATE_ADD(%s, INTERVAL 7 DAY)
+                     ORDER BY ABS(DATEDIFF(COALESCE(invoice_date, due_date, %s), %s))
+                     LIMIT 5",
+                    $iban,
+                    $amount,
+                    $amount,
+                    $today,
+                    $today,
+                    $today,
+                    $today,
+                    $today
+                ) );
+            }
+        }
+
+        foreach ( (array) $rows as $doc ) {
+            if ( self::booking_direction( $doc ) !== $direction ) {
+                continue;
+            }
+            $result = self::link_document_to_journal( $doc, $journal_id );
+            if ( ! is_wp_error( $result ) ) {
+                return (int) $doc->id;
+            }
+        }
+
+        return 0;
     }
 
     private static function booking_description( object $row ): string {
@@ -775,29 +949,38 @@ class Peppol {
 
         if ( ! empty( $args['search'] ) ) {
             $like     = '%' . $wpdb->esc_like( (string) $args['search'] ) . '%';
-            $where[]  = '(invoice_id LIKE %s OR vendor_name LIKE %s OR vendor_tax_id LIKE %s OR customer_name LIKE %s OR purchase_order LIKE %s OR note LIKE %s)';
+            $where[]  = '(d.invoice_id LIKE %s OR d.vendor_name LIKE %s OR d.vendor_tax_id LIKE %s OR d.customer_name LIKE %s OR d.purchase_order LIKE %s OR d.note LIKE %s)';
             $prepare  = array_merge( $prepare, array_fill( 0, 6, $like ) );
         }
         if ( ! empty( $args['document_type'] ) ) {
-            $where[]   = 'document_type = %s';
+            $where[]   = 'd.document_type = %s';
             $prepare[] = $args['document_type'];
         }
         if ( ! empty( $args['status'] ) ) {
-            $where[]   = 'processing_status = %s';
+            $where[]   = 'd.processing_status = %s';
             $prepare[] = $args['status'];
+        } else {
+            // Soft-deleted documents are hidden unless explicitly filtered.
+            $where[] = "d.processing_status <> 'deleted'";
         }
         if ( ! empty( $args['booking_status'] ) ) {
-            $where[] = $args['booking_status'] === 'booked' ? 'journal_id IS NOT NULL' : 'journal_id IS NULL';
+            if ( $args['booking_status'] === 'paid' ) {
+                $where[] = 'd.journal_id IS NOT NULL AND j.is_reconciled = 1';
+            } elseif ( $args['booking_status'] === 'booked' ) {
+                $where[] = 'd.journal_id IS NOT NULL AND ( j.is_reconciled = 0 OR j.is_reconciled IS NULL )';
+            } else {
+                $where[] = 'd.journal_id IS NULL';
+            }
         }
         if ( ! empty( $args['peppol_status'] ) ) {
-            $where[]   = 'peppol_status = %s';
+            $where[]   = 'd.peppol_status = %s';
             $prepare[] = $args['peppol_status'];
         }
         if ( ! empty( $args['daterange'] ) ) {
             $parts = array_map( 'trim', explode( ',', (string) $args['daterange'] ) );
             if ( count( $parts ) >= 2 && $parts[0] !== '' && $parts[1] !== '' ) {
-                $where[]   = 'invoice_date >= %s';
-                $where[]   = 'invoice_date <= %s';
+                $where[]   = 'd.invoice_date >= %s';
+                $where[]   = 'd.invoice_date <= %s';
                 $prepare[] = $parts[0];
                 $prepare[] = $parts[1];
             }
@@ -807,7 +990,7 @@ class Peppol {
     }
 
     private static function build_order( string $raw ): string {
-        $allowed = [ 'id', 'invoice_date', 'received_at', 'invoice_total', 'vendor_name', 'invoice_id', 'document_type', 'peppol_status', 'processing_status', 'journal_id' ];
+        $allowed = [ 'id', 'invoice_date', 'received_at', 'invoice_total', 'vendor_name', 'invoice_id', 'document_type', 'peppol_status', 'processing_status', 'journal_id', 'deleted_at' ];
         $out     = [];
 
         foreach ( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) as $part ) {
@@ -820,11 +1003,11 @@ class Peppol {
                     continue;
                 }
                 $dir   = isset( $m[2] ) && strtoupper( $m[2] ) === 'DESC' ? 'DESC' : 'ASC';
-                $out[] = $column . ' ' . $dir;
+                $out[] = 'd.' . $column . ' ' . $dir;
             }
         }
 
-        return $out ? implode( ', ', $out ) : 'received_at DESC, id DESC';
+        return $out ? implode( ', ', $out ) : 'd.received_at DESC, d.id DESC';
     }
 
     public static function s( $value, int $max = 0 ): string {
