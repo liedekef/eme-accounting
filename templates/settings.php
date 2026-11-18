@@ -110,6 +110,7 @@ if ( isset( $_POST['emeacc_peppol_nonce'] )
     }
     $imap_max                    = (int) ( $_POST['peppol_imap_max_messages'] ?? 25 ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
     $peppol['imap_max_messages'] = max( 1, min( 100, $imap_max ) );
+    $peppol['imap_delete_after_parse'] = (int) ! empty( $_POST['peppol_imap_delete_after_parse'] );
 
     $raw_password = $_POST['peppol_imap_password'] ?? ''; //phpcs:ignore WordPress.Security.ValidatedSanitizedInput
     $new_password = is_string( $raw_password ) ? preg_replace( '/[\x00-\x1F\x7F]/', '', wp_unslash( $raw_password ) ) : '';
@@ -702,7 +703,14 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
                 <input type="number" name="peppol_imap_max_messages" value="<?php echo esc_attr( (string) $pp['imap_max_messages'] ); ?>" min="1" max="100" style="width:80px">
             </label>
         </p>
-        <p class="description"><?php esc_html_e( 'Enkel berichten met een UBL-XML-bijlage worden geïmporteerd. Dubbels worden herkend aan de UBL-UUID. De mailbox wordt enkel gelezen, nooit gewijzigd: elk uur worden de berichten van de laatste periode (dubbel zo lang als sinds de vorige controle) opnieuw bekeken, zodat een eenmalige fout vanzelf wordt hersteld.', 'eme-accounting' ); ?></p>
+        <p class="description"><?php esc_html_e( 'Enkel berichten met een UBL-XML-bijlage worden geïmporteerd. Dubbels worden herkend aan de UBL-UUID.', 'eme-accounting' ); ?></p>
+        <p>
+            <label>
+                <input type="checkbox" name="peppol_imap_delete_after_parse" value="1" <?php echo checked( 1, (int) $pp['imap_delete_after_parse'], false ); ?>>
+                <?php esc_html_e( 'Berichten verwijderen uit de mailbox na succesvolle verwerking', 'eme-accounting' ); ?>
+            </label>
+        </p>
+        <p class="description"><?php esc_html_e( 'Zonder deze optie wordt de mailbox enkel gelezen en worden berichten van de laatste periode (dubbel zo lang als sinds de vorige controle) opnieuw bekeken, zodat een eenmalige fout vanzelf wordt hersteld. Met deze optie worden enkel berichten verwijderd waarvan alle UBL-XML-bijlagen geïmporteerd zijn; bij fouten of zonder XML blijven ze staan. Verwijderde berichten zijn niet terug te halen.', 'eme-accounting' ); ?></p>
     </td>
 </tr>
 </table>

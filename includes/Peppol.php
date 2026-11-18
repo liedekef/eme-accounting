@@ -86,6 +86,7 @@ class Peppol {
             'imap_password'       => '',
             'imap_folder'         => 'INBOX',
             'imap_max_messages'   => 25,
+            'imap_delete_after_parse' => 0,
             'imap_checked_at'     => 0,   // unix time of the last successful mailbox scan
             'imap_last_poll_at'   => '',
             'imap_last_poll_status'=> '',

@@ -12,11 +12,13 @@ use EventsMadeEasy\ImapClient;
  * Mails should contain the UBL XML and optionally a PDF. Documents are stored in
  * the same inbox table as the e-invoice.be API, keyed by the UBL UUID.
  *
- * The mailbox is only ever read (EXAMINE, BODY.PEEK): nothing is flagged or
- * moved. Every run looks at the messages that arrived since twice the time
- * since the last successful check; imports are idempotent, so seeing a message
- * again is harmless and gives a one-off failure a second chance. A direct
- * XML upload covers the rest.
+ * By default the mailbox is only ever read (EXAMINE, BODY.PEEK): nothing is
+ * flagged or moved. When imap_delete_after_parse is enabled, messages whose
+ * UBL XML attachments were all imported are flagged \Deleted and expunged.
+ * Every run looks at the messages that arrived since twice the time since the
+ * last successful check; imports are idempotent, so seeing a message again is
+ * harmless and gives a one-off failure a second chance. A direct XML upload
+ * covers the rest.
  */
 class PeppolImap {
 
@@ -186,8 +188,9 @@ class PeppolImap {
     }
 
     private static function run_poll( array $settings, bool $manual ): array|\WP_Error {
-        $summary = [ 'processed' => 0, 'skipped' => 0, 'errors' => 0 ];
-        $client  = self::open( $settings );
+        $summary            = [ 'processed' => 0, 'skipped' => 0, 'errors' => 0, 'deleted' => 0 ];
+        $delete_after_parse = ! empty( $settings['imap_delete_after_parse'] );
+        $client             = self::open( $settings, $delete_after_parse );
         if ( is_wp_error( $client ) ) {
             self::save_status( $client->get_error_message() );
             return $manual ? $client : $summary;
@@ -214,13 +217,23 @@ class PeppolImap {
             }
             rsort( $fresh ); // newest first
 
-            $limit = max( 1, min( 100, (int) $settings['imap_max_messages'] ) );
+            $limit     = max( 1, min( 100, (int) $settings['imap_max_messages'] ) );
+            $to_delete = [];
 
             foreach ( array_slice( $fresh, 0, $limit ) as $uid ) {
                 $result = self::process_message( $client, $uid );
                 foreach ( $summary as $key => $value ) {
                     $summary[ $key ] = $value + (int) ( $result[ $key ] ?? 0 );
                 }
+                if ( $delete_after_parse && $result['processed'] > 0 && empty( $result['errors'] ) ) {
+                    $to_delete[] = $uid;
+                }
+            }
+
+            $deleted = 0;
+            if ( $to_delete ) {
+                $deleted = method_exists( $client, 'delete_messages' ) && $client->delete_messages( $to_delete ) ? count( $to_delete ) : 0;
+                $summary['deleted'] = $deleted;
             }
 
             $status = $fresh
@@ -232,6 +245,20 @@ class PeppolImap {
                     $summary['errors']
                 )
                 : __( 'Geen nieuwe berichten.', 'eme-accounting' );
+            if ( $delete_after_parse ) {
+                $status .= ' ' . sprintf(
+                    /* translators: %d: number of deleted messages */
+                    __( 'Verwijderd: %d.', 'eme-accounting' ),
+                    $deleted
+                );
+                if ( count( $to_delete ) !== $deleted ) {
+                    $status .= ' ' . sprintf(
+                        /* translators: %d: number of messages that could not be deleted */
+                        __( 'Niet verwijderd: %d.', 'eme-accounting' ),
+                        count( $to_delete ) - $deleted
+                    );
+                }
+            }
             // The scan itself succeeded: move the window, even if single
             // messages failed (they get a second chance in the next window).
             self::save_status( $status, $now );
@@ -388,7 +415,7 @@ class PeppolImap {
      * IMAP transport
      * ------------------------------------------------------------------ */
 
-    private static function open( array $settings ) {
+    private static function open( array $settings, bool $write = false ) {
         $host = trim( (string) $settings['imap_host'] );
         $host = preg_replace( '#^[a-z]+://#i', '', $host );
         $host = trim( $host, "{} \t\n\r\0\x0B" );
@@ -418,7 +445,7 @@ class PeppolImap {
         }
 
         $folder = trim( (string) $settings['imap_folder'] ) ?: 'INBOX';
-        if ( $client->open_mailbox_read_only( $folder ) === false ) { // read-only: never changes the mailbox
+        if ( $client->open_mailbox( $folder, ! $write ) === false ) {
             $error = $client->get_last_error();
             $client->logout();
             return new \WP_Error( 'peppol_imap_folder', $error ?: __( 'Kan de IMAP-map niet openen.', 'eme-accounting' ) );
