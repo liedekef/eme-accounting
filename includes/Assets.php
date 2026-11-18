@@ -143,12 +143,30 @@ class Assets {
 
         if ( $plugin_page === 'emeaccounting-peppol'
             || ( $plugin_page === 'emeaccounting-settings' && sanitize_key( $_GET['tab'] ?? '' ) === 'peppol' ) ) { //phpcs:ignore WordPress.Security.NonceVerification.Recommended -- tab switch only
+            $coa_in_select  = [ "<optgroup label='".esc_html__( 'Ontvangsten', 'eme-accounting' )."'>" ];
+            $coa_out_select = [ "<optgroup label='".esc_html__( 'Uitgaven', 'eme-accounting' )."'>" ];
+            foreach ( ChartOfAccounts::get_all() as $coa ) {
+                if ( empty( $coa->is_active ) ) {
+                    continue;
+                }
+                $disabled = empty( $coa->parent_id ) ? 'disabled' : '';
+                if ( ( $coa->direction ?? '' ) === 'in' ) {
+                    $coa_in_select[] = "<option value='".(int) $coa->id."' $disabled>". esc_html( $coa->code . ' - ' . $coa->name )."</option>";
+                }
+                if ( ( $coa->direction ?? '' ) === 'out' ) {
+                    $coa_out_select[] = "<option value='".(int) $coa->id."' $disabled>". esc_html( $coa->code . ' - ' . $coa->name )."</option>";
+                }
+            }
+            $coa_in_select[]  = '</optgroup>';
+            $coa_out_select[] = '</optgroup>';
             wp_enqueue_script( 'emeaccounting-peppol', EME_ACCOUNTING_URL . 'assets/js/peppol.js', [ 'emeaccounting' ], EME_ACCOUNTING_VERSION, true );
             wp_localize_script( 'emeaccounting-peppol', 'emeAccountingPeppol', [
-                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-                'nonce'      => wp_create_nonce( 'eme_accounting_nonce' ),
-                'canManage'  => Capabilities::can_manage( 'peppol' ) ? 1 : 0,
-                'journalUrl' => admin_url( 'admin.php?page=emeaccounting-journal' ),
+                'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+                'nonce'        => wp_create_nonce( 'eme_accounting_nonce' ),
+                'canManage'    => Capabilities::can_manage( 'peppol' ) ? 1 : 0,
+                'journalUrl'   => admin_url( 'admin.php?page=emeaccounting-journal' ),
+                'coaSelectIn'  => $coa_in_select,
+                'coaSelectOut' => $coa_out_select,
             ] );
         }
 

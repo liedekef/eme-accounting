@@ -417,17 +417,15 @@
                 : 'Richting: uitgave (factuur)';
         }
 
-        Array.from(bookingForm.querySelectorAll('#peppol-booking-coa option')).forEach(function (option) {
-            if (!option.value) return;
-            if (option.dataset.originalDisabled === undefined) {
-                option.dataset.originalDisabled = option.disabled ? '1' : '0';
-            }
-            const matches = option.dataset.direction === direction;
-            option.hidden = !matches;
-            option.disabled = option.dataset.originalDisabled === '1' || !matches;
-        });
         const coaSelect = bookingForm.querySelector('#peppol-booking-coa');
-        if (coaSelect && coaSelect.selectedOptions.length && coaSelect.selectedOptions[0].disabled) {
+        if (coaSelect) {
+            const placeholder = coaSelect.querySelector('option[value=""]');
+            const opts = direction === 'in'
+                ? (cfg.coaSelectIn || [])
+                : (cfg.coaSelectOut || []);
+            coaSelect.innerHTML = '';
+            if (placeholder) coaSelect.appendChild(placeholder);
+            coaSelect.insertAdjacentHTML('beforeend', opts.join(''));
             coaSelect.value = '';
         }
 
@@ -652,6 +650,53 @@
                 }
                 if (table) table.reload();
             });
+        });
+    }
+
+    /* ── XML upload ───────────────────────────────────────────────── */
+    const xmlBtn = document.getElementById('peppol-xml-import');
+    if (xmlBtn) {
+        xmlBtn.addEventListener('click', function () {
+            const input  = document.getElementById('peppol-xml-files');
+            const result = document.getElementById('peppol-xml-result');
+            const detailEl = document.getElementById('peppol-xml-detail');
+            const files  = input && input.files ? Array.prototype.slice.call(input.files) : [];
+
+            if (!files.length) {
+                if (result) result.textContent = 'Kies eerst een of meer XML-bestanden.';
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('action', 'eme_accounting_peppol_import_xml');
+            fd.append('nonce', nonce);
+            files.forEach(function (file) { fd.append('xml_files[]', file); });
+
+            xmlBtn.disabled = true;
+            if (result) result.textContent = 'Bezig…';
+            if (detailEl) detailEl.textContent = '';
+
+            fetch(ajaxUrl, { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .catch(function () { return { success: false, data: 'Netwerk- of serverfout' }; })
+                .then(function (r) {
+                    xmlBtn.disabled = false;
+                    if (!r.success) {
+                        if (result) result.textContent = r.data || 'Fout';
+                        return;
+                    }
+                    const s = r.data || {};
+                    if (result) {
+                        result.textContent = 'Verwerkt: ' + (s.processed || 0) +
+                            ', overgeslagen: ' + (s.skipped || 0) +
+                            ', fouten: ' + (s.errors || 0);
+                    }
+                    if (detailEl) {
+                        detailEl.textContent = Array.isArray(s.detail) ? s.detail.join('\n') : '';
+                    }
+                    if (input) input.value = '';
+                    if (table) table.reload();
+                });
         });
     }
 

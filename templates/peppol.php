@@ -20,7 +20,6 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
     $label = $acc->name . ( $acc->iban ? ' (' . $acc->iban . ')' : '' );
     $booking_accounts[ (int) $acc->id ] = $label;
 }
-$booking_coa = EMEAccounting\ChartOfAccounts::get_all();
 ?>
 <div class="wrap eme-acc-wrap">
 <h1><?php esc_html_e( 'Peppol inbox', 'eme-accounting' ); ?></h1>
@@ -189,24 +188,8 @@ $booking_coa = EMEAccounting\ChartOfAccounts::get_all();
         <div class="eme-acc-row">
             <div class="eme-acc-field">
                 <label><?php esc_html_e( 'Rekeningstelsel', 'eme-accounting' ); ?> *</label>
-                <select name="coa_id" id="peppol-booking-coa" required>
+                <select name="coa_id" id="peppol-booking-coa" required class="eme_snapselect" data-live-search="true">
                     <option value=""><?php esc_html_e( '— Kies rubriek —', 'eme-accounting' ); ?></option>
-                    <optgroup label="<?php esc_attr_e( 'Ontvangsten', 'eme-accounting' ); ?>">
-                        <?php foreach ( $booking_coa as $coa ): ?>
-                            <?php if ( ( $coa->direction ?? '' ) !== 'in' || empty( $coa->is_active ) ) continue; ?>
-                            <option value="<?php echo (int) $coa->id; ?>" data-direction="in" <?php disabled( empty( $coa->parent_id ) ); ?>>
-                                <?php echo esc_html( $coa->code . ' - ' . $coa->name ); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                    <optgroup label="<?php esc_attr_e( 'Uitgaven', 'eme-accounting' ); ?>">
-                        <?php foreach ( $booking_coa as $coa ): ?>
-                            <?php if ( ( $coa->direction ?? '' ) !== 'out' || empty( $coa->is_active ) ) continue; ?>
-                            <option value="<?php echo (int) $coa->id; ?>" data-direction="out" <?php disabled( empty( $coa->parent_id ) ); ?>>
-                                <?php echo esc_html( $coa->code . ' - ' . $coa->name ); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </optgroup>
                 </select>
             </div>
         </div>
