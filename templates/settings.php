@@ -517,9 +517,12 @@ foreach ( array_keys( $all_roles ) as $slug ) {
 
 <?php elseif ( $active_tab === 'peppol' ): ?>
 <?php
-$pp            = EMEAccounting\Peppol::get_settings();
-$pp_status     = EMEAccounting\PeppolEInvoice::get_public_status();
-$imap_status   = EMEAccounting\PeppolImap::get_public_status();
+$pp              = EMEAccounting\Peppol::get_settings();
+$einvoice_status = EMEAccounting\PeppolEInvoice::get_public_status();
+$imap_status     = EMEAccounting\PeppolImap::get_public_status();
+$api_configured  = ! empty( $einvoice_status['api_configured'] );
+$imap_configured = ! empty( $imap_status['configured'] );
+
 $masked_key  = $pp['api_key'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['api_key'], -4 ) : '';
 $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $pp['imap_password'], -4 ) : '';
 ?>
@@ -531,7 +534,11 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
 <?php wp_nonce_field( 'emeacc_peppol', 'emeacc_peppol_nonce' ); ?>
 
 <details class="eme-acc-form-box">
-<summary><b><?php esc_html_e( 'e-invoice.be koppeling', 'eme-accounting' ); ?></b></summary>
+    <summary><b><?php esc_html_e( 'e-invoice.be koppeling', 'eme-accounting' ); ?></b>
+        <span class="eme-acc-tag <?php echo $api_configured ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
+            <?php echo $api_configured ? esc_html__( 'Geconfigureerd', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
+        </span>
+    </summary>
 <table class="form-table">
 <tr>
     <th><?php esc_html_e( 'API-key', 'eme-accounting' ); ?></th>
@@ -610,8 +617,8 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
 <tr>
     <th><?php esc_html_e( 'Webhook', 'eme-accounting' ); ?></th>
     <td>
-        <span class="eme-acc-tag <?php echo ! empty( $pp_status['webhook_configured'] ) ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
-            <?php echo ! empty( $pp_status['webhook_configured'] ) ? esc_html__( 'Actief', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
+        <span class="eme-acc-tag <?php echo ! empty( $einvoice_status['webhook_configured'] ) ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
+            <?php echo ! empty( $einvoice_status['webhook_configured'] ) ? esc_html__( 'Actief', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
         </span>
     </td>
 </tr>
@@ -620,17 +627,17 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
 <p>
     <button type="submit" class="button button-primary"><?php esc_html_e( 'Peppol-instellingen opslaan', 'eme-accounting' ); ?></button>
     <button type="button" id="peppol-api-test" class="button"><?php esc_html_e( 'Verbinding testen', 'eme-accounting' ); ?></button>
-    <button type="button" id="peppol-api-sync" class="button" <?php echo empty( $pp_status['api_configured'] ) ? 'disabled' : ''; ?>>
+    <button type="button" id="peppol-api-sync" class="button" <?php echo empty( $einvoice_status['api_configured'] ) ? 'disabled' : ''; ?>>
         <?php esc_html_e( 'Nu synchroniseren', 'eme-accounting' ); ?>
     </button>
     <span id="peppol-api-test-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
     <span id="peppol-api-sync-result" style="margin-left:1em;font-size:13px;color:#646970">
-        <?php if ( ! empty( $pp_status['last_poll_at'] ) ): ?>
+        <?php if ( ! empty( $einvoice_status['last_poll_at'] ) ): ?>
             <?php
             printf(
                 /* translators: %s: date */
                 esc_html__( 'Laatste synchronisatie: %s', 'eme-accounting' ),
-                esc_html( eme_localized_datetime( $pp_status['last_poll_at'], EME_TIMEZONE ) )
+                esc_html( eme_localized_datetime( $einvoice_status['last_poll_at'], EME_TIMEZONE ) )
             );
             ?>
         <?php endif; ?>
@@ -639,7 +646,11 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
 </details>
 
 <details class="eme-acc-form-box">
-<summary><b><?php esc_html_e( 'E-mailbox koppeling', 'eme-accounting' ); ?></b></summary>
+<summary><b><?php esc_html_e( 'E-mailbox koppeling', 'eme-accounting' ); ?></b>
+    <span class="eme-acc-tag <?php echo $imap_configured ? 'eme-acc-reconciled' : 'eme-acc-pending'; ?>">
+        <?php echo $imap_configured ? esc_html__( 'Geconfigureerd', 'eme-accounting' ) : esc_html__( 'Niet geconfigureerd', 'eme-accounting' ); ?>
+    </span>
+</summary>
 <?php if ( empty( $imap_status['available'] ) ): ?>
     <div class="notice notice-warning inline"><p><?php esc_html_e( 'De interne IMAP-client is niet beschikbaar op deze server.', 'eme-accounting' ); ?></p></div>
 <?php endif; ?>

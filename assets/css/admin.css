@@ -92,6 +92,11 @@
     background: #f0f0f1;
     color: #646970;
 }
+.eme-acc-form-box[open] > summary {
+    border-bottom: 1px solid #f0f0f1;
+    padding-bottom: 10px;
+}
+.eme-acc-form-box > summary .eme-acc-tag { margin-left: 6px; vertical-align: middle; }
 .eme-acc-payment-qr {
     margin-top: 16px;
 }
