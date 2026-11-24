@@ -33,8 +33,8 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
 </div>
 <?php endif; ?>
 
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'Status', 'eme-accounting' ); ?></h2>
+<details class="eme-acc-form-box">
+    <summary><b><?php esc_html_e( 'Status', 'eme-accounting' ); ?></b></summary>
 <table class="eme-acc-table">
 <tbody>
 <tr>
@@ -44,7 +44,7 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
         <?php if ( $api_configured && ! empty( $einvoice_status['last_poll_at'] ) ): ?>
             <?php $has_last_sync = true; ?>
             <strong><?php esc_html_e( 'e-invoice.be', 'eme-accounting' ); ?>:</strong>
-            <?php echo esc_html( eme_localized_datetime(time $einvoice_status['last_poll_at'], EME_TIMEZONE ) ); ?>
+            <?php echo esc_html( eme_localized_datetime( $einvoice_status['last_poll_at'], EME_TIMEZONE ) ); ?>
             <?php if ( ! empty( $einvoice_status['last_poll_status'] ) ): ?>
                 <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $einvoice_status['last_poll_status'] ); ?></span>
             <?php endif; ?>
@@ -102,11 +102,11 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
 </tr>
 </tbody>
 </table>
-</div>
+</details>
 
 <?php if ( $can_manage ): ?>
-<div class="eme-acc-form-box">
-<h2><?php esc_html_e( 'XML importeren', 'eme-accounting' ); ?></h2>
+<details class="eme-acc-form-box">
+    <summary><b><?php esc_html_e( 'XML importeren', 'eme-accounting' ); ?></b></summary>
 <p class="description"><?php esc_html_e( 'Voeg UBL-facturen of -creditnota\'s (.xml) rechtstreeks toe, bv. een factuur die buiten Peppol of de mailbox om binnenkwam. Bestaande documenten worden herkend en niet dubbel opgeslagen.', 'eme-accounting' ); ?></p>
 <p>
     <input type="file" id="peppol-xml-files" accept=".xml,application/xml,text/xml" multiple>
@@ -114,7 +114,7 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
     <span id="peppol-xml-result" style="margin-left:1em;font-size:13px;color:#646970"></span>
 </p>
 <div id="peppol-xml-detail" style="white-space:pre-line;font-size:12px;color:#b32d2e"></div>
-</div>
+</details>
 <?php endif; ?>
 
 <div class="eme-acc-form-box">
