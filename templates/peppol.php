@@ -44,7 +44,7 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
         <?php if ( $api_configured && ! empty( $einvoice_status['last_poll_at'] ) ): ?>
             <?php $has_last_sync = true; ?>
             <strong><?php esc_html_e( 'e-invoice.be', 'eme-accounting' ); ?>:</strong>
-            <?php echo esc_html( eme_localized_datetime( $einvoice_status['last_poll_at'], 'UTC' ) ); ?>
+            <?php echo esc_html( eme_localized_datetime( $einvoice_status['last_poll_at'] . ' UTC', EME_TIMEZONE ) ); ?>
             <?php if ( ! empty( $einvoice_status['last_poll_status'] ) ): ?>
                 <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $einvoice_status['last_poll_status'] ); ?></span>
             <?php endif; ?>
@@ -53,7 +53,7 @@ foreach ( EMEAccounting\Accounts::get_all() as $acc ) {
             <?php if ( $has_last_sync ): ?><br><?php endif; ?>
             <?php $has_last_sync = true; ?>
             <strong><?php esc_html_e( 'Mailbox', 'eme-accounting' ); ?>:</strong>
-            <?php echo esc_html( eme_localized_datetime( $imap_status['last_poll_at'], 'UTC' ) ); ?>
+            <?php echo esc_html( eme_localized_datetime( $imap_status['last_poll_at'] . 'UTC', EME_TIMEZONE ) ); ?>
             <?php if ( ! empty( $imap_status['last_poll_status'] ) ): ?>
                 <br><span style="font-size:12px;color:#646970"><?php echo esc_html( $imap_status['last_poll_status'] ); ?></span>
             <?php endif; ?>

@@ -269,7 +269,7 @@
         html += row('Factuurnummer', E(data.invoice_id || ''));
         html += row('Type', E(typeLabels[data.document_type] || data.document_type || ''));
         html += row('Factuurdatum', E(data.invoice_date_display || data.invoice_date || ''));
-        html += row('Vervaldatum', E(data.due_date || ''));
+        html += row('Vervaldatum', E(data.due_date_display || data.due_date || ''));
         html += row('Leverancier', E(data.vendor_name || '') +
             (data.vendor_tax_id ? '<br><span style="color:#646970">' + E(data.vendor_tax_id) + '</span>' : '') +
             (data.vendor_email ? '<br><span style="color:#646970">' + E(data.vendor_email) + '</span>' : ''));
@@ -297,8 +297,8 @@
             bookingHtml += ' <button type="button" class="button button-small peppol-book-open">Boek naar dagboek</button>';
         }
         html += row('Boeking', bookingHtml);
-        html += row('Ontvangen', E(data.received_at || ''));
-        html += row('Opgehaald', E(data.fetched_at || ''));
+        html += row('Ontvangen', E(data.received_at_display || data.received_at || ''));
+        html += row('Opgehaald', E(data.fetched_at_display || data.fetched_at || ''));
         if (data.last_error) {
             html += row('Laatste fout', '<span style="color:#d63638">' + E(data.last_error) + '</span>');
         }

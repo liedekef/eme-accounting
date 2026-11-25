@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Installer {
 
     const DB_VERSION_OPTION = 'eme_accounting_db_version';
-    const DB_VERSION        = '27';
+    const DB_VERSION        = '28';
     const CRON_HOOK         = 'eme_accounting_weekly_rebuild_totals';
 
     /**
@@ -196,6 +196,21 @@ class Installer {
             // whose document_id stays in the table so an IMAP overlap scan or
             // an API re-import does not resurrect it.
             self::migrate_peppol_delete_columns();
+        }
+        if ( $current_version && $current_version < 28 ) {
+            // raw_json duplicated every other column and was never read: the
+            // UBL file on disk is the original document.
+            self::migrate_peppol_drop_raw_json();
+        }
+    }
+
+    /** Drop the unused raw_json column. Idempotent. */
+    private static function migrate_peppol_drop_raw_json(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'emeacc_peppol_documents';
+
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'raw_json' ) ) ) { //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( "ALTER TABLE `{$table}` DROP COLUMN raw_json" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         }
     }
 
@@ -646,7 +661,6 @@ class Installer {
             items_json           LONGTEXT,
             tax_details_json     LONGTEXT,
             attachments_json     LONGTEXT,
-            raw_json             LONGTEXT,
             processing_status    VARCHAR(20)     NOT NULL DEFAULT 'new',
             journal_id           BIGINT UNSIGNED          DEFAULT NULL,
             booked_at            DATETIME                 DEFAULT NULL,

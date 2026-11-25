@@ -174,7 +174,8 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                     <?php
                         $current = (string) ( $edit_entry->vat_code ?? '' );
                         $rates   = \EMEAccounting\Vat::rates();
-                        if ( $current !== '' && $current !== 'exempt' && ! in_array( $current, $rates, true ) ) {
+                        $special = \EMEAccounting\Vat::special();
+                        if ( $current !== '' && $current !== 'exempt' && ! isset( $special[ $current ] ) && ! in_array( $current, $rates, true ) ) {
                             $rates[] = $current;   // legacy tarief: blijft zichtbaar/selecteerbaar bij bewerken
                         }
                     ?>
@@ -184,6 +185,9 @@ $active_accounts = array_filter( $accounts, function( $id ) use ( $accounts ) {
                         <option value="<?php echo esc_attr( $r ); ?>" <?php echo selected( $current, $r, false ); ?>><?php echo esc_html( $r ); ?>%</option>
                         <?php endforeach; ?>
                         <option value="exempt" <?php echo selected( $current, 'exempt', false ); ?>><?php esc_html_e( 'Vrijgesteld', 'eme-accounting' ); ?></option>
+                        <?php if ( isset( $special[ $current ] ) ): ?>
+                        <option value="<?php echo esc_attr( $current ); ?>" selected><?php echo esc_html( $special[ $current ] ); ?></option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="eme-acc-field">

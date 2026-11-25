@@ -268,7 +268,8 @@ function emeAccEscapeHtml(str) {
                         sortable: false,
                         searchable: false,
                         display: function(data) {
-                            return data.value ? '<span class="eme-acc-tag">' + esc(data.value) + '</span>' : '';
+                            const special = { mixed: 'Meerdere', unknown: 'Onbekend' };
+                            return data.value ? '<span class="eme-acc-tag">' + esc(special[data.value] || data.value) + '</span>' : '';
                         }
                     },
                     vat_amount: {
@@ -497,6 +498,8 @@ function emeAccEscapeHtml(str) {
     }
 
     function recalcVat() {
+        // set by the Peppol booking: the amount is the total of several/unknown rates, don't recalculate
+        if ( ['mixed', 'unknown'].includes( vatCode.value ) ) return;
         const rate = parseFloat( vatCode.value );
         if ( isNaN(rate) || rate <= 0 ) {
             vatAmount.value = '';

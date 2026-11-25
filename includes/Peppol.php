@@ -30,6 +30,9 @@ class Peppol {
 
     const DOCUMENT_TYPES = [ 'INVOICE', 'CREDIT_NOTE', 'SELFBILLING_INVOICE', 'SELFBILLING_CREDIT_NOTE' ];
 
+    /** Large columns that only the detail view needs; left out of the list query. */
+    private const LIST_EXCLUDED_COLUMNS = [ 'items_json', 'tax_details_json', 'attachments_json' ];
+
     /** @var \EMEFileAttachments|null */
     private static ?\EMEFileAttachments $attachments = null;
 
@@ -130,7 +133,7 @@ class Peppol {
         $table   = $wpdb->prefix . self::TABLE;
         $journal = $wpdb->prefix . 'emeacc_journal';
         $from    = "FROM `{$table}` d LEFT JOIN `{$journal}` j ON j.id = d.journal_id";
-        $select  = "SELECT d.*, j.is_reconciled AS journal_is_reconciled {$from}";
+        $select  = 'SELECT ' . self::list_columns() . ", j.is_reconciled AS journal_is_reconciled {$from}";
 
         if ( $prepare ) {
             $total = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) {$from} {$where_sql}", ...$prepare ) ); //phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -150,14 +153,13 @@ class Peppol {
 
         $records = [];
         foreach ( (array) $rows as $row ) {
-            unset( $row->raw_json, $row->items_json, $row->tax_details_json, $row->attachments_json );
-            $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, 'UTC' ) : '';
-            $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date, 'UTC' ) : '';
-            $row->received_at_display  = $row->received_at ? eme_localized_datetime( $row->received_at, 'UTC' ) : '';
+            $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date . 'UTC', EME_TIMEZONE ) : '';
+            $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date . 'UTC', EME_TIMEZONE ) : '';
+            $row->received_at_display  = $row->received_at ? eme_localized_datetime( $row->received_at . 'UTC', EME_TIMEZONE ) : '';
             $row->journal_edit_url     = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
             $row->booking_status       = self::booking_state( $row );
             $row->payment_qr_available = EpcQr::is_payable( $row ) ? 1 : 0;
-            $row->deleted_at_display   = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, 'UTC' ) : '';
+            $row->deleted_at_display   = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at . 'UTC', EME_TIMEZONE ) : '';
             $row->files                = self::files_html( (int) $row->id );
             unset( $row->journal_is_reconciled );
             $records[]                 = $row;
@@ -168,6 +170,19 @@ class Peppol {
             'Records'          => $records,
             'TotalRecordCount' => $total,
         ] );
+    }
+
+    /** Quoted, alias-prefixed column list for the list query: all columns except LIST_EXCLUDED_COLUMNS. */
+    private static function list_columns(): string {
+        global $wpdb;
+        static $columns = null;
+        if ( $columns === null ) {
+            $table   = $wpdb->prefix . self::TABLE;
+            $names   = (array) $wpdb->get_col( "SHOW COLUMNS FROM `{$table}`" ); //phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $names   = array_diff( $names, self::LIST_EXCLUDED_COLUMNS );
+            $columns = $names ? implode( ', ', array_map( static fn( $name ) => 'd.`' . $name . '`', $names ) ) : 'd.id';
+        }
+        return $columns;
     }
 
     public static function ajax_get(): void {
@@ -193,12 +208,15 @@ class Peppol {
         $row->tax_details     = json_decode( (string) $row->tax_details_json, true ) ?: [];
         $row->attachments     = json_decode( (string) $row->attachments_json, true ) ?: [];
         $row->files           = self::files_html( (int) $row->id );
-        $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, 'UTC' ) : '';
+        $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date . 'UTC', EME_TIMEZONE ) : '';
+        $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date . 'UTC', EME_TIMEZONE ) : '';
+        $row->received_at_display  = $row->received_at ? eme_localized_datetime( $row->received_at . 'UTC', EME_TIMEZONE ) : '';
+        $row->fetched_at_display   = $row->fetched_at ? eme_localized_datetime( $row->fetched_at . 'UTC', EME_TIMEZONE ) : '';
         $row->journal_edit_url = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
         $row->booking_status   = self::booking_state( $row );
         $row->payment_qr       = EpcQr::for_document( $row );
-        $row->deleted_at_display = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, 'UTC' ) : '';
-        unset( $row->raw_json, $row->journal_is_reconciled );
+        $row->deleted_at_display = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at . 'UTC', EME_TIMEZONE ) : '';
+        unset( $row->journal_is_reconciled );
 
         wp_send_json_success( $row );
     }
@@ -625,7 +643,6 @@ class Peppol {
             'items_json'         => wp_json_encode( $doc['items'] ?? [] ),
             'tax_details_json'   => wp_json_encode( $doc['tax_details'] ?? [] ),
             'attachments_json'   => wp_json_encode( $doc['attachments'] ?? [] ),
-            'raw_json'           => wp_json_encode( $doc ),
             'received_at'        => self::datetime_or_null( $doc['created_at'] ?? null ),
             'fetched_at'         => gmdate( 'Y-m-d H:i:s' ),
             'last_error'         => '',
@@ -806,17 +823,25 @@ class Peppol {
         }
         $rates = array_values( array_unique( $rates ) );
 
-        $code = '';
-        if ( count( $rates ) === 1 ) {
+        $total_tax = round( (float) ( $row->total_tax ?? 0 ), 2 );
+        $code      = '';
+        if ( count( $rates ) > 1 ) {
+            // One journal entry holds one code: flag several rates, vat_amount stays the total.
+            $code = Vat::MIXED;
+        } elseif ( count( $rates ) === 1 ) {
             $rate = (string) $rates[0];
             if ( (float) $rate === 0.0 ) {
                 $code = 'exempt';
             } elseif ( in_array( $rate, Vat::rates(), true ) ) {
                 $code = $rate;
+            } else {
+                $code = Vat::UNKNOWN;   // rate not in Vat::rates(): keep it in the VAT report
             }
+        } elseif ( $total_tax > 0 ) {
+            $code = Vat::UNKNOWN;       // VAT charged but no rate in the document
         }
 
-        return [ $code, round( (float) ( $row->total_tax ?? 0 ), 2 ) ];
+        return [ $code, $total_tax ];
     }
 
     /** @return array<int,array<string,mixed>> */
@@ -858,7 +883,7 @@ class Peppol {
             $out[] = [
                 'id'                 => (int) $candidate->id,
                 'entry_date'         => (string) $candidate->entry_date,
-                'entry_date_display' => eme_localized_date( $candidate->entry_date, 'UTC' ),
+                'entry_date_display' => eme_localized_date( $candidate->entry_date . 'UTC', EME_TIMEZONE ),
                 'description'        => (string) $candidate->description,
                 'amount'             => (float) $candidate->amount,
                 'direction'          => (string) $candidate->direction,

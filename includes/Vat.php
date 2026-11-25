@@ -6,6 +6,9 @@ defined( 'ABSPATH' ) || exit;
 class Vat {
     // Officiële tarieven: aanpassen bij een wetswijziging, komt mee met de plugin-update.
     public const OFFICIAL_RATES = [ '6', '12', '21' ];
+    // Journal vat_codes set by the Peppol booking when no single known rate applies (vat_amount is the total).
+    public const MIXED   = 'mixed';    // several rates on one document
+    public const UNKNOWN = 'unknown';  // a rate that is not in rates()
     private const CUSTOM_OPTION = 'eme_accounting_vat_rates_custom';
 
     private static function parse( string $csv ): array {
@@ -29,6 +32,14 @@ class Vat {
         $all = array_values( array_unique( array_merge( self::OFFICIAL_RATES, self::custom() ) ) );
         sort( $all, SORT_NUMERIC );
         return $all;
+    }
+
+    /** Codes that are set by the Peppol booking, not picked by hand; code => label. */
+    public static function special(): array {
+        return [
+            self::MIXED   => __( 'Meerdere tarieven', 'eme-accounting' ),
+            self::UNKNOWN => __( 'Onbekend tarief', 'eme-accounting' ),
+        ];
     }
 
     public static function save_custom( string $csv ): void {
