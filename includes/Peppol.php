@@ -151,13 +151,13 @@ class Peppol {
         $records = [];
         foreach ( (array) $rows as $row ) {
             unset( $row->raw_json, $row->items_json, $row->tax_details_json, $row->attachments_json );
-            $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, EME_TIMEZONE ) : '';
-            $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date, EME_TIMEZONE ) : '';
-            $row->received_at_display  = $row->received_at ? eme_localized_date( $row->received_at, EME_TIMEZONE ) : '';
+            $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, 'UTC' ) : '';
+            $row->due_date_display     = $row->due_date ? eme_localized_date( $row->due_date, 'UTC' ) : '';
+            $row->received_at_display  = $row->received_at ? eme_localized_datetime( $row->received_at, 'UTC' ) : '';
             $row->journal_edit_url     = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
             $row->booking_status       = self::booking_state( $row );
             $row->payment_qr_available = EpcQr::is_payable( $row ) ? 1 : 0;
-            $row->deleted_at_display   = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, EME_TIMEZONE ) : '';
+            $row->deleted_at_display   = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, 'UTC' ) : '';
             $row->files                = self::files_html( (int) $row->id );
             unset( $row->journal_is_reconciled );
             $records[]                 = $row;
@@ -193,11 +193,11 @@ class Peppol {
         $row->tax_details     = json_decode( (string) $row->tax_details_json, true ) ?: [];
         $row->attachments     = json_decode( (string) $row->attachments_json, true ) ?: [];
         $row->files           = self::files_html( (int) $row->id );
-        $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, EME_TIMEZONE ) : '';
+        $row->invoice_date_display = $row->invoice_date ? eme_localized_date( $row->invoice_date, 'UTC' ) : '';
         $row->journal_edit_url = ! empty( $row->journal_id ) ? admin_url( 'admin.php?page=emeaccounting-journal&edit=' . (int) $row->journal_id ) : '';
         $row->booking_status   = self::booking_state( $row );
         $row->payment_qr       = EpcQr::for_document( $row );
-        $row->deleted_at_display = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, EME_TIMEZONE ) : '';
+        $row->deleted_at_display = ! empty( $row->deleted_at ) ? eme_localized_date( $row->deleted_at, 'UTC' ) : '';
         unset( $row->raw_json, $row->journal_is_reconciled );
 
         wp_send_json_success( $row );
@@ -858,7 +858,7 @@ class Peppol {
             $out[] = [
                 'id'                 => (int) $candidate->id,
                 'entry_date'         => (string) $candidate->entry_date,
-                'entry_date_display' => eme_localized_date( $candidate->entry_date, EME_TIMEZONE ),
+                'entry_date_display' => eme_localized_date( $candidate->entry_date, 'UTC' ),
                 'description'        => (string) $candidate->description,
                 'amount'             => (float) $candidate->amount,
                 'direction'          => (string) $candidate->direction,

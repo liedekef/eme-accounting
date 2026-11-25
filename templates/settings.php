@@ -586,7 +586,7 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
                 printf(
                     /* translators: %s: cursor date */
                     esc_html__( 'Huidige positie: documenten vanaf %s.', 'eme-accounting' ),
-                    esc_html( eme_localized_datetime( $pp['cursor_created_at'], EME_TIMEZONE ) )
+                    esc_html( eme_localized_datetime( $pp['cursor_created_at'], 'UTC' ) )
                 );
                 ?>
             <?php else: ?>
@@ -637,7 +637,7 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
             printf(
                 /* translators: %s: date */
                 esc_html__( 'Laatste synchronisatie: %s', 'eme-accounting' ),
-                esc_html( eme_localized_datetime( $einvoice_status['last_poll_at'], EME_TIMEZONE ) )
+                esc_html( eme_localized_datetime( $einvoice_status['last_poll_at'], 'UTC' ) )
             );
             ?>
         <?php endif; ?>
@@ -739,7 +739,7 @@ $masked_imap = $pp['imap_password'] !== '' ? str_repeat( '•', 8 ) . substr( $p
         printf(
             /* translators: 1: date, 2: status */
             esc_html__( 'Laatste mailbox-synchronisatie: %1$s — %2$s', 'eme-accounting' ),
-            esc_html( eme_localized_datetime( $imap_status['last_poll_at'], EME_TIMEZONE ) ),
+            esc_html( eme_localized_datetime( $imap_status['last_poll_at'], 'UTC' ) ),
             esc_html( $imap_status['last_poll_status'] )
         );
         ?>
