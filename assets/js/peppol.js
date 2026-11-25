@@ -260,7 +260,7 @@
         return '<tr><th style="width:220px">' + E(label) + '</th><td>' + value + '</td></tr>';
     }
 
-    function renderDetail(data) {
+    function renderDetail(data, showQr) {
         const items = Array.isArray(data.items) ? data.items : [];
         const taxes = Array.isArray(data.tax_details) ? data.tax_details : [];
         const atts  = Array.isArray(data.attachments) ? data.attachments : [];
@@ -343,15 +343,6 @@
             html += '</tbody></table>';
         }
 
-        if (atts.length) {
-            html += '<h3>Bijlagen (e-invoice.be)</h3><ul style="font-size:12px">';
-            atts.forEach(function (att) {
-                html += '<li>' + E(att.file_name || att.name || att.id || '') +
-                    (att.file_type ? ' <span style="color:#646970">(' + E(att.file_type) + ')</span>' : '') + '</li>';
-            });
-            html += '</ul>';
-        }
-
         if (data.files) {
             html += '<h3>Lokale bestanden</h3><div>' + data.files + '</div>';
         }
@@ -359,8 +350,7 @@
         if (data.payment_qr && data.payment_qr.svg) {
             html += '<div class="eme-acc-payment-qr">' +
                 '<h3>Betaling</h3>' +
-                '<button type="button" id="peppol-qr-toggle" class="button">Betaal met QR</button>' +
-                '<div id="peppol-qr-box" class="eme-acc-qr-box" style="display:none">' +
+                '<div id="peppol-qr-box" class="eme-acc-qr-box">' +
                 data.payment_qr.svg +
                 '<p class="description">Scan deze code met je bankapp om ' +
                 fmtCur(data.amount_due || data.invoice_total, data.currency) +
@@ -379,7 +369,8 @@
         if (detailHardDelete) detailHardDelete.style.display = (cfg.canManage && isDeleted) ? '' : 'none';
 
         detail.style.display = '';
-        detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const scrollTarget = (showQr && document.getElementById('peppol-qr-box')) || detail;
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function openDetail(id, showQr) {
@@ -391,11 +382,7 @@
                 return;
             }
             detailRow = r.data;
-            renderDetail(r.data);
-            if (showQr) {
-                const toggle = document.getElementById('peppol-qr-toggle');
-                if (toggle) toggle.click();
-            }
+            renderDetail(r.data, showQr);
         });
     }
 
@@ -681,12 +668,6 @@
         if (e.target.id === 'peppol-detail-close') {
             detail.style.display = 'none';
             detailRow = null;
-            return;
-        }
-
-        if (e.target.id === 'peppol-qr-toggle') {
-            const box = document.getElementById('peppol-qr-box');
-            if (box) box.style.display = box.style.display === 'none' ? '' : 'none';
             return;
         }
 
